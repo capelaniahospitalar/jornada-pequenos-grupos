@@ -347,6 +347,22 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 .panel-stat span{color:var(--text3)}
 .panel-stat strong{color:var(--text);font-weight:500}
 
+/* ══ PAINEL DO TUTOR — Pequenos Grupos sob seus cuidados ══ */
+.tutor-grupo-card{
+  margin:.75rem 1rem 0;background:var(--card);border:0.5px solid var(--border);
+  border-radius:var(--radius);padding:1rem;cursor:pointer;transition:opacity .15s
+}
+.tutor-grupo-card:hover{opacity:.85}
+.tutor-grupo-card-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}
+.tutor-grupo-nome{font-size:17px;font-weight:700;color:var(--text);font-family:var(--ff-body)}
+.tutor-grupo-papel-tag{font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:20px;background:var(--navy);color:#fff;font-family:var(--ff-body);flex-shrink:0}
+.tutor-grupo-info-line{font-size:14.5px;color:var(--text2);font-family:var(--ff-body);margin-bottom:.3rem;line-height:1.4}
+.tutor-grupo-info-line:last-child{margin-bottom:0}
+.tutor-participante-row{padding:.55rem 0;border-bottom:0.5px solid var(--border)}
+.tutor-participante-row:last-child{border-bottom:none}
+.tutor-participante-nome{font-size:16px;font-weight:500;color:var(--text);font-family:var(--ff-body)}
+.tutor-participante-meta{font-size:13px;color:var(--text3);font-family:var(--ff-body);margin-top:1px}
+
 .ai-fab{position:fixed;bottom:5rem;right:1rem;background:var(--navy);color:#fff;border:none;border-radius:50px;padding:.6rem 1rem;font-size:16px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 3px 12px rgba(0,0,0,0.2);z-index:99;font-family:var(--ff-body);transition:all .15s}
 .ai-fab:hover{background:var(--navy2);transform:scale(1.03)}
 
@@ -1178,6 +1194,8 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 }
 .insc-input:focus{border-color:var(--navy)}
 .insc-input.error{border-color:#E05050}
+.insc-field-row{display:flex;gap:.65rem}
+.insc-field-row .insc-field{flex:1;min-width:0}
 
 /* Opções de tipo */
 .insc-tipo-opts{display:flex;flex-direction:column;gap:.45rem}
@@ -1202,7 +1220,7 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 .insc-tipo-sub{font-size:13px;color:var(--text3);margin-top:2px;
   font-family:var(--ff-body);line-height:1.4}
 
-/* Painel de info do grupo (tutor, coordenador, whatsapp) */
+/* Painel de info do grupo (nome, tutor, coordenador) */
 .grupo-info-card{
   background:var(--card);border:0.5px solid var(--border);
   border-radius:var(--radius);overflow:hidden
@@ -1216,11 +1234,12 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
   font-family:var(--ff-body);margin-bottom:1px}
 .grupo-info-val{font-size:15.5px;color:var(--text);
   font-family:var(--ff-body);font-weight:500}
-.grupo-wa-btn{
-  background:#25D366;color:#fff;border:none;border-radius:20px;
-  padding:4px 12px;font-size:13.5px;font-weight:600;cursor:pointer;
-  font-family:var(--ff-body);flex-shrink:0
+.grupo-troca-papel-btn{
+  flex-shrink:0;background:none;border:0.5px solid var(--border);
+  border-radius:6px;padding:4px 10px;font-size:13px;color:var(--text3);
+  cursor:pointer;font-family:var(--ff-body)
 }
+.grupo-troca-papel-btn:hover{border-color:var(--navy);color:var(--navy)}
 
 /* Botão de inscrição */
 .insc-submit-btn{
@@ -1452,6 +1471,27 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 .grat-text::after{content:'"'}
 
 .grat-react-row{display:flex;align-items:center;gap:14px;margin-top:.65rem}
+
+.comm-hdr-sub2{font-size:12px;color:rgba(255,255,255,.55);font-family:var(--ff-body);margin-top:2px}
+
+.grat-tipo-row{display:flex;gap:8px;margin-bottom:.65rem}
+.grat-tipo-chip{
+  flex:1;background:var(--bg);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:.5rem .6rem;font-size:14px;
+  color:var(--text2);cursor:pointer;font-family:var(--ff-body);
+  font-weight:500;text-align:center;transition:all .15s
+}
+.grat-tipo-chip.active{background:var(--gold-light);border-color:var(--gold);color:var(--gold);font-weight:700}
+.grat-tipo-chip.oracao.active{background:var(--purple-light,#EFE9FA);border-color:var(--purple);color:var(--purple)}
+
+.grat-tag{
+  flex-shrink:0;font-size:11px;font-weight:600;padding:3px 9px;
+  border-radius:20px;background:var(--gold-light);color:var(--gold);
+  font-family:var(--ff-body)
+}
+.grat-tag.oracao{background:var(--purple-light,#EFE9FA);color:var(--purple)}
+
+.grat-card.oracao{border-left-color:var(--purple)}
 .grat-react-btn{
   display:flex;align-items:center;gap:4px;background:none;border:none;
   cursor:pointer;font-size:14px;color:var(--text3);font-family:var(--ff-body);
@@ -1474,22 +1514,6 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
   cursor:pointer;font-family:var(--ff-body);transition:all .15s;white-space:nowrap
 }
 .mural-filter-chip.active{background:var(--gold);border-color:var(--gold);color:#fff;font-weight:600}
-
-/* ══ INSTRUÇÕES — CRIAR GRUPO DE WHATSAPP ══ */
-.wa-link-howto{
-  background:#E7F7EE;border:0.5px solid rgba(37,211,102,.3);
-  border-radius:var(--radius-sm);padding:.7rem .9rem;margin-bottom:.65rem
-}
-.wa-link-howto-title{
-  font-size:13.5px;font-weight:700;color:#1A8A4A;
-  font-family:var(--ff-body);margin-bottom:.4rem
-}
-.wa-link-howto-steps{
-  margin:0 0 0 1.1rem;padding:0;font-size:13.5px;color:var(--text2);
-  font-family:var(--ff-body);line-height:1.6
-}
-.wa-link-howto-steps li{margin-bottom:.2rem}
-.wa-link-howto-steps li:last-child{margin-bottom:0}
 </style>
 </head>
 <body>
@@ -1555,77 +1579,10 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
       </div>
     </div>
 
-    <!-- PASSO 3: Quem irá caminhar com você -->
-    <div class="welcome-step-card" id="step-tutor-card">
-      <div class="welcome-step-hdr">
-        <div class="welcome-step-num">3</div>
-        <div class="welcome-step-title">Quem irá caminhar com você?</div>
-      </div>
-      <div class="welcome-step-body">
-        <p class="tutor-section-sub" style="margin-bottom:.75rem">Escolha o tutor responsável pelo seu Pequeno Grupo.</p>
-        <div class="tutor-cards-wrap" id="tutor-cards-wrap">
-          <div class="welcome-tutor-card" id="wtc-0" onclick="selectWelcomeTutor(0)">
-            <div class="wtc-check" id="wtc-check-0"></div>
-            <div class="wtc-avatar">🙏</div>
-            <div class="wtc-info">
-              <div class="wtc-name" id="wtc-name-0"></div>
-              <div class="wtc-role" id="wtc-role-0">Capelão / Tutor</div>
-            </div>
-          </div>
-          <div class="welcome-tutor-card" id="wtc-1" onclick="selectWelcomeTutor(1)">
-            <div class="wtc-check" id="wtc-check-1"></div>
-            <div class="wtc-avatar">✝️</div>
-            <div class="wtc-info">
-              <div class="wtc-name" id="wtc-name-1"></div>
-              <div class="wtc-role" id="wtc-role-1">Capelão / Tutor</div>
-            </div>
-          </div>
-          <div class="welcome-tutor-card" id="wtc-2" onclick="selectWelcomeTutor(2)">
-            <div class="wtc-check" id="wtc-check-2"></div>
-            <div class="wtc-avatar">📖</div>
-            <div class="wtc-info">
-              <div class="wtc-name" id="wtc-name-2"></div>
-              <div class="wtc-role" id="wtc-role-2">Capelão / Tutor</div>
-            </div>
-          </div>
-          <div class="welcome-tutor-card" id="wtc-3" onclick="selectWelcomeTutor(3)">
-            <div class="wtc-check" id="wtc-check-3"></div>
-            <div class="wtc-avatar">🌿</div>
-            <div class="wtc-info">
-              <div class="wtc-name" id="wtc-name-3"></div>
-              <div class="wtc-role" id="wtc-role-3">Capelão / Tutor</div>
-            </div>
-          </div>
-          <!-- Tutor convidado -->
-          <div class="welcome-tutor-card" id="wtc-guest" onclick="selectGuestWelcomeCard()">
-            <div class="wtc-check" id="wtc-check-guest"></div>
-            <div class="wtc-avatar">🤝</div>
-            <div class="wtc-info">
-              <div class="wtc-name">Tutor Convidado</div>
-              <div class="wtc-role">Tutor externo ao hospital</div>
-            </div>
-          </div>
-        </div>
-        <!-- Campos tutor convidado -->
-        <div id="guest-fields-welcome" style="display:none;margin-top:.65rem;display:none">
-          <div style="margin-bottom:.5rem">
-            <label style="font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);display:block;margin-bottom:3px">Nome do tutor</label>
-            <input id="guest-tutor-name" type="text" placeholder="Nome do tutor convidado" style="width:100%;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.6rem .85rem;font-size:16px;font-family:var(--ff-body);background:var(--bg);color:var(--text);outline:none;box-sizing:border-box">
-          </div>
-          <div>
-            <label style="font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);display:block;margin-bottom:3px">WhatsApp do tutor</label>
-            <input id="guest-tutor-wa" type="tel" placeholder="55 (21) 99999-0000" style="width:100%;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.6rem .85rem;font-size:16px;font-family:var(--ff-body);background:var(--bg);color:var(--text);outline:none;box-sizing:border-box">
-          </div>
-          <button onclick="confirmGuestWelcome()" style="margin-top:.5rem;width:100%;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);padding:.7rem;font-size:16px;font-weight:600;cursor:pointer;font-family:var(--ff-body)">Confirmar tutor convidado</button>
-        </div>
-        <div class="confirm-msg" id="welcome-confirm-msg" style="margin-top:.6rem;display:none;background:var(--teal-light);border:0.5px solid var(--teal);border-radius:var(--radius-sm);padding:.6rem .85rem;font-size:15px;color:var(--teal)">✓ Tutor selecionado!</div>
-      </div>
-    </div>
-
     <!-- NOME DO PARTICIPANTE -->
     <div class="welcome-step-card">
       <div class="welcome-step-hdr">
-        <div class="welcome-step-num">4</div>
+        <div class="welcome-step-num">3</div>
         <div class="welcome-step-title">Qual é o seu nome?</div>
       </div>
       <div class="welcome-step-body">
@@ -1796,23 +1753,6 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 
 
 <!-- TUTOR SCREEN -->
-<div id="screen-tutor" class="screen">
-  <div class="study-hdr">
-    <button class="back-btn" onclick="goHome()" aria-label="Voltar">&#8592;</button>
-    <div class="sh-info">
-      <div class="sh-step" style="color:rgba(255,255,255,0.55)">Sistema de tutoria</div>
-      <div class="sh-title">Escolha seu Tutor de Jornada</div>
-    </div>
-  </div>
-  <div class="tutor-screen">
-    <div class="tutor-intro content-card">
-      <div class="phase-tag tag-opening">Tutoria</div>
-      <p class="body-text">Cada discípulo cresce melhor acompanhado. Escolha um tutor — um capelão que caminhará com você nessa jornada, estará disponível para tirar dúvidas, orar junto e celebrar cada avanço.</p>
-    </div>
-    <div id="tutor-list"></div>
-    <div id="tutor-wa-wrap" style="display:none"></div>
-  </div>
-</div>
 
 
 <!-- JOURNAL SCREEN -->
@@ -2092,6 +2032,7 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
     <div class="comm-hdr-info">
       <div class="comm-hdr-tag">Jornada Discipular · Pequenos Grupos</div>
       <div class="comm-hdr-title">❤️ Comunidade</div>
+      <div class="comm-hdr-sub2">Mural de Gratidão / Pedidos de Oração</div>
     </div>
   </div>
   <div class="comm-body" id="comunidade-body"></div>
@@ -2999,462 +2940,266 @@ function openTutorPanel() {
   renderTutorLogin();
 }
 
-// ── senhas dos tutores (persistidas no dispositivo) ────────────────────────
+// ── Senhas dos Tutores/Coordenadores — criadas no primeiro acesso ──────
+// Chave: nome exato digitado (case-sensitive como cadastrado no grupo)
 function getTutorPassStore() {
-  try {
-    return JSON.parse(localStorage.getItem('amjTutorPass') || '{}');
-  } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem('amjTutorPass') || '{}'); } catch { return {}; }
 }
-function setTutorPass(tutorName, pass) {
+function setTutorPass(nome, pass) {
   const store = getTutorPassStore();
-  store[tutorName] = pass;
+  store[nome] = pass;
   try { localStorage.setItem('amjTutorPass', JSON.stringify(store)); } catch {}
 }
-function getTutorPass(tutorName) {
+function getTutorPass(nome) {
   const store = getTutorPassStore();
-  return store.hasOwnProperty(tutorName) ? store[tutorName] : (TUTORS.find(t=>t.name===tutorName)||{}).pass;
+  return store.hasOwnProperty(nome) ? store[nome] : undefined;
 }
-function tutorHasPass(tutorName) {
-  const p = getTutorPass(tutorName);
-  return p !== null && p !== undefined && p !== '';
-}
-
-// ── TUTORES CONVIDADOS ────────────────────────────────────────────────────
-function getGuestTutors() {
-  try { return JSON.parse(localStorage.getItem('jdpgGuestTutors') || '[]'); } catch { return []; }
-}
-function saveGuestTutors(arr) {
-  try { localStorage.setItem('jdpgGuestTutors', JSON.stringify(arr)); } catch {}
-}
-function getAllTutors() {
-  const guests = getGuestTutors().map((g, i) => ({ ...g, isGuest: true, guestIdx: i }));
-  return [...TUTORS.map(t => ({ ...t, isGuest: false })), ...guests];
+function tutorHasPass(nome) {
+  const p = getTutorPass(nome);
+  return p !== undefined && p !== null && p !== '';
 }
 
-function renderTutorRegisterGuest(errorMsg) {
-  const body = document.getElementById('tutorpanel-body');
-  body.innerHTML = `
-    <div class="content-card">
-      <div class="phase-tag tag-content">Inscrição — Tutor Convidado</div>
-      <p class="body-text">Preencha os dados abaixo para se inscrever como tutor convidado e acessar o painel de acompanhamento de discípulos.</p>
-    </div>
-    <div class="panel-section">
-      <label style="display:block;font-size:14px;color:var(--text3);margin-bottom:4px">Nome completo</label>
-      <input id="tg-name" type="text" style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box;margin-bottom:.6rem" placeholder="Seu nome completo">
-      <label style="display:block;font-size:14px;color:var(--text3);margin-bottom:4px">WhatsApp (somente números, com DDD)</label>
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:.6rem">
-        <span style="font-size:16px;color:var(--text3);white-space:nowrap">+55</span>
-        <input id="tg-wa" type="tel" style="flex:1;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box" placeholder="ex: 21999990000">
-      </div>
-      <label style="display:block;font-size:14px;color:var(--text3);margin-bottom:4px">Criar senha de acesso</label>
-      <input id="tg-pass" type="password" autocomplete="new-password" style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box;margin-bottom:.6rem" placeholder="Crie uma senha">
-      ${errorMsg ? `<p style="color:#E05050;font-size:14px;margin:0 0 .6rem">${errorMsg}</p>` : ''}
-      <button onclick="registerGuestTutor()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17.5px;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">
-        🤝 Inscrever-me como Tutor Convidado
-      </button>
-      <button onclick="renderTutorLogin()" style="width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">← Voltar ao login</button>
-    </div>`;
-}
-
-function registerGuestTutor(errorMsg) {
-  const name = document.getElementById('tg-name')?.value.trim();
-  const wa = document.getElementById('tg-wa')?.value.replace(/\D/g,'');
-  const pass = document.getElementById('tg-pass')?.value;
-  if (!name) { renderTutorRegisterGuest('Informe seu nome completo.'); return; }
-  if (!wa || wa.length < 10) { renderTutorRegisterGuest('Informe um WhatsApp válido.'); return; }
-  if (!pass) { renderTutorRegisterGuest('Crie uma senha de acesso.'); return; }
-
-  const guests = getGuestTutors();
-  if (guests.find(g => g.name === name)) { renderTutorRegisterGuest('Já existe um tutor convidado com este nome.'); return; }
-  guests.push({ name, icon: '🤝', wa: '55' + wa, pass });
-  saveGuestTutors(guests);
-  alert('Inscrição realizada com sucesso! Faça login para acessar o painel.');
-  renderTutorLogin();
+// ── Encontrar todos os PGs onde esta pessoa é Tutor ou Coordenador ─────
+function getGruposDoResponsavel(nome) {
+  if (!nome || typeof PEQUENOS_GRUPOS === 'undefined') return [];
+  const nomeNorm = nome.trim().toLowerCase();
+  return PEQUENOS_GRUPOS.filter(g =>
+    (g.tutor && g.tutor.trim().toLowerCase() === nomeNorm) ||
+    (g.coordenador && g.coordenador.trim().toLowerCase() === nomeNorm)
+  );
 }
 
 function renderTutorLogin(errorMsg) {
   const body = document.getElementById('tutorpanel-body');
-  const allTutors = getAllTutors();
-  const options = allTutors.map((t, i) =>
-    `<option value="${i}">${t.icon} ${t.name}${t.isGuest ? ' (convidado)' : ''}</option>`
-  ).join('');
-
+  if (!body) return;
   body.innerHTML = `
     <div class="content-card">
-      <div class="phase-tag tag-content">Acesso restrito</div>
-      <p class="body-text">Esta área é exclusiva para tutores e capelães. Selecione seu nome e informe sua senha de acesso.</p>
+      <div class="phase-tag tag-content">Painel do Tutor</div>
+      <p class="body-text">Digite o nome que você usou ao se identificar como Tutor ou Coordenador de um Pequeno Grupo.</p>
     </div>
     <div class="panel-section">
-      <label style="display:block;font-size:14px;color:var(--text3);margin-bottom:4px">Tutor</label>
-      <select id="tp-tutor-select" onchange="renderTutorLoginHint()" style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);font-family:var(--ff-body);margin-bottom:.6rem">
-        ${options}
-      </select>
-      <label style="display:block;font-size:14px;color:var(--text3);margin-bottom:4px">Senha</label>
-      <input id="tp-pass-input" type="password" autocomplete="off" style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box;margin-bottom:.6rem" placeholder="Digite sua senha">
+      <label style="display:block;font-size:14px;color:var(--text3);margin-bottom:4px">Seu nome completo</label>
+      <input id="tp-nome-input" type="text" style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box;margin-bottom:.6rem" placeholder="Nome completo">
       ${errorMsg ? `<p style="color:#E05050;font-size:14px;margin:0 0 .6rem">${errorMsg}</p>` : ''}
-      <button id="tp-login-btn" onclick="tutorLogin()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--navy);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17.5px;color:#fff;cursor:pointer;font-family:var(--ff-body)">
-        🔐 Entrar
+      <button onclick="tutorIdentificar()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--navy);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17.5px;color:#fff;cursor:pointer;font-family:var(--ff-body)">
+        Continuar →
       </button>
-      <div id="tp-login-hint" style="margin-top:.6rem;font-size:14px;color:var(--text3);text-align:center"></div>
-      <div style="border-top:0.5px solid var(--border);margin-top:1rem;padding-top:1rem;text-align:center">
-        <p style="font-size:14px;color:var(--text3);margin-bottom:.5rem">Ainda não está na lista?</p>
-        <button onclick="renderTutorRegisterGuest()" style="background:var(--teal-light);border:0.5px solid var(--teal);border-radius:var(--radius-sm);padding:.55rem 1rem;font-size:15px;color:var(--teal);cursor:pointer;font-family:var(--ff-body);font-weight:600">
-          🤝 Inscrever-me como Tutor Convidado
-        </button>
-      </div>
     </div>`;
-
-  const passInput = document.getElementById('tp-pass-input');
-  passInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') tutorLogin(); });
-  renderTutorLoginHint();
 }
 
-function renderTutorLoginHint() {
-  const idx = parseInt(document.getElementById('tp-tutor-select').value, 10);
-  const allTutors = getAllTutors();
-  const tutor = allTutors[idx];
-  const hint = document.getElementById('tp-login-hint');
-  const btn = document.getElementById('tp-login-btn');
-  if (!tutor) return;
+function tutorIdentificar() {
+  const nome = document.getElementById('tp-nome-input')?.value.trim();
+  if (!nome) { renderTutorLogin('Informe seu nome.'); return; }
 
-  if (tutor.isGuest) {
-    btn.innerHTML = '🔐 Entrar';
-    hint.innerHTML = `Tutor convidado — use a senha definida no cadastro.`;
+  const grupos = getGruposDoResponsavel(nome);
+  if (!grupos.length) {
+    renderTutorLogin('Nenhum Pequeno Grupo encontrado com esse nome como Tutor ou Coordenador. Verifique se digitou exatamente como na inscrição.');
     return;
   }
 
-  if (!tutorHasPass(tutor.name)) {
-    btn.innerHTML = '🆕 Criar minha senha';
-    hint.innerHTML = `Você ainda não tem uma senha cadastrada. Digite a senha que deseja usar e clique em "Criar minha senha".`;
+  if (!tutorHasPass(nome)) {
+    renderTutorCreatePass(nome);
   } else {
-    btn.innerHTML = '🔐 Entrar';
-    hint.innerHTML = `<a href="#" onclick="renderTutorResetPass();return false" style="color:var(--text3);text-decoration:underline">Esqueci/quero trocar minha senha</a>`;
+    renderTutorPassLogin(nome);
   }
 }
 
-function tutorLogin() {
-  const idx = parseInt(document.getElementById('tp-tutor-select').value, 10);
-  const pass = document.getElementById('tp-pass-input').value;
-  const allTutors = getAllTutors();
-  const tutor = allTutors[idx];
-  if (!tutor) return;
-
-  if (!pass) {
-    renderTutorLogin('Digite uma senha.');
-    return;
-  }
-
-  // Tutores convidados: senha já foi definida no cadastro
-  if (tutor.isGuest) {
-    if (pass !== tutor.pass) {
-      renderTutorLogin('Senha incorreta. Tente novamente.');
-      return;
-    }
-    ST.tutorPanelAuth = tutor.name;
-    renderTutorMenu(tutor);
-    return;
-  }
-
-  // Tutores do hospital
-  if (!tutorHasPass(tutor.name)) {
-    // primeiro acesso: cadastra a senha digitada
-    setTutorPass(tutor.name, pass);
-    ST.tutorPanelAuth = tutor.name;
-    renderTutorMenu(tutor);
-    return;
-  }
-
-  if (pass !== getTutorPass(tutor.name)) {
-    renderTutorLogin('Senha incorreta. Tente novamente.');
-    return;
-  }
-
-  ST.tutorPanelAuth = tutor.name;
-  renderTutorMenu(tutor);
-}
-
-function renderTutorResetPass() {
-  const idx = parseInt(document.getElementById('tp-tutor-select').value, 10);
-  const allTutors = getAllTutors();
-  const tutor = allTutors[idx];
+function renderTutorCreatePass(nome, errorMsg) {
   const body = document.getElementById('tutorpanel-body');
-
   body.innerHTML = `
     <div class="content-card">
-      <div class="phase-tag tag-content">${tutor.icon} ${tutor.name}</div>
-      <p class="body-text">Para redefinir sua senha, informe a senha atual e a nova senha desejada. Se você esqueceu a senha atual, peça à coordenação para limpar os dados deste app no navegador (isso remove todas as senhas salvas).</p>
+      <div class="phase-tag tag-content">Olá, ${nome}!</div>
+      <p class="body-text">Este é o primeiro acesso com esse nome. Crie uma senha para proteger seu painel — assim, outras pessoas não conseguem ver as informações dos seus grupos usando seu nome.</p>
     </div>
     <div class="panel-section">
-      <label style="display:block;font-size:14px;color:var(--text3);margin-bottom:4px">Senha atual</label>
-      <input id="tp-old-pass" type="password" autocomplete="off" style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box;margin-bottom:.6rem" placeholder="Senha atual">
-      <label style="display:block;font-size:14px;color:var(--text3);margin-bottom:4px">Nova senha</label>
-      <input id="tp-new-pass" type="password" autocomplete="off" style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box;margin-bottom:.6rem" placeholder="Nova senha">
-      <div id="tp-reset-msg" style="font-size:14px;margin-bottom:.6rem"></div>
-      <button onclick="tutorResetPass()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--navy);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17.5px;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">
-        💾 Salvar nova senha
+      <label style="display:block;font-size:14px;color:var(--text3);margin-bottom:4px">Criar senha de acesso</label>
+      <input id="tp-pass-create" type="password" autocomplete="new-password" style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box;margin-bottom:.6rem" placeholder="Crie uma senha">
+      ${errorMsg ? `<p style="color:#E05050;font-size:14px;margin:0 0 .6rem">${errorMsg}</p>` : ''}
+      <button onclick="tutorConfirmarCriarPass('${nome.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17.5px;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">
+        🔑 Criar senha e continuar
       </button>
       <button onclick="renderTutorLogin()" style="width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">← Voltar</button>
     </div>`;
 }
 
-function tutorResetPass() {
-  const idx = parseInt(document.getElementById('tp-tutor-select')?.value ?? '0', 10);
-  const allTutors = getAllTutors();
-  const tutor = allTutors[idx];
-  // Tutores convidados não podem trocar senha por esta interface
-  if (tutor && tutor.isGuest) {
-    document.getElementById('tp-reset-msg').innerHTML = '<span style="color:#E05050">Tutores convidados não podem redefinir senha aqui. Realize novo cadastro.</span>';
-    return;
-  }
-  const oldPass = document.getElementById('tp-old-pass').value;
-  const newPass = document.getElementById('tp-new-pass').value;
-  const msg = document.getElementById('tp-reset-msg');
-
-  if (oldPass !== getTutorPass(tutor.name)) {
-    msg.innerHTML = '<span style="color:#E05050">Senha atual incorreta.</span>';
-    return;
-  }
-  if (!newPass) {
-    msg.innerHTML = '<span style="color:#E05050">Digite a nova senha.</span>';
-    return;
-  }
-
-  setTutorPass(tutor.name, newPass);
-  renderTutorLogin();
+function tutorConfirmarCriarPass(nome) {
+  const pass = document.getElementById('tp-pass-create')?.value;
+  if (!pass || pass.length < 4) { renderTutorCreatePass(nome, 'Crie uma senha com pelo menos 4 caracteres.'); return; }
+  setTutorPass(nome, pass);
+  ST.tutorPanelAuth = nome;
+  save(ST);
+  renderTutorGruposList(nome);
 }
 
-function renderTutorMenu(tutor) {
+function renderTutorPassLogin(nome, errorMsg) {
   const body = document.getElementById('tutorpanel-body');
   body.innerHTML = `
     <div class="content-card">
-      <div class="phase-tag tag-content">${tutor.icon} ${tutor.name}</div>
-      <p class="body-text">Bem-vindo(a)! O que você deseja ver?</p>
+      <div class="phase-tag tag-content">Olá, ${nome}!</div>
+      <p class="body-text">Digite sua senha para acessar o painel dos seus Pequenos Grupos.</p>
     </div>
     <div class="panel-section">
-      <button onclick="loadTutorList('${tutor.name.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:10px;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17.5px;color:var(--text);cursor:pointer;font-family:var(--ff-body);margin-bottom:.6rem;text-align:left">
-        <span style="font-size:25px">${tutor.icon}</span>Meus discípulos
+      <label style="display:block;font-size:14px;color:var(--text3);margin-bottom:4px">Senha</label>
+      <input id="tp-pass-login" type="password" autocomplete="current-password" style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box;margin-bottom:.6rem" placeholder="Sua senha">
+      ${errorMsg ? `<p style="color:#E05050;font-size:14px;margin:0 0 .6rem">${errorMsg}</p>` : ''}
+      <button onclick="tutorConfirmarLogin('${nome.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--navy);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17.5px;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">
+        Entrar →
       </button>
-      <button onclick="loadTutorList('all')" style="display:flex;align-items:center;gap:10px;width:100%;background:var(--navy);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17.5px;color:#fff;cursor:pointer;font-family:var(--ff-body);text-align:left">
-        <span style="font-size:25px">🏛️</span>Visão institucional (todos)
-      </button>
-    </div>
-    <button onclick="renderTutorResetPassFromMenu()" style="margin-top:.5rem;width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">🔑 Trocar minha senha</button>
-    <button onclick="tutorLogout()" style="width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">🚪 Sair</button>`;
+      <button onclick="renderTutorLogin()" style="width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">← Voltar</button>
+    </div>`;
 }
 
-function renderTutorResetPassFromMenu() {
-  const tutor = getCurrentTutorObj();
-  const allTutors = getAllTutors();
-  const idx = allTutors.findIndex(t => t.name === (tutor && tutor.name));
-  // garante que o select interno aponte para o tutor atual, mesmo que a tela de login não esteja renderizada
-  const body = document.getElementById('tutorpanel-body');
-  body.innerHTML = `<select id="tp-tutor-select" style="display:none">${allTutors.map((t,i)=>`<option value="${i}" ${i===idx?'selected':''}>${t.name}</option>`).join('')}</select>`;
-  renderTutorResetPass();
+function tutorConfirmarLogin(nome) {
+  const pass = document.getElementById('tp-pass-login')?.value;
+  if (pass !== getTutorPass(nome)) { renderTutorPassLogin(nome, 'Senha incorreta.'); return; }
+  ST.tutorPanelAuth = nome;
+  save(ST);
+  renderTutorGruposList(nome);
 }
 
 function tutorLogout() {
   ST.tutorPanelAuth = null;
+  save(ST);
   renderTutorLogin();
 }
 
-function getCurrentTutorObj() {
-  if (!ST.tutorPanelAuth) return null;
-  const allTutors = getAllTutors();
-  return allTutors.find(t => t.name === ST.tutorPanelAuth) || null;
-}
+// ── Lista de Pequenos Grupos sob a tutela do responsável logado ────────
+function renderTutorGruposList(nome) {
+  loadGrupos();
+  const grupos = getGruposDoResponsavel(nome);
 
-async function loadTutorList(tutorName) {
-  const body = document.getElementById('tutorpanel-body');
-  body.innerHTML = `
-    <div class="content-card">
-      <div class="phase-tag tag-content">${tutorName === 'all' ? 'Visão institucional' : tutorName}</div>
-      <p class="body-text">Carregando lista de discípulos...</p>
-    </div>`;
-
-  try {
-    const res = await fetch(`${TUTOR_PANEL_URL}?tutor=${encodeURIComponent(tutorName)}`);
-    const data = await res.json();
-
-    if (!data.ok) throw new Error(data.error || 'Erro ao carregar dados');
-
-    const discipulos = data.discipulos || [];
-
-    if (discipulos.length === 0) {
-      body.innerHTML = `
-        <div class="content-card">
-          <div class="phase-tag tag-content">${tutorName === 'all' ? 'Visão institucional' : tutorName}</div>
-          <p class="body-text">Nenhum discípulo encontrado ainda. A lista será atualizada conforme os discípulos avançarem na jornada.</p>
-        </div>
-        <button onclick="renderTutorMenu(getCurrentTutorObj())" style="margin-top:1rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Voltar</button>`;
-      return;
-    }
-
-    // Armazena para acesso no detalhe
-    window._tutorDiscipulos = discipulos;
-    window._tutorListContext = tutorName;
-
-    const cards = discipulos.map((d, i) => {
-      const estudos = d.estudos || 0;
-      const pct = Math.round((estudos / 17) * 100);
-      const nivel = d.nivel || '—';
-      const streak = d.streak || 0;
-      const ultima = d.ultimaAtividade ? new Date(d.ultimaAtividade).toLocaleDateString('pt-BR') : '—';
-      const tutorTag = tutorName === 'all'
-        ? `<span style="font-size:12px;background:rgba(255,255,255,0.15);border-radius:10px;padding:2px 8px;margin-left:6px">${d.tutor || '—'}</span>`
-        : '';
-
-      // Barra de progresso
-      const barColor = pct >= 100 ? '#27AE60' : pct >= 50 ? '#2E86C1' : '#D4A017';
-
-      return `
-        <div onclick="renderDiscipuloDetalhe(${i})" style="background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.85rem 1rem;margin-bottom:.5rem;cursor:pointer;transition:opacity .15s" onmouseenter="this.style.opacity='.85'" onmouseleave="this.style.opacity='1'">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
-            <div style="font-size:16.5px;font-weight:700;color:var(--text)">${d.nome || 'Sem nome'}${tutorTag}</div>
-            <div style="font-size:13px;color:var(--text3)">${d.perfil || ''}</div>
-          </div>
-          <div style="font-size:13px;color:var(--text3);margin-bottom:.5rem">${nivel} · ${estudos}/13 estudos · 🔥 ${streak} dias · Ativo: ${ultima}</div>
-          <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
-            <div style="height:100%;width:${pct}%;background:${barColor};border-radius:3px;transition:width .4s"></div>
-          </div>
-          <div style="font-size:12px;color:var(--text3);margin-top:3px;text-align:right">${pct}% concluído</div>
-        </div>`;
-    }).join('');
-
-    body.innerHTML = `
+  if (!grupos.length) {
+    document.getElementById('tutorpanel-body').innerHTML = `
       <div class="content-card">
-        <div class="phase-tag tag-content">${tutorName === 'all' ? 'Visão institucional' : tutorName}</div>
-        <p class="body-text">${discipulos.length} discípulo(s) — toque para ver o progresso completo.</p>
+        <div class="phase-tag tag-content">${nome}</div>
+        <p class="body-text">Nenhum Pequeno Grupo encontrado sob seus cuidados no momento.</p>
       </div>
-      ${cards}
-      <button onclick="renderTutorMenu(getCurrentTutorObj())" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Voltar</button>
-      <button onclick="loadTutorList('${tutorName}')" style="margin-top:.5rem;width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">🔄 Atualizar</button>`;
-
-  } catch (err) {
-    body.innerHTML = `
-      <div class="content-card">
-        <div class="phase-tag tag-content">Erro</div>
-        <p class="body-text">Não foi possível carregar a lista agora. Verifique sua conexão e tente novamente.</p>
-      </div>
-      <button onclick="renderTutorMenu(getCurrentTutorObj())" style="margin-top:1rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Voltar</button>`;
+      <button onclick="tutorLogout()" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Sair</button>`;
+    return;
   }
-}
 
-function renderDiscipuloDetalhe(idx) {
-  const d = (window._tutorDiscipulos || [])[idx];
-  if (!d) return;
+  const cards = grupos.map(g => {
+    const progresso = getOrInitPgProgress(g.num);
+    const ultimoEstudoIdx = Math.max(0, (progresso.estudos || 0) - 1);
+    const ultimoEstudoNome = (typeof STUDIES !== 'undefined' && STUDIES[ultimoEstudoIdx])
+      ? STUDIES[ultimoEstudoIdx].title || STUDIES[ultimoEstudoIdx].titulo || `Estudo ${ultimoEstudoIdx + 1}`
+      : (progresso.estudos > 0 ? `Estudo ${progresso.estudos}` : 'Nenhum ainda');
+    const reuniao = g.diaReuniao ? `${g.diaReuniao}${g.horaReuniao ? ' às ' + g.horaReuniao : ''}` : 'Não definido';
+    const meuPapel = (g.tutor && g.tutor.trim().toLowerCase() === nome.trim().toLowerCase()) ? 'Tutor' : 'Coordenador';
 
-  const body = document.getElementById('tutorpanel-body');
-  const tutorCtx = window._tutorListContext || 'all';
-
-  const estudos = d.estudos || 0;
-  const pct = Math.round((estudos / 17) * 100);
-  const nivel = d.nivel || '—';
-  const streak = d.streak || 0;
-  const xp = d.xp || 0;
-  const ultima = d.ultimaAtividade ? new Date(d.ultimaAtividade).toLocaleDateString('pt-BR') : '—';
-  const inicio = d.dataInicio ? new Date(d.dataInicio).toLocaleDateString('pt-BR') : '—';
-  const totalDiario = d.totalDiario || 0;
-
-  // Atributos
-  const attrsData = [
-    { id:'sabedoria',    label:'Sabedoria',    icon:'📖' },
-    { id:'oracao',       label:'Oração',       icon:'🙏' },
-    { id:'amor',         label:'Amor',         icon:'❤️' },
-    { id:'perseveranca', label:'Perseverança', icon:'🛡️' },
-    { id:'saude',        label:'Saúde',        icon:'🌱' },
-    { id:'missao',       label:'Missão',       icon:'🎯' }
-  ];
-  const attrsHtml = attrsData.map(a => {
-    const val = parseInt(d[a.id] || d['attrs_' + a.id] || 0);
-    const pctA = Math.min(100, val);
     return `
-      <div style="margin-bottom:.45rem">
-        <div style="display:flex;justify-content:space-between;font-size:14px;color:var(--text2);margin-bottom:2px">
-          <span>${a.icon} ${a.label}</span><strong>${val}/100</strong>
+      <div class="tutor-grupo-card" onclick="renderTutorGrupoDetalhe(${g.num}, '${nome.replace(/'/g,"\\'")}')">
+        <div class="tutor-grupo-card-hdr">
+          <div class="tutor-grupo-nome">🌿 ${g.nome || 'Grupo ' + g.num}</div>
+          <span class="tutor-grupo-papel-tag">${meuPapel}</span>
         </div>
-        <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden">
-          <div style="height:100%;width:${pctA}%;background:var(--navy);border-radius:3px"></div>
-        </div>
+        <div class="tutor-grupo-info-line">🤝 Coordenador: <strong>${g.coordenador || '— não definido —'}</strong></div>
+        <div class="tutor-grupo-info-line">📖 Último estudo concluído: <strong>${ultimoEstudoNome}</strong> (${progresso.estudos || 0}/13)</div>
+        <div class="tutor-grupo-info-line">🗓️ Reunião: <strong>${reuniao}</strong></div>
+        <div class="tutor-grupo-info-line">👥 ${g.participantes.length} participante${g.participantes.length===1?'':'s'} — toque para ver detalhes</div>
       </div>`;
   }).join('');
 
-  // Estudos concluídos
-  let estudosHtml = '';
-  if (d.estudosConcluidos && d.estudosConcluidos.length) {
-    const lista = (typeof d.estudosConcluidos === 'string'
-      ? d.estudosConcluidos.split('|')
-      : d.estudosConcluidos);
-    estudosHtml = lista.map(t => `<div style="font-size:14px;color:var(--text2);padding:3px 0;border-bottom:0.5px solid var(--border)">✅ ${t}</div>`).join('');
-  } else {
-    estudosHtml = `<div style="font-size:14px;color:var(--text3)">Nenhum estudo registrado ainda.</div>`;
-  }
-
-  // Obstáculos vencidos
-  let obstHtml = '';
-  if (d.obstaculosVencidos && d.obstaculosVencidos.length) {
-    const lista = (typeof d.obstaculosVencidos === 'string'
-      ? d.obstaculosVencidos.split('|')
-      : d.obstaculosVencidos);
-    obstHtml = lista.map(o => `<span style="display:inline-block;font-size:13px;background:var(--teal);color:#fff;border-radius:10px;padding:2px 10px;margin:2px 3px 2px 0">${o}</span>`).join('');
-  } else {
-    obstHtml = `<span style="font-size:14px;color:var(--text3)">Nenhum ainda.</span>`;
-  }
-
-  // Botão WhatsApp se tiver
-  const tutorObj = getCurrentTutorObj();
-  const waBtn = tutorObj && tutorObj.wa
-    ? `<a href="https://wa.me/${tutorObj.wa}?text=${encodeURIComponent('Olá! Estou acompanhando seu progresso na Jornada Discipular em Pequenos Grupos e quero parabenizá-lo(a)! ' + d.nome + ', você já concluiu ' + estudos + ' de 13 estudos. Continue firme!')}" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:#25D366;border:none;border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;color:#fff;cursor:pointer;font-family:var(--ff-body);text-decoration:none;margin-top:.5rem">💬 Enviar mensagem de encorajamento</a>`
-    : '';
-
-  body.innerHTML = `
+  document.getElementById('tutorpanel-body').innerHTML = `
     <div class="content-card">
-      <div class="phase-tag tag-content">${d.perfil || 'Discípulo'}</div>
-      <div style="font-size:22px;font-weight:800;color:var(--text);margin:.25rem 0 .1rem">${d.nome || 'Sem nome'}</div>
-      <div style="font-size:14px;color:var(--text3)">Tutor: ${d.tutor || '—'} · Na jornada desde ${inicio}</div>
+      <div class="phase-tag tag-content">${nome}</div>
+      <p class="body-text">${grupos.length} Pequeno${grupos.length===1?'':'s'} Grupo${grupos.length===1?'':'s'} sob seus cuidados.</p>
     </div>
+    ${cards}
+    <button onclick="renderTutorResetPassScreen('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">🔑 Trocar minha senha</button>
+    <button onclick="tutorLogout()" style="width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">🚪 Sair</button>`;
+}
 
+// ── Detalhe de um PG: participantes individuais ─────────────────────────
+function renderTutorGrupoDetalhe(grupoNum, nome) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return;
+  const progresso = getOrInitPgProgress(grupoNum);
+  const metas = getPgWeekMetas(grupoNum);
+
+  const participantesHtml = g.participantes.length
+    ? g.participantes.map(p => `
+      <div class="tutor-participante-row">
+        <div class="tutor-participante-nome">${p.nome}</div>
+        <div class="tutor-participante-meta">${p.tipo === 'colaborador' ? '🏥 ' + (p.departamento||'Colaborador') : p.tipo === 'amigo' ? '🤝 Amigo' : p.tipo === 'membro' ? '⛪ Membro IASD' : p.tipo === 'tutor' ? '👨‍🏫 Tutor' : p.tipo === 'coordenador' ? '🤝 Coordenador' : '🌿 Participante'} · inscrito em ${p.dataInscricao || '—'}</div>
+      </div>`).join('')
+    : '<div style="font-size:15px;color:var(--text3);padding:.5rem 0">Nenhum participante inscrito ainda.</div>';
+
+  document.getElementById('tutorpanel-body').innerHTML = `
+    <div class="content-card">
+      <div class="phase-tag tag-content">🌿 ${g.nome || 'Grupo ' + g.num}</div>
+      <p class="body-text">Detalhes do Pequeno Grupo e seus participantes.</p>
+    </div>
     <div class="panel-section">
-      <div class="panel-title">📊 Resumo</div>
-      <div class="panel-stat"><span>🎖️ Nível</span><strong>${nivel}</strong></div>
-      <div class="panel-stat"><span>⭐ XP Total</span><strong>${xp}</strong></div>
-      <div class="panel-stat"><span>📖 Estudos</span><strong>${estudos}/13 (${pct}%)</strong></div>
-      <div class="panel-stat"><span>🔥 Sequência atual</span><strong>${streak} dias</strong></div>
-      <div class="panel-stat"><span>📔 Registros no diário</span><strong>${totalDiario}</strong></div>
-      <div class="panel-stat"><span>🕐 Última atividade</span><strong>${ultima}</strong></div>
-      <div style="margin-top:.6rem;height:8px;background:var(--border);border-radius:4px;overflow:hidden">
-        <div style="height:100%;width:${pct}%;background:${pct>=100?'#27AE60':pct>=50?'#2E86C1':'#D4A017'};border-radius:4px"></div>
-      </div>
+      <div class="panel-title">Progresso semanal do grupo</div>
+      <div class="panel-stat"><span>📖 Estudos concluídos</span><strong>${progresso.estudos||0}/${metas.estudos.meta}</strong></div>
+      <div class="panel-stat"><span>🙏 Pedidos de oração</span><strong>${progresso.oracoes||0}/${metas.oracoes.meta}</strong></div>
+      <div class="panel-stat"><span>❤️ Atos de bondade</span><strong>${progresso.bondades||0}/${metas.bondades.meta}</strong></div>
     </div>
-
     <div class="panel-section">
-      <div class="panel-title">🏛️ Atributos Espirituais</div>
-      ${attrsHtml}
+      <div class="panel-title">Participantes (${g.participantes.length})</div>
+      ${participantesHtml}
     </div>
-
-    <div class="panel-section">
-      <div class="panel-title">📖 Estudos Concluídos</div>
-      ${estudosHtml}
-    </div>
-
-    <div class="panel-section">
-      <div class="panel-title">⚔️ Obstáculos Vencidos</div>
-      <div style="margin-top:.3rem">${obstHtml}</div>
-    </div>
-
-    ${waBtn}
-
-    <button onclick="loadTutorList('${tutorCtx}')" style="margin-top:.75rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Voltar à lista</button>`;
+    <button onclick="renderTutorGruposList('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Voltar aos meus grupos</button>`;
 
   resetScroll();
 }
+
+function renderTutorResetPassScreen(nome, errorMsg) {
+  const body = document.getElementById('tutorpanel-body');
+  body.innerHTML = `
+    <div class="content-card">
+      <div class="phase-tag tag-content">Trocar senha</div>
+      <p class="body-text">Defina uma nova senha de acesso para ${nome}.</p>
+    </div>
+    <div class="panel-section">
+      <label style="display:block;font-size:14px;color:var(--text3);margin-bottom:4px">Senha atual</label>
+      <input id="tp-old-pass" type="password" style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box;margin-bottom:.6rem" placeholder="Senha atual">
+      <label style="display:block;font-size:14px;color:var(--text3);margin-bottom:4px">Nova senha</label>
+      <input id="tp-new-pass" type="password" style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box;margin-bottom:.6rem" placeholder="Nova senha">
+      ${errorMsg ? `<p style="color:#E05050;font-size:14px;margin:0 0 .6rem">${errorMsg}</p>` : ''}
+      <button onclick="tutorConfirmarTrocaPass('${nome.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17.5px;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">
+        ✓ Salvar nova senha
+      </button>
+      <button onclick="renderTutorGruposList('${nome.replace(/'/g,"\\'")}')" style="width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">← Cancelar</button>
+    </div>`;
+}
+
+function tutorConfirmarTrocaPass(nome) {
+  const oldPass = document.getElementById('tp-old-pass')?.value;
+  const newPass = document.getElementById('tp-new-pass')?.value;
+  if (oldPass !== getTutorPass(nome)) { renderTutorResetPassScreen(nome, 'Senha atual incorreta.'); return; }
+  if (!newPass || newPass.length < 4) { renderTutorResetPassScreen(nome, 'A nova senha precisa ter pelo menos 4 caracteres.'); return; }
+  setTutorPass(nome, newPass);
+  alert('Senha alterada com sucesso!');
+  renderTutorGruposList(nome);
+}
+
 
 function openPanel() {
   showScreen('panel');
   const attrs = getAttrs();
   const lv = getRpgLevel();
-  const tutor = ST.tutor === 'guest'
-    ? { name: ST.guestTutor?.name || 'Tutor Convidado', icon:'🤝', wa: ST.guestTutor?.wa || '' }
-    : ST.tutor !== undefined ? TUTORS[ST.tutor] : null;
+
+  // ── Buscar Tutor e Coordenador reais do meu Pequeno Grupo ───────────
+  const meuGrupo = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
+  const g = meuGrupo && typeof PEQUENOS_GRUPOS !== 'undefined'
+    ? PEQUENOS_GRUPOS.find(x => x.num === meuGrupo.grupoNum)
+    : null;
+
+  // Tenta achar o WhatsApp de quem ocupa cada papel, procurando entre os
+  // participantes reais do grupo (o nome do tutor/coordenador é uma string
+  // livre, então o cruzamento é por nome — se não achar, fica sem WhatsApp).
+  function acharWaPorNome(nome) {
+    if (!g || !nome) return '';
+    const p = g.participantes.find(p => p.nome === nome);
+    return p ? p.wa : '';
+  }
+
+  const destinatarios = [];
+  if (g?.tutor) destinatarios.push({ papel: 'Tutor', nome: g.tutor, wa: acharWaPorNome(g.tutor) });
+  if (g?.coordenador && g.coordenador !== g?.tutor) destinatarios.push({ papel: 'Coordenador', nome: g.coordenador, wa: acharWaPorNome(g.coordenador) });
+
   const attrRows = ATTRIBUTES.map(a =>
     `<div class="panel-stat"><span>${a.icon} ${a.label}</span><strong>${attrs[a.id]||0}/100</strong></div>`
   ).join('');
@@ -3462,21 +3207,34 @@ function openPanel() {
     .map(o => `<div class="panel-stat"><span>${o.icon} ${o.label}</span><strong style="color:var(--teal)">✓ Vencido</strong></div>`)
     .join('') || '<div style="font-size:16px;color:var(--text3);padding:.4rem 0">Nenhum ainda</div>';
 
-  const waMsg = tutor ? encodeURIComponent(
-    `Olá ${tutor.name}! Aqui está meu progresso na jornada "Aos Pés do Mestre Jesus":\n\n` +
-    `📊 Nível: ${lv.name}\n` +
-    `✅ Estudos: ${ST.done.length}/${STUDIES.length}\n` +
-    `⭐ XP: ${ST.xp}\n` +
-    `🔥 Sequência: ${ST.streak} dias\n` +
-    `📔 Registros no diário: ${(ST.journal||[]).length}\n\n` +
-    `Atributos espirituais:\n` +
-    ATTRIBUTES.map(a=>`${a.icon} ${a.label}: ${attrs[a.id]||0}`).join('\n')
-  ) : '';
+  function buildWaMsg(nome) {
+    return encodeURIComponent(
+      `Olá ${nome}! Aqui está meu progresso na jornada "Aos Pés do Mestre Jesus":\n\n` +
+      `📊 Nível: ${lv.name}\n` +
+      `✅ Estudos: ${ST.done.length}/${STUDIES.length}\n` +
+      `⭐ XP: ${ST.xp}\n` +
+      `🔥 Sequência: ${ST.streak} dias\n` +
+      `📔 Registros no diário: ${(ST.journal||[]).length}\n\n` +
+      `Atributos espirituais:\n` +
+      ATTRIBUTES.map(a=>`${a.icon} ${a.label}: ${attrs[a.id]||0}`).join('\n')
+    );
+  }
+
+  const enviarBtns = destinatarios.length
+    ? destinatarios.map(d => d.wa ? `
+      <button class="tutor-wa" onclick="window.open('https://wa.me/${d.wa}?text=${buildWaMsg(d.nome)}','_blank')" style="margin:0 0 .5rem">
+        <svg viewBox="0 0 24 24" fill="white" width="18" height="18"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/></svg>
+        Enviar progresso para ${d.papel} (${d.nome})
+      </button>` : `
+      <div style="font-size:14px;color:var(--text3);text-align:center;padding:.5rem;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);margin-bottom:.5rem">
+        ${d.papel} do grupo: <strong>${d.nome}</strong> — combine com ele(a) pela Comunidade do app.
+      </div>`).join('')
+    : `<div style="font-size:16px;color:var(--text3);text-align:center;padding:.5rem">Seu grupo ainda não tem Tutor ou Coordenador definidos.</div>`;
 
   document.getElementById('panel-body').innerHTML = `
     <div class="content-card">
       <div class="phase-tag tag-content">Meu progresso</div>
-      <p class="body-text">Este é seu painel de discípulo. Compartilhe com seu tutor para acompanhamento personalizado.</p>
+      <p class="body-text">Este é seu painel de discípulo. Compartilhe com o tutor ou coordenador do seu Pequeno Grupo para acompanhamento personalizado.</p>
     </div>
     <div class="panel-section">
       <div class="panel-title">Resumo geral</div>
@@ -3494,11 +3252,7 @@ function openPanel() {
       <div class="panel-title">Obstáculos vencidos</div>
       ${bossRows}
     </div>
-    ${tutor && tutor.wa ? `
-    <button class="tutor-wa" onclick="window.open('https://wa.me/${tutor.wa}?text=${waMsg}','_blank')" style="margin:0">
-      <svg viewBox="0 0 24 24" fill="white" width="18" height="18"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/></svg>
-      Enviar progresso para ${tutor.name}
-    </button>` : `<div style="font-size:16px;color:var(--text3);text-align:center;padding:.5rem">Escolha um tutor para compartilhar seu progresso.</div>`}
+    ${enviarBtns}
     <button class="nav-btn" onclick="goHome()" style="background:transparent;color:var(--blue);border:0.5px solid var(--blue)">Voltar ao início</button>`;
 }
 
@@ -4172,154 +3926,7 @@ function renderAIArea() {
 }
 
 
-function renderTutorArea() {
-  const isGuest = ST.tutor === 'guest';
-  const tutor = isGuest
-    ? { name: ST.guestTutor?.name || 'Tutor Convidado', icon:'🤝', wa: ST.guestTutor?.wa || '' }
-    : ST.tutor !== undefined ? TUTORS[ST.tutor] : null;
-  const area = document.getElementById('h-tutor-area');
-  if (tutor) {
-    area.innerHTML = `
-      <div style="margin:.75rem 1rem 0;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.85rem 1rem;display:flex;align-items:center;gap:10px">
-        <div style="font-size:27.5px">${tutor.icon}</div>
-        <div style="flex:1">
-          <div style="font-size:16px;font-weight:500;color:var(--text)">${tutor.name}</div>
-          <div style="font-size:14px;color:var(--text3)">Seu Tutor de Jornada</div>
-        </div>
-        <button onclick="openTutor()" style="background:none;border:0.5px solid var(--border);border-radius:6px;padding:4px 8px;font-size:14px;color:var(--text3);cursor:pointer">Trocar</button>
-      </div>`;
-    renderFixedTutorBtn(tutor);
-  } else {
-    area.innerHTML = `
-      <div style="margin:.75rem 1rem 0">
-        <button onclick="openTutor()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);padding:.8rem;font-size:17.5px;font-weight:500;cursor:pointer;font-family:var(--ff-body)">
-          🙋 Escolher meu Tutor de Jornada
-        </button>
-      </div>`;
-    removeFixedTutorBtn();
-  }
 
-  // Botão de recomeço — sempre visível na home
-  const restartArea = document.getElementById('h-tutor-area');
-  if (restartArea) {
-    restartArea.innerHTML += `
-      <div style="margin:.75rem 1rem 0;text-align:center">
-        <button onclick="confirmRestart()" style="background:transparent;border:none;padding:.4rem .5rem;font-size:14px;color:var(--text3);cursor:pointer;font-family:var(--ff-body);text-decoration:underline;text-underline-offset:3px">
-          🔄 Recomeçar a partir do estudo 1
-        </button>
-      </div>`;
-  }
-}
-
-function renderFixedTutorBtn(tutor) {
-  removeFixedTutorBtn();
-  const btn = document.createElement('button');
-  btn.id = 'fixed-tutor-btn';
-  btn.className = 'tutor-btn-fixed';
-  btn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M13 0C5.796 0 0 5.796 0 13c0 2.29.6 4.434 1.644 6.29L.05 25.95l6.82-1.767A12.935 12.935 0 0013 26c7.204 0 13-5.796 13-13S20.204 0 13 0z" opacity=".3"/></svg><span class="tbf-name">${tutor.name}</span>`;
-  btn.setAttribute('aria-label', `Falar com ${tutor.name} no WhatsApp`);
-  btn.title = `Falar com ${tutor.name} no WhatsApp`;
-  btn.onclick = () => {
-    window.open(`https://wa.me/${tutor.wa}?text=Olá, sou discípulo da Jornada Discipular em Pequenos Grupos e gostaria de conversar!`, '_blank');
-  };
-  document.getElementById('app').appendChild(btn);
-}
-
-function removeFixedTutorBtn() {
-  const old = document.getElementById('fixed-tutor-btn');
-  if (old) old.remove();
-}
-
-function openTutor() {
-  const list = document.getElementById('tutor-list');
-  const guestSelected = ST.tutor === 'guest';
-
-  const fixedCards = TUTORS.map((t, i) => `
-    <div class="tutor-card ${ST.tutor === i ? 'selected' : ''}" onclick="selectTutor(${i})">
-      <div class="tutor-avatar">${t.icon}</div>
-      <div class="tutor-info">
-        <div class="tutor-name">${t.name}</div>
-        <div class="tutor-role">Capelão — Hospital Adventista</div>
-      </div>
-      ${ST.tutor === i ? '<div style="font-size:22.5px">✓</div>' : ''}
-    </div>`).join('');
-
-  // Guest tutor card
-  const guestName = ST.guestTutor?.name || '';
-  const guestWa   = ST.guestTutor?.wa   || '';
-  const guestCard = `
-    <div class="tutor-card ${guestSelected ? 'selected' : ''}" id="guest-tutor-card" style="flex-direction:column;align-items:flex-start;gap:.6rem">
-      <div style="display:flex;align-items:center;gap:10px;width:100%">
-        <div class="tutor-avatar">🤝</div>
-        <div class="tutor-info">
-          <div class="tutor-name">Tutor Convidado</div>
-          <div class="tutor-role">Alguém da sua comunidade de fé</div>
-        </div>
-        ${guestSelected ? '<div style="font-size:22.5px">✓</div>' : ''}
-      </div>
-      <div style="width:100%;display:flex;flex-direction:column;gap:6px" id="guest-tutor-form">
-        <input id="guest-name" type="text" value="${guestName}" placeholder="Nome do tutor convidado"
-          style="width:100%;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.6rem .85rem;font-size:17.5px;font-family:var(--ff-body);outline:none;background:var(--bg);color:var(--text)"
-          oninput="updateGuestTutor()">
-        <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:16px;color:var(--text3);white-space:nowrap">+55</span>
-          <input id="guest-wa" type="tel" value="${guestWa}" placeholder="WhatsApp (somente números)"
-            style="flex:1;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.6rem .85rem;font-size:17.5px;font-family:var(--ff-body);outline:none;background:var(--bg);color:var(--text)"
-            oninput="updateGuestTutor()">
-        </div>
-        <button onclick="selectGuestTutor()" style="background:var(--teal);color:#fff;border:none;border-radius:var(--radius-sm);padding:.6rem;font-size:16px;cursor:pointer;font-family:var(--ff-body);width:100%">
-          ✓ Confirmar tutor convidado
-        </button>
-      </div>
-    </div>`;
-
-  list.innerHTML = fixedCards + guestCard;
-  renderTutorWaBtn();
-  showScreen('tutor');
-}
-
-function updateGuestTutor() {
-  const name = document.getElementById('guest-name')?.value.trim() || '';
-  const wa   = document.getElementById('guest-wa')?.value.replace(/\D/g,'') || '';
-  ST.guestTutor = { name, wa: '55' + wa };
-  save(ST);
-}
-
-function selectGuestTutor() {
-  const name = document.getElementById('guest-name')?.value.trim() || '';
-  const wa   = document.getElementById('guest-wa')?.value.replace(/\D/g,'') || '';
-  if (!name || !wa) { alert('Preencha o nome e o WhatsApp do tutor convidado.'); return; }
-  ST.guestTutor = { name, wa: '55' + wa };
-  ST.tutor = 'guest';
-  save(ST);
-  renderTutorWaBtn();
-  // Update card visual
-  document.querySelectorAll('.tutor-card').forEach(c => c.classList.remove('selected'));
-  document.getElementById('guest-tutor-card')?.classList.add('selected');
-}
-
-function selectTutor(i) {
-  ST.tutor = i;
-  save(ST);
-  openTutor(); // re-render to update selection visuals
-}
-
-function renderTutorWaBtn() {
-  const wrap = document.getElementById('tutor-wa-wrap');
-  if (ST.tutor === undefined) { wrap.style.display='none'; return; }
-  const t = ST.tutor === 'guest'
-    ? { name: ST.guestTutor?.name || 'Tutor Convidado', wa: ST.guestTutor?.wa || '' }
-    : TUTORS[ST.tutor];
-  if (!t.wa) { wrap.style.display='none'; return; }
-  const msg = encodeURIComponent(`Olá ${t.name}! Sou discípulo do app "Aos Pés do Mestre Jesus" e gostaria de conversar sobre minha jornada.`);
-  wrap.style.display = '';
-  wrap.innerHTML = `
-    <button class="tutor-wa" onclick="window.open('https://wa.me/${t.wa}?text=${msg}','_blank')">
-      <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/></svg>
-      Conversar com ${t.name} no WhatsApp
-    </button>
-    <button class="nav-btn" onclick="goHome()" style="background:transparent;color:var(--blue);border:0.5px solid var(--blue)">Confirmar e voltar</button>`;
-}
 
 
 const LEVELS = [
@@ -4361,58 +3968,10 @@ const PHASE_TAG_CSS = {
 // ══════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════
-const SYNC_URL = 'https://script.google.com/macros/s/AKfycbz1eoMpd6OwunBWtBRwCUbcg40wZvk89cIu2KA2PwuGb1HbZ4hpO91tOo-IRmjnNoy1/exec';
-
 function getTutorNameForSync() {
-  if (ST.tutor === 'guest') {
-    return ST.guestTutor?.name ? ('Convidado: ' + ST.guestTutor.name) : 'Tutor Convidado';
-  }
-  if (ST.tutor !== undefined && TUTORS[ST.tutor]) return TUTORS[ST.tutor].name;
+  // O tutor agora é definido por papel dentro do Pequeno Grupo, não mais
+  // escolhido na tela de boas-vindas. Mantida apenas como fallback seguro.
   return '';
-}
-
-function getProfileLabelForSync() {
-  const map = { paciente:'Paciente', colaborador:'Colaborador', amigo:'Amigo dos Adventistas' };
-  return map[ST.userProfile] || ST.userProfile || '';
-}
-
-let _syncTimeout = null;
-function syncToTutorBackend() {
-  // Só sincroniza se houver nome de usuário e tutor definido
-  if (!ST.userName || !ST.userName.trim()) return;
-  const tutorName = getTutorNameForSync();
-  if (!tutorName) return;
-
-  // Debounce: evita disparos excessivos em sequência
-  if (_syncTimeout) clearTimeout(_syncTimeout);
-  _syncTimeout = setTimeout(() => {
-    if (!ST.syncDataInicio) ST.syncDataInicio = new Date().toISOString();
-    const attrs = getAttrs();
-    const nivel = getRpgLevel();
-    const estudosConcluidos = (ST.done || []).map(i => STUDIES[i] ? STUDIES[i].title : '').filter(Boolean);
-    const obstaculosVencidos = OBSTACLES.filter(o => getObstacleProgress(o) >= 100).map(o => o.label);
-    const payload = {
-      nome: ST.userName.trim(),
-      tutor: tutorName,
-      estudos: (ST.done || []).length,
-      estudosConcluidos: estudosConcluidos,
-      xp: ST.xp || 0,
-      nivel: nivel ? nivel.name : '',
-      streak: ST.streak || 0,
-      perfil: getProfileLabelForSync(),
-      dataInicio: ST.syncDataInicio,
-      attrs: attrs,
-      obstaculosVencidos: obstaculosVencidos,
-      totalDiario: (ST.journal || []).length
-    };
-    try {
-      fetch(SYNC_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' }, // evita preflight CORS
-        body: JSON.stringify(payload)
-      }).catch(() => {});
-    } catch {}
-  }, 1500);
 }
 
 function save(s) {
@@ -4424,7 +3983,6 @@ function save(s) {
     exp.setFullYear(exp.getFullYear() + 1);
     document.cookie = 'amj3=' + encodeURIComponent(data) + ';expires=' + exp.toUTCString() + ';path=/;SameSite=Lax';
   } catch {}
-  syncToTutorBackend();
 }
 
 function load() {
@@ -4623,12 +4181,13 @@ function renderHome() {
   // Phase 3 — Share, AI, Panel
   renderShareArea();
   renderAIArea();
-  renderTutorArea();
   renderCompanionHomeBtn();
   setTimeout(() => {
     if (typeof renderGruposBtnHome === 'function') renderGruposBtnHome();
     if (typeof renderPgProgressHome === 'function') renderPgProgressHome();
     if (typeof renderComunidadeBtnHome === 'function') renderComunidadeBtnHome();
+    // O botão de recomeço fica sempre por último na Home
+    if (typeof renderRestartArea === 'function') renderRestartArea();
   }, 30);
 }
 
@@ -4961,7 +4520,7 @@ function showScreen(n) {
     else compFab.style.display = '';
   }
   // Barra inferior: só visível nas telas E7 abertas via bbarGo
-  if (['study','welcome','home','journal','ai','tutorpanel','companion','share','panel','complete','tutor'].includes(n)) {
+  if (['study','welcome','home','journal','ai','tutorpanel','companion','share','panel','complete'].includes(n)) {
     hideBottomBar();
   }
   // Resetar tipo selecionado ao sair da inscrição
@@ -4991,88 +4550,31 @@ function resetScroll() {
 
 let welcomeTutorSelected = null;
 
-function selectWelcomeTutor(idx) {
-  welcomeTutorSelected = idx;
-  // Reset all fixed cards
-  const totalFixed = TUTORS.length;
-  Array.from({length: totalFixed}, (_, i) => i).forEach(i => {
-    document.getElementById('wtc-'+i)?.classList.remove('selected');
-    const ch = document.getElementById('wtc-check-'+i);
-    if (ch) ch.textContent = '';
-  });
-  // Reset guest
-  document.getElementById('wtc-guest')?.classList.remove('selected');
-  document.getElementById('wtc-check-guest').textContent = '';
-  document.getElementById('guest-fields-welcome').style.display = 'none';
-  // Select chosen
-  document.getElementById('wtc-'+idx)?.classList.add('selected');
-  const ch = document.getElementById('wtc-check-'+idx);
-  if (ch) ch.textContent = '✓';
-  // Show confirm msg and enable button
-  document.getElementById('welcome-confirm-msg').classList.add('visible');
-  document.getElementById('start-btn').disabled = false;
-  // Save
-  ST.tutor = idx;
-  save(ST);
-}
-
-function selectGuestWelcomeCard() {
-  // Reset fixed cards
-  const totalFixed = TUTORS.length;
-  Array.from({length: totalFixed}, (_, i) => i).forEach(i => {
-    document.getElementById('wtc-'+i)?.classList.remove('selected');
-    const ch = document.getElementById('wtc-check-'+i);
-    if (ch) ch.textContent = '';
-  });
-  welcomeTutorSelected = 'guest';
-  document.getElementById('wtc-guest')?.classList.add('selected');
-  document.getElementById('wtc-check-guest').textContent = '✓';
-  document.getElementById('guest-fields-welcome').style.display = 'flex';
-  document.getElementById('guest-fields-welcome').style.flexDirection = 'column';
-  document.getElementById('guest-fields-welcome').style.gap = '6px';
-}
-
-function confirmGuestWelcome() {
-  const name = document.getElementById('gw-name')?.value.trim() || '';
-  const wa   = document.getElementById('gw-wa')?.value.replace(/\D/g,'') || '';
-  if (!name || !wa) { alert('Preencha o nome e o WhatsApp do tutor convidado.'); return; }
-  ST.guestTutor = { name, wa: '55' + wa };
-  ST.tutor = 'guest';
-  save(ST);
-  document.getElementById('welcome-confirm-msg').classList.add('visible');
-  document.getElementById('start-btn').disabled = false;
-}
-
 function startJourney() {
-  if (ST.tutor === undefined) { alert('Escolha um tutor para começar!'); return; }
+  // Validar grupo — único requisito obrigatório agora
+  const meuGrupo = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
+  if (!meuGrupo) {
+    const el = document.getElementById('welcome-group-required');
+    if (el) { el.style.display = 'block'; setTimeout(()=>el.style.display='none', 4000); }
+    openGrupos();
+    return;
+  }
   ST.welcomeDone = true;
+  ST.grupoNum  = meuGrupo.grupoNum;
+  ST.grupoNome = meuGrupo.grupoNome;
+  if (!ST.userName && meuGrupo.nome) ST.userName = meuGrupo.nome;
   save(ST);
   showScreen('home');
   renderHome();
-  renderFixedTutorBtn(
-    ST.tutor === 'guest'
-      ? { name: ST.guestTutor?.name || 'Tutor Convidado', wa: ST.guestTutor?.wa || '' }
-      : TUTORS[ST.tutor]
-  );
   renderCompanionFab();
+  setTimeout(initGrupos, 100);
 }
-
-// Click guest card header to open fields
-document.getElementById('wtc-guest').addEventListener('click', function(e) {
-  if (!e.target.closest('#guest-fields-welcome')) selectGuestWelcomeCard();
-});
 
 // Restore welcome state: if already done, go straight to home
 function initApp() {
   if (ST.welcomeDone) {
     showScreen('home');
     renderHome();
-    if (ST.tutor !== undefined) {
-      const t = ST.tutor === 'guest'
-        ? { name: ST.guestTutor?.name || 'Tutor Convidado', wa: ST.guestTutor?.wa || '' }
-        : TUTORS[ST.tutor];
-      renderFixedTutorBtn(t);
-    }
     renderCompanionFab();
     setTimeout(initGrupos, 80);
   } else {
@@ -5080,7 +4582,6 @@ function initApp() {
     setTimeout(() => {
       renderGrupoBarWelcome();
       renderGrupoPreviewWelcome();
-      renderTutorNamesOnWelcome();
     }, 80);
   }
 }
@@ -5104,14 +4605,31 @@ let CP = {
   myPrayerDate: null,
 };
 
-// Pool de participantes do grupo (simulados — em produção viria do backend)
-const COMPANION_POOL = [
-  { name:'Ana Lima',      icon:'🌸', fase:'discipulo',   xp:520,  streak:14, prayerRequest:'Ore pela saúde da minha mãe.',         missionDone:true  },
-  { name:'Pedro Alves',   icon:'⚓', fase:'aprendiz',    xp:280,  streak:7,  prayerRequest:'Que Deus me dê força no trabalho.',     missionDone:false },
-  { name:'Carla Sousa',   icon:'🌻', fase:'comprometido',xp:890,  streak:21, prayerRequest:'Ore pela minha família.',               missionDone:true  },
-  { name:'Rafael Melo',   icon:'🏔️', fase:'iniciante',   xp:120,  streak:3,  prayerRequest:'',                                     missionDone:false },
-  { name:'Joana Ferreira',icon:'🕊️', fase:'discipulo',   xp:610,  streak:10, prayerRequest:'Preciso de sabedoria numa decisão.',    missionDone:true  },
-];
+// COMPANION_POOL é montado dinamicamente a partir dos participantes REAIS
+// do mesmo Pequeno Grupo do usuário — nunca contém pessoas fictícias.
+// Ver função getCompanionPool() abaixo.
+const COMPANION_ICONS = ['🌿','🌸','⚓','🌻','🏔️','🕊️','🔥','💧','🌅','🍃'];
+
+function getCompanionPool() {
+  const meuGrupo = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
+  if (!meuGrupo || typeof PEQUENOS_GRUPOS === 'undefined') return [];
+
+  const g = PEQUENOS_GRUPOS.find(x => x.num === meuGrupo.grupoNum);
+  if (!g || !g.participantes) return [];
+
+  // Excluir a própria pessoa da lista de possíveis companheiros
+  return g.participantes
+    .filter(p => p.ts !== meuGrupo.ts)
+    .map((p, i) => ({
+      name: p.nome,
+      icon: COMPANION_ICONS[i % COMPANION_ICONS.length],
+      fase: 'iniciante',  // não temos XP de outros participantes ainda — neutro por padrão
+      xp: 0,
+      streak: 0,
+      prayerRequest: '',
+      missionDone: false,
+    }));
+}
 
 const FASE_LABELS_COMP = {
   iniciante:   'Buscador',
@@ -5186,12 +4704,28 @@ function renderCompanionSelector(el) {
     return 'iniciante';
   })();
 
-  const cards = COMPANION_POOL.map((p, i) => `
+  const pool = getCompanionPool();
+
+  if (!pool.length) {
+    el.innerHTML = `
+      <div class="cp-selector">
+        <div class="cp-selector-hdr">🤝 Escolha seu Companheiro de Jornada</div>
+        <div class="cp-selector-body">
+          <p style="font-size:15px;color:var(--text3);text-align:center;padding:1rem 0;font-family:var(--ff-body);line-height:1.6">
+            Ainda não há outros participantes inscritos no seu Pequeno Grupo.<br>
+            Quando mais pessoas se inscreverem, elas aparecerão aqui para você escolher um companheiro de jornada.
+          </p>
+        </div>
+      </div>`;
+    return;
+  }
+
+  const cards = pool.map((p, i) => `
     <div class="cp-card${CP.companionIdx === i ? ' selected' : ''}" id="cp-card-${i}" onclick="selectCompanion(${i})">
       <div class="cp-avatar-sm">${p.icon}</div>
       <div class="cp-info">
         <div class="cp-name">${p.name}</div>
-        <div class="cp-lvl">${FASE_LABELS_COMP[p.fase] || p.fase} · 🔥 ${p.streak} dias</div>
+        <div class="cp-lvl">${FASE_LABELS_COMP[p.fase] || p.fase}</div>
       </div>
       <div class="cp-check" id="cp-check-${i}">${CP.companionIdx === i ? '✓' : ''}</div>
     </div>`).join('');
@@ -5201,7 +4735,7 @@ function renderCompanionSelector(el) {
       <div class="cp-selector-hdr">🤝 Escolha seu Companheiro de Jornada</div>
       <div class="cp-selector-body">
         <p style="font-size:15px;color:var(--text3);margin-bottom:.85rem;font-family:var(--ff-body);line-height:1.5">
-          Um companheiro caminha com você, ora por você e compartilha a jornada. Escolha alguém do grupo:
+          Um companheiro caminha com você, ora por você e compartilha a jornada. Escolha alguém do seu grupo:
         </p>
         ${cards}
         ${CP.companionIdx !== null ? `
@@ -5224,7 +4758,7 @@ function selectCompanion(idx) {
   CP.companionIdx = idx;
   saveCP();
   // Atualizar visual dos cards
-  COMPANION_POOL.forEach((_, i) => {
+  getCompanionPool().forEach((_, i) => {
     const card  = document.getElementById('cp-card-' + i);
     const check = document.getElementById('cp-check-' + i);
     if (card)  { card.classList.toggle('selected', i === idx); }
@@ -5243,7 +4777,7 @@ function confirmCompanion() {
 
 // ── Dashboard do companheiro ─────────────────────────────────────────────
 function renderCompanionDashboard(el) {
-  const p = COMPANION_POOL[CP.companionIdx];
+  const p = getCompanionPool()[CP.companionIdx];
   if (!p) { CP.companionIdx = null; saveCP(); renderCompanionSelector(el); return; }
 
   // Verificar reset semanal do contato
@@ -5474,8 +5008,8 @@ function renderCompanionHomeBtn() {
   div.id = 'home-companion-btn';
   div.style.cssText = 'margin:.75rem 1rem 0';
   loadCP();
-  const hasCp = CP.companionIdx !== null && COMPANION_POOL[CP.companionIdx];
-  const p = hasCp ? COMPANION_POOL[CP.companionIdx] : null;
+  const hasCp = CP.companionIdx !== null && getCompanionPool()[CP.companionIdx];
+  const p = hasCp ? getCompanionPool()[CP.companionIdx] : null;
   div.innerHTML = hasCp
     ? `<button onclick="openCompanion()" style="display:flex;align-items:center;gap:10px;width:100%;background:var(--card);border:0.5px solid rgba(92,61,143,.35);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">
         <span style="font-size:22px">${p.icon}</span>
@@ -6299,16 +5833,8 @@ function renderCelebracoes(containerEl) {
   loadE8();
   if (!containerEl) return;
 
-  // Celebrações fixas de exemplo + as reais do usuário
-  const examples = [
-    { type:'level',   ts:Date.now()-900000,  timeLabel:'15 min', data:{ name:'Ana Lima',    level:'Discípulo',           icon:'🙏' } },
-    { type:'mission', ts:Date.now()-3600000, timeLabel:'1 h',    data:{ name:'Pedro Alves', mission:'Concluiu a Missão da Semana', icon:'🎯' } },
-    { type:'streak',  ts:Date.now()-7200000, timeLabel:'2 h',    data:{ name:'Carla Sousa', streak:21, icon:'🔥' } },
-    { type:'level',   ts:Date.now()-86400000,timeLabel:'1 d',    data:{ name:'Rafael Melo', level:'Seguidor',             icon:'👣' } },
-    { type:'aniv',    ts:Date.now()-172800000,timeLabel:'2 d',   data:{ name:'Joana Ferreira', weeks:4, icon:'🎂' } },
-  ];
-
-  const allCelebs = [...(E8.celebs || []), ...examples]
+  // Celebrações reais — só as conquistas genuínas dos participantes do grupo.
+  const allCelebs = [...(E8.celebs || [])]
     .sort((a, b) => b.ts - a.ts)
     .slice(0, 12);
 
@@ -6463,14 +5989,16 @@ function checkStreakCelebration(streak) {
 // ══════════════════════════════════════
 
 // ── Dados dos 50 grupos ──────────────────────────────────────────────────
-// Estrutura: { num, nome, tutor, coordenador, wa, participantes:[] }
-// wa = número do WhatsApp comunitário do grupo (somente dígitos, com DDI)
+// Estrutura: { num, nome, tutor, coordenador, participantes:[] }
+// A comunicação acontece dentro do próprio app (Comunidade, Mural,
+// Companheiro de Jornada) — não há mais dependência de grupo externo.
 const PEQUENOS_GRUPOS = Array.from({length:50}, (_, i) => ({
   num: i + 1,
   nome: null,         // definido pelo primeiro participante que criar o grupo
   tutor: null,        // nome do tutor (preenchido por quem se identificar como tutor)
   coordenador: null,  // nome do coordenador (preenchido por quem se identificar como coordenador)
-  waLink: null,       // Link de convite do grupo de WhatsApp (definido por quem criar o grupo)
+  diaReuniao: null,   // dia da semana em que o PG se reúne
+  horaReuniao: null,  // horário da reunião (HH:MM)
   participantes: [],
   maxParticipantes: null, // null = ilimitado
 }));
@@ -6490,7 +6018,8 @@ function loadGrupos() {
           PEQUENOS_GRUPOS[idx].nome = g.nome ?? null;
           PEQUENOS_GRUPOS[idx].tutor = g.tutor ?? null;
           PEQUENOS_GRUPOS[idx].coordenador = g.coordenador ?? null;
-          PEQUENOS_GRUPOS[idx].waLink = g.waLink ?? null;
+          PEQUENOS_GRUPOS[idx].diaReuniao = g.diaReuniao ?? null;
+          PEQUENOS_GRUPOS[idx].horaReuniao = g.horaReuniao ?? null;
           PEQUENOS_GRUPOS[idx].participantes = g.participantes || [];
         }
       });
@@ -6505,7 +6034,8 @@ function saveGrupos() {
       nome: g.nome,
       tutor: g.tutor,
       coordenador: g.coordenador,
-      waLink: g.waLink,
+      diaReuniao: g.diaReuniao,
+      horaReuniao: g.horaReuniao,
       participantes: g.participantes,
     }));
     localStorage.setItem(GRUPOS_KEY, JSON.stringify(dadosSalvar));
@@ -6558,31 +6088,48 @@ function openGrupos() {
 }
 
 // ── Render: lista de grupos ────────────────────────────────────────────
+// Mostra apenas: grupos já existentes (em formação ou completos) + o único
+// próximo grupo disponível para criação. Os demais grupos vazios/bloqueados
+// (a grande maioria, no início do uso do app) NUNCA aparecem na tela —
+// nem mesmo como itens bloqueados — para não ocupar espaço sem necessidade.
 function renderGrupoList(filtro = '') {
   const body = document.getElementById('grupo-list-body');
   if (!body) return;
 
   loadGrupos();
 
-  const grupos = PEQUENOS_GRUPOS.filter(g => {
-    if (!filtro) return true;
-    const f = filtro.toLowerCase();
-    return String(g.num).includes(f) ||
-           (g.nome && g.nome.toLowerCase().includes(f)) ||
-           (g.tutor && g.tutor.toLowerCase().includes(f)) ||
-           (g.coordenador && g.coordenador.toLowerCase().includes(f));
+  const proximoVazio = getProximoGrupoVazio();
+
+  // Grupos visíveis: já existem (formação/completo) OU é o único próximo disponível
+  let gruposVisiveis = PEQUENOS_GRUPOS.filter(g => {
+    const status = getGrupoStatus(g);
+    if (status !== 'vazio') return true;               // já existe — sempre mostrado
+    return proximoVazio && g.num === proximoVazio.num;  // só o próximo da fila
   });
 
-  if (!grupos.length) {
+  // Aplicar busca textual (apenas sobre os grupos já existentes — não faz
+  // sentido buscar texto dentro de um grupo que ainda não tem nome/tutor)
+  if (filtro) {
+    const f = filtro.toLowerCase();
+    gruposVisiveis = gruposVisiveis.filter(g => {
+      const status = getGrupoStatus(g);
+      if (status === 'vazio') return true; // mantém o card de "criar próximo" visível mesmo buscando
+      return String(g.num).includes(f) ||
+             (g.nome && g.nome.toLowerCase().includes(f)) ||
+             (g.tutor && g.tutor.toLowerCase().includes(f)) ||
+             (g.coordenador && g.coordenador.toLowerCase().includes(f));
+    });
+  }
+
+  if (!gruposVisiveis.length) {
     body.innerHTML = `<div style="text-align:center;padding:2rem;font-size:16px;color:var(--text3);font-family:var(--ff-body)">Nenhum grupo encontrado.</div>`;
     return;
   }
 
   const meuGrupo = loadMeuGrupo();
 
-  body.innerHTML = grupos.map(g => {
+  body.innerHTML = gruposVisiveis.map(g => {
     const status = getGrupoStatus(g);
-    const acessivel = isGrupoAcessivel(g);
     const total = g.participantes.length;
     const cheio = g.maxParticipantes !== null && total >= g.maxParticipantes;
     const isMeu = meuGrupo && meuGrupo.grupoNum === g.num;
@@ -6593,17 +6140,11 @@ function renderGrupoList(filtro = '') {
     let metaDisplay = '';
 
     if (status === 'vazio') {
-      if (acessivel) {
-        vTag = '<span class="grupo-vagas vagas-disponivel">✨ Disponível para criar</span>';
-        cardCls = 'disponivel';
-        nomeDisplay = '<em style="color:var(--text3);font-style:italic">Aguardando criação…</em>';
-        metaDisplay = 'Seja o primeiro a se inscrever neste grupo';
-      } else {
-        vTag = '<span class="grupo-vagas vagas-cheio">🔒 Bloqueado</span>';
-        cardCls = 'bloqueado';
-        nomeDisplay = '<em style="color:var(--text3);font-style:italic">Ainda não disponível</em>';
-        metaDisplay = 'Este grupo será liberado em breve';
-      }
+      // Só chega aqui se for o próximo grupo da fila — sempre acessível
+      vTag = '<span class="grupo-vagas vagas-disponivel">✨ Disponível para criar</span>';
+      cardCls = 'disponivel';
+      nomeDisplay = '<em style="color:var(--text3);font-style:italic">Aguardando criação…</em>';
+      metaDisplay = 'Seja o primeiro a se inscrever neste grupo';
     } else if (status === 'formacao') {
       vTag = `<span class="grupo-vagas vagas-formacao">🛠️ Em formação</span>`;
       nomeDisplay = g.nome || '<em style="color:var(--text3);font-style:italic">Nome ainda não definido</em>';
@@ -6621,7 +6162,7 @@ function renderGrupoList(filtro = '') {
       metaDisplay = `👨‍🏫 ${g.tutor} · 🤝 ${g.coordenador}`;
     }
 
-    const clickable = (status !== 'vazio' || acessivel) && !cheio;
+    const clickable = !cheio;
 
     return `<div class="grupo-card ${cardCls}" onclick="${clickable ? `openInscricao(${g.num})` : ''}">
       <div class="grupo-card-inner">
@@ -6668,6 +6209,7 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
   if (!body) return;
 
   const status = getGrupoStatus(g);
+  const podeGerenciar = !!jaInscrito; // só quem já está no grupo pode trocar papéis
 
   // ── Painel de status do grupo (o que já foi definido) ───────────────
   const statusCard = `
@@ -6685,6 +6227,7 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
           <div class="grupo-info-lbl">Tutor</div>
           <div class="grupo-info-val">${g.tutor || '— ainda não definido —'}</div>
         </div>
+        ${podeGerenciar && g.tutor ? `<button class="grupo-troca-papel-btn" onclick="iniciarTrocaPapel(${g.num},'tutor')">Trocar</button>` : ''}
       </div>
       <div class="grupo-info-row">
         <span class="grupo-info-ico">🤝</span>
@@ -6692,6 +6235,15 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
           <div class="grupo-info-lbl">Coordenador</div>
           <div class="grupo-info-val">${g.coordenador || '— ainda não definido —'}</div>
         </div>
+        ${podeGerenciar && g.coordenador ? `<button class="grupo-troca-papel-btn" onclick="iniciarTrocaPapel(${g.num},'coordenador')">Trocar</button>` : ''}
+      </div>
+      <div class="grupo-info-row">
+        <span class="grupo-info-ico">🗓️</span>
+        <div class="grupo-info-txt">
+          <div class="grupo-info-lbl">Dia e horário de reunião</div>
+          <div class="grupo-info-val">${g.diaReuniao ? `${g.diaReuniao}${g.horaReuniao ? ' às ' + g.horaReuniao : ''}` : '— ainda não definido —'}</div>
+        </div>
+        ${podeGerenciar ? `<button class="grupo-troca-papel-btn" onclick="iniciarTrocaReuniao(${g.num})">Trocar</button>` : ''}
       </div>
       <div class="grupo-info-row">
         <span class="grupo-info-ico">👥</span>
@@ -6700,15 +6252,6 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
           <div class="grupo-info-val">${g.participantes.length}</div>
         </div>
       </div>
-      ${g.waLink ? `
-      <div class="grupo-info-row">
-        <span class="grupo-info-ico">💬</span>
-        <div class="grupo-info-txt">
-          <div class="grupo-info-lbl">Grupo do WhatsApp</div>
-          <div class="grupo-info-val">Link de convite disponível</div>
-        </div>
-        <button class="grupo-wa-btn" onclick="abrirWaGrupo('${g.waLink}')">Entrar</button>
-      </div>` : ''}
     </div>`;
 
   // ── Se já estou inscrito, mostrar confirmação ────────────────────────
@@ -6720,11 +6263,11 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
         <div class="insc-confirm-title">Você já faz parte deste grupo!</div>
         <div class="insc-confirm-msg">
           <strong>${meuGrupo.nome}</strong><br>
-          ${meuGrupo.papel === 'coordenador' ? '🤝 Você é o Coordenador deste grupo' : (meuGrupo.tipo === 'colaborador' ? `🏥 ${meuGrupo.departamento}` : meuGrupo.tipo === 'amigo' ? '🤝 Amigo dos Adventistas' : meuGrupo.tipo === 'membro' ? '⛪ Membro IASD' : '🌿 Participante')}<br>
-          <span style="font-size:13px;color:var(--text3);margin-top:.3rem;display:block">Entre no grupo do WhatsApp para ficar conectado.</span>
+          ${meuGrupo.papel === 'tutor' ? '👨‍🏫 Você é o Tutor deste grupo' : meuGrupo.papel === 'coordenador' ? '🤝 Você é o Coordenador deste grupo' : (meuGrupo.tipo === 'colaborador' ? `🏥 ${meuGrupo.departamento}` : meuGrupo.tipo === 'amigo' ? '🤝 Amigo dos Adventistas' : meuGrupo.tipo === 'membro' ? '⛪ Membro IASD' : '🌿 Participante')}<br>
+          <span style="font-size:13px;color:var(--text3);margin-top:.3rem;display:block">Acompanhe seu grupo na Comunidade do app — mural de gratidão, progresso e companheiro de jornada.</span>
         </div>
       </div>
-      ${g.waLink ? `<button class="insc-submit-btn" style="background:var(--teal)" onclick="abrirWaGrupo('${g.waLink}')">💬 Entrar no grupo do WhatsApp</button>` : `<div class="insc-confirm" style="margin-top:.6rem"><div style="font-size:14px;color:var(--text3);font-family:var(--ff-body)">⏳ O grupo de WhatsApp ainda não foi criado pelo organizador deste PG.</div></div>`}
+      <button class="insc-submit-btn" style="background:var(--gold)" onclick="openComunidade()">❤️ Ir para a Comunidade</button>
       <button onclick="cancelarInscricao(${g.num})" style="background:none;border:none;color:var(--text3);font-size:14px;cursor:pointer;font-family:var(--ff-body);padding:.5rem;margin-top:.25rem;width:100%;text-align:center">
         Cancelar minha inscrição
       </button>`;
@@ -6744,27 +6287,30 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
       <div class="papel-form-hdr participante">🌱 Você está criando este grupo!</div>
       <div class="papel-form-body">
         <p style="font-size:14.5px;color:var(--text2);font-family:var(--ff-body);line-height:1.5;margin-bottom:.7rem">
-          Este grupo ainda não existe. Ao se inscrever, você dá um nome ao Pequeno Grupo e cria o grupo de WhatsApp comunitário.
+          Este grupo ainda não existe. Ao se inscrever, você dá um nome ao Pequeno Grupo — toda a comunicação acontece aqui dentro do app, no Mural de Gratidão e Pedidos de Oração.
         </p>
         <div class="insc-field" style="margin-bottom:.6rem">
           <label>Nome do Pequeno Grupo *</label>
           <input class="insc-input" id="insc-grupo-nome-input" type="text" placeholder="Ex: Luz do Caminho, Fonte de Vida…">
         </div>
-
-        <div class="wa-link-howto">
-          <div class="wa-link-howto-title">📱 Como criar o grupo de WhatsApp</div>
-          <ol class="wa-link-howto-steps">
-            <li>Abra o WhatsApp e toque em <strong>Novo grupo</strong></li>
-            <li>Adicione a si mesmo e nomeie como <strong>"Grupo ${g.num} — [nome do PG]"</strong></li>
-            <li>Toque no nome do grupo → <strong>Convidar via link</strong></li>
-            <li>Copie o link e cole no campo abaixo</li>
-          </ol>
-        </div>
-
-        <div class="insc-field">
-          <label>Link de convite do grupo de WhatsApp *</label>
-          <input class="insc-input" id="insc-grupo-wa-input" type="url" placeholder="https://chat.whatsapp.com/...">
-          <p style="font-size:12.5px;color:var(--text3);margin-top:4px;font-family:var(--ff-body)">Cole aqui o link gerado pelo WhatsApp — todos que se inscreverem depois entrarão direto pelo link.</p>
+        <div class="insc-field-row">
+          <div class="insc-field">
+            <label>Dia da semana</label>
+            <select class="insc-input" id="insc-grupo-dia-input">
+              <option value="">Selecione…</option>
+              <option value="Domingo">Domingo</option>
+              <option value="Segunda-feira">Segunda-feira</option>
+              <option value="Terça-feira">Terça-feira</option>
+              <option value="Quarta-feira">Quarta-feira</option>
+              <option value="Quinta-feira">Quinta-feira</option>
+              <option value="Sexta-feira">Sexta-feira</option>
+              <option value="Sábado">Sábado</option>
+            </select>
+          </div>
+          <div class="insc-field">
+            <label>Horário</label>
+            <input class="insc-input" id="insc-grupo-hora-input" type="time">
+          </div>
         </div>
       </div>
     </div>` : ''}
@@ -6790,6 +6336,15 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
       <div class="insc-block-hdr">👤 Qual é o seu papel neste grupo?</div>
       <div class="insc-block-body">
         <div class="insc-tipo-opts">
+
+          ${!g.tutor ? `
+          <div class="insc-tipo-opt" id="tipo-opt-tutor" onclick="selecionarTipo('tutor')">
+            <div class="insc-tipo-radio"></div>
+            <div class="insc-tipo-info">
+              <div class="insc-tipo-label">👨‍🏫 Sou o Tutor deste grupo</div>
+              <div class="insc-tipo-sub">Capelão ou responsável espiritual pelo grupo</div>
+            </div>
+          </div>` : ''}
 
           ${!g.coordenador ? `
           <div class="insc-tipo-opt" id="tipo-opt-coordenador" onclick="selecionarTipo('coordenador')">
@@ -6880,30 +6435,32 @@ function confirmarInscricao(grupoNum) {
   if (tipoSelecionado === 'colaborador' && !dept) { mostrarErroInsc('Informe o departamento onde você trabalha.'); return; }
 
   // Validações de criação do grupo (só se for o primeiro a entrar)
-  let grupoNomeInput = null, grupoWaLinkInput = null;
+  let grupoNomeInput = null, grupoDiaInput = null, grupoHoraInput = null;
   if (precisaNome) {
-    grupoNomeInput   = document.getElementById('insc-grupo-nome-input')?.value.trim();
-    grupoWaLinkInput = document.getElementById('insc-grupo-wa-input')?.value.trim();
+    grupoNomeInput = document.getElementById('insc-grupo-nome-input')?.value.trim();
+    grupoDiaInput  = document.getElementById('insc-grupo-dia-input')?.value || '';
+    grupoHoraInput = document.getElementById('insc-grupo-hora-input')?.value || '';
     if (!grupoNomeInput) { mostrarErroInsc('Por favor, dê um nome ao Pequeno Grupo.'); return; }
-    if (!grupoWaLinkInput || !grupoWaLinkInput.startsWith('https://chat.whatsapp.com/')) {
-      mostrarErroInsc('Cole um link de convite válido do WhatsApp (começa com chat.whatsapp.com).');
-      return;
-    }
   }
 
   document.getElementById('insc-erro').style.display = 'none';
 
-  // ── Definir nome e link do grupo de WhatsApp, se for o criador ──────
+  // ── Definir nome e horário do grupo, se for o criador ────────────────
   if (precisaNome) {
-    g.nome   = grupoNomeInput;
-    g.waLink = grupoWaLinkInput;
+    g.nome = grupoNomeInput;
+    g.diaReuniao = grupoDiaInput || null;
+    g.horaReuniao = grupoHoraInput || null;
   }
 
-  // ── Tutor do grupo = tutor já escolhido na tela de boas-vindas ──────
-  // (preenchido automaticamente, sem precisar de uma opção separada aqui)
-  if (!g.tutor && typeof getTutorNameForSync === 'function') {
-    const tutorDaWelcome = getTutorNameForSync();
-    if (tutorDaWelcome) g.tutor = tutorDaWelcome;
+  // ── Tutor do grupo: prioridade para escolha explícita "Sou o Tutor";
+  // se ninguém escolher isso, usa o tutor já selecionado na welcome screen ──
+  if (!g.tutor) {
+    if (tipoSelecionado === 'tutor') {
+      g.tutor = nome;
+    } else if (typeof getTutorNameForSync === 'function') {
+      const tutorDaWelcome = getTutorNameForSync();
+      if (tutorDaWelcome) g.tutor = tutorDaWelcome;
+    }
   }
 
   // ── Definir coordenador, se aplicável ────────────────────────────────
@@ -6914,7 +6471,7 @@ function confirmarInscricao(grupoNum) {
     nome,
     wa: '55' + wa,
     tipo: tipoSelecionado,
-    papel: (tipoSelecionado === 'coordenador') ? 'coordenador' : null,
+    papel: (tipoSelecionado === 'tutor' || tipoSelecionado === 'coordenador') ? tipoSelecionado : null,
     departamento: tipoSelecionado === 'colaborador' ? dept : '',
     dataInscricao: new Date().toLocaleDateString('pt-BR'),
     ts: Date.now(),
@@ -6944,8 +6501,6 @@ function confirmarInscricao(grupoNum) {
   const meuGrupo = { grupoNum: g.num, nome: g.nome, papel: participante.papel, tipo: tipoSelecionado, departamento: dept };
   renderInscricaoBody(g, true, meuGrupo);
 
-  if (g.waLink) setTimeout(() => abrirWaGrupo(g.waLink), 800);
-
   setTimeout(() => {
     renderGrupoPreviewWelcome();
     const sb = document.getElementById('start-btn');
@@ -6958,6 +6513,119 @@ function mostrarErroInsc(msg) {
   if (el) { el.textContent = msg; el.style.display = 'block'; }
 }
 
+// ── Trocar Tutor ou Coordenador de um grupo já existente ────────────────
+function iniciarTrocaPapel(grupoNum, papel) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return;
+  const label = papel === 'tutor' ? 'Tutor' : 'Coordenador';
+  const atual = papel === 'tutor' ? g.tutor : g.coordenador;
+
+  const body = document.getElementById('insc-body');
+  if (!body) return;
+
+  const formHtml = `
+    <div class="papel-form-card" id="troca-papel-form">
+      <div class="papel-form-hdr ${papel}">🔄 Trocar ${label} do grupo</div>
+      <div class="papel-form-body">
+        <div class="papel-status-row">
+          <span class="papel-status-ico">${papel === 'tutor' ? '👨‍🏫' : '🤝'}</span>
+          <span class="papel-status-txt">Atual: <span class="papel-status-nome">${atual}</span></span>
+        </div>
+        <div class="insc-field">
+          <label>Novo nome do ${label.toLowerCase()} *</label>
+          <input class="insc-input" id="troca-papel-nome" type="text" placeholder="Nome completo">
+        </div>
+        <div style="display:flex;gap:8px;margin-top:.6rem">
+          <button class="insc-submit-btn" style="margin:0;flex:1" onclick="confirmarTrocaPapel(${grupoNum},'${papel}')">✓ Confirmar troca</button>
+          <button onclick="cancelarTrocaPapel(${grupoNum})" style="background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">Cancelar</button>
+        </div>
+      </div>
+    </div>`;
+
+  // Inserir o formulário no topo do corpo, antes do restante do conteúdo
+  const existing = document.getElementById('troca-papel-form');
+  if (existing) existing.remove();
+  body.insertAdjacentHTML('afterbegin', formHtml);
+  setTimeout(() => document.getElementById('troca-papel-nome')?.focus(), 50);
+}
+
+function cancelarTrocaPapel(grupoNum) {
+  openInscricao(grupoNum);
+}
+
+function confirmarTrocaPapel(grupoNum, papel) {
+  const novoNome = document.getElementById('troca-papel-nome')?.value.trim();
+  if (!novoNome) { alert('Informe o nome do novo ' + (papel === 'tutor' ? 'tutor' : 'coordenador') + '.'); return; }
+
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return;
+
+  if (papel === 'tutor') g.tutor = novoNome;
+  if (papel === 'coordenador') g.coordenador = novoNome;
+  saveGrupos();
+
+  openInscricao(grupoNum);
+  setTimeout(() => renderGrupoPreviewWelcome(), 100);
+}
+
+// ── Trocar dia/horário de reunião do grupo ──────────────────────────────
+function iniciarTrocaReuniao(grupoNum) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return;
+
+  const body = document.getElementById('insc-body');
+  if (!body) return;
+
+  const dias = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+  const diasOpts = dias.map(d => `<option value="${d}" ${g.diaReuniao===d?'selected':''}>${d}</option>`).join('');
+
+  const formHtml = `
+    <div class="papel-form-card" id="troca-papel-form">
+      <div class="papel-form-hdr participante">🔄 Trocar dia e horário de reunião</div>
+      <div class="papel-form-body">
+        <div class="papel-status-row">
+          <span class="papel-status-ico">🗓️</span>
+          <span class="papel-status-txt">Atual: <span class="papel-status-nome">${g.diaReuniao ? `${g.diaReuniao}${g.horaReuniao ? ' às ' + g.horaReuniao : ''}` : '— não definido —'}</span></span>
+        </div>
+        <div class="insc-field-row">
+          <div class="insc-field">
+            <label>Dia da semana</label>
+            <select class="insc-input" id="troca-reuniao-dia">
+              <option value="">Selecione…</option>
+              ${diasOpts}
+            </select>
+          </div>
+          <div class="insc-field">
+            <label>Horário</label>
+            <input class="insc-input" id="troca-reuniao-hora" type="time" value="${g.horaReuniao || ''}">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:.6rem">
+          <button class="insc-submit-btn" style="margin:0;flex:1" onclick="confirmarTrocaReuniao(${grupoNum})">✓ Salvar novo horário</button>
+          <button onclick="cancelarTrocaPapel(${grupoNum})" style="background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">Cancelar</button>
+        </div>
+      </div>
+    </div>`;
+
+  const existing = document.getElementById('troca-papel-form');
+  if (existing) existing.remove();
+  body.insertAdjacentHTML('afterbegin', formHtml);
+}
+
+function confirmarTrocaReuniao(grupoNum) {
+  const dia = document.getElementById('troca-reuniao-dia')?.value || '';
+  const hora = document.getElementById('troca-reuniao-hora')?.value || '';
+
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return;
+
+  g.diaReuniao = dia || null;
+  g.horaReuniao = hora || null;
+  saveGrupos();
+
+  openInscricao(grupoNum);
+}
+
 function cancelarInscricao(grupoNum) {
   if (!confirm('Deseja cancelar sua participação neste grupo?')) return;
   const meuGrupo = loadMeuGrupo();
@@ -6965,18 +6633,12 @@ function cancelarInscricao(grupoNum) {
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
   if (g && meuGrupo) {
     g.participantes = g.participantes.filter(p => p.ts !== meuGrupo.ts);
-    // Se a pessoa que saiu era a coordenadora, libera o papel novamente
-    // (o tutor é definido pela escolha na tela de boas-vindas, não muda aqui)
+    // Se a pessoa que saiu era tutor ou coordenadora, libera o papel novamente
+    if (meuGrupo.papel === 'tutor') g.tutor = null;
     if (meuGrupo.papel === 'coordenador') g.coordenador = null;
     saveGrupos();
   }
   openInscricao(grupoNum);
-}
-
-// ── WhatsApp comunitário — abre o link de convite do grupo ──────────────
-function abrirWaGrupo(waLink) {
-  if (!waLink) return;
-  window.open(waLink, '_blank');
 }
 
 // ── Chip de grupo na home ──────────────────────────────────────────────
@@ -7099,14 +6761,6 @@ function renderGrupoPreviewWelcome() {
   }
 }
 
-// ── Preencher nomes dos tutores nos cards da welcome ─────────────────
-function renderTutorNamesOnWelcome() {
-  TUTORS.forEach((t, i) => {
-    const nameEl = document.getElementById('wtc-name-' + i);
-    if (nameEl) nameEl.textContent = t.name;
-  });
-}
-
 
 // ══════════════════════════════════════
 //  PROGRESSO DO MEU PEQUENO GRUPO (específico)
@@ -7136,21 +6790,21 @@ function savePgProgress(data) {
   try { localStorage.setItem(PG_PROGRESS_KEY, JSON.stringify(data)); } catch {}
 }
 
-// Gera (ou recupera) o progresso simulado do grupo desta semana
+// Gera (ou recupera) o progresso real do grupo desta semana — começa zerado
 function getOrInitPgProgress(grupoNum) {
   let data = loadPgProgress();
   const weekKey = getISOWeekPg();
 
   if (!data || data.grupoNum !== grupoNum || data.weekKey !== weekKey) {
-    // Nova semana ou grupo novo — gerar progresso inicial simulado
-    const metas = getPgWeekMetas(grupoNum);
-    const seedBase = (grupoNum * 37) % 100;
+    // Nova semana ou grupo novo — começa sempre zerado.
+    // O progresso só avança com ações reais dos participantes
+    // (completar estudo, orar, registrar bondade, etc).
     data = {
       grupoNum,
       weekKey,
-      estudos:  Math.min(metas.estudos.meta,  Math.floor(metas.estudos.meta  * (0.35 + (seedBase % 30)/100))),
-      oracoes:  Math.min(metas.oracoes.meta,  Math.floor(metas.oracoes.meta  * (0.40 + (seedBase % 25)/100))),
-      bondades: Math.min(metas.bondades.meta, Math.floor(metas.bondades.meta * (0.30 + (seedBase % 35)/100))),
+      estudos: 0,
+      oracoes: 0,
+      bondades: 0,
     };
     savePgProgress(data);
   }
@@ -7251,14 +6905,9 @@ function renderPgProgressHome() {
 
 const GRAT_KEY = 'jdpg_gratidoes_v1';
 
-// Posts de exemplo (simulando outros participantes do grupo/comunidade)
-const GRAT_EXAMPLES = [
-  { id:'ex1', nome:'Ana Lima',      avatar:'🌸', texto:'Hoje sou grata por ter conseguido visitar minha mãe no hospital e orar com ela. Deus é fiel.', ts:Date.now()-3600000,  reacoes:{coracao:7,oracao:3}, privado:false },
-  { id:'ex2', nome:'Pedro Alves',   avatar:'⚓', texto:'Hoje sou grato pela paz que senti durante o estudo de hoje. Precisava muito disso.',             ts:Date.now()-7200000,  reacoes:{coracao:4,oracao:5}, privado:false },
-  { id:'ex3', nome:'Carla Sousa',   avatar:'🌻', texto:'Hoje sou grata por um colega de trabalho que me ajudou sem eu nem precisar pedir.',                ts:Date.now()-21600000, reacoes:{coracao:9,oracao:2}, privado:false },
-  { id:'ex4', nome:'Rafael Melo',   avatar:'🏔️', texto:'Hoje sou grato por mais um dia de saúde para cuidar da minha família.',                          ts:Date.now()-86400000, reacoes:{coracao:5,oracao:1}, privado:false },
-  { id:'ex5', nome:'Joana Ferreira',avatar:'🕊️', texto:'Hoje sou grata por ter encontrado forças para perdoar alguém que me machucou.',                  ts:Date.now()-172800000,reacoes:{coracao:11,oracao:6}, privado:false },
-];
+// O Mural de Gratidão começa vazio — só mostra gratidões reais
+// compartilhadas pelos participantes do Pequeno Grupo.
+const GRAT_EXAMPLES = [];
 
 function loadGratidoes() {
   try { return JSON.parse(localStorage.getItem(GRAT_KEY) || '[]'); } catch { return []; }
@@ -7293,24 +6942,42 @@ function renderComunidadeScreen() {
   const minhasGrat = loadGratidoes();
   const todasGrat  = [...minhasGrat, ...GRAT_EXAMPLES].sort((a,b) => b.ts - a.ts);
 
-  const visiveis = muralFiltro === 'meus'
-    ? minhasGrat.sort((a,b) => b.ts - a.ts)
-    : todasGrat;
+  let visiveis;
+  if (muralFiltro === 'meus') {
+    visiveis = minhasGrat.sort((a,b) => b.ts - a.ts);
+  } else if (muralFiltro === 'gratidao') {
+    visiveis = todasGrat.filter(g => (g.tipo || 'gratidao') === 'gratidao');
+  } else if (muralFiltro === 'oracao') {
+    visiveis = todasGrat.filter(g => g.tipo === 'oracao');
+  } else {
+    visiveis = todasGrat;
+  }
+
+  const tipoAtual = postTipoSelecionado || 'gratidao';
+  const prefixo = tipoAtual === 'oracao' ? 'Peço oração por…' : 'Hoje sou grato(a) por…';
+  const placeholder = tipoAtual === 'oracao'
+    ? 'Compartilhe um pedido de oração com o seu grupo…'
+    : 'Compartilhe algo bom que Deus fez por você hoje…';
+  const corBtn = tipoAtual === 'oracao' ? 'var(--purple)' : 'var(--gold)';
 
   const composerHtml = `
     <div class="grat-composer">
-      <div class="grat-composer-hdr">❤️ Mural de Gratidão</div>
+      <div class="grat-composer-hdr">❤️ Mural de Gratidão / Pedidos de Oração</div>
       <div class="grat-composer-body">
-        <div class="grat-prefix">Hoje sou grato(a) por…</div>
+        <div class="grat-tipo-row">
+          <button class="grat-tipo-chip ${tipoAtual==='gratidao'?'active':''}" onclick="setPostTipo('gratidao')">🙌 Gratidão</button>
+          <button class="grat-tipo-chip oracao ${tipoAtual==='oracao'?'active':''}" onclick="setPostTipo('oracao')">🙏 Pedido de oração</button>
+        </div>
+        <div class="grat-prefix">${prefixo}</div>
         <textarea class="grat-textarea" id="grat-input" rows="3"
-          placeholder="Compartilhe algo bom que Deus fez por você hoje…"
+          placeholder="${placeholder}"
           oninput="document.getElementById('grat-send-btn').disabled = !this.value.trim()"></textarea>
         <div class="grat-send-row">
           <label class="grat-privacy-toggle">
             <input type="checkbox" id="grat-privado" style="margin:0">
             🔒 Privado (só eu vejo)
           </label>
-          <button class="grat-send-btn" id="grat-send-btn" onclick="enviarGratidao()" disabled>Compartilhar</button>
+          <button class="grat-send-btn" id="grat-send-btn" style="background:${corBtn}" onclick="enviarGratidao()" disabled>Compartilhar</button>
         </div>
       </div>
     </div>`;
@@ -7318,12 +6985,19 @@ function renderComunidadeScreen() {
   const filterHtml = `
     <div class="mural-filter-row">
       <div class="mural-filter-chip ${muralFiltro==='todos'?'active':''}" onclick="setMuralFiltro('todos')">🌍 Todo o mural</div>
-      <div class="mural-filter-chip ${muralFiltro==='meus'?'active':''}" onclick="setMuralFiltro('meus')">📝 Minhas gratidões</div>
+      <div class="mural-filter-chip ${muralFiltro==='gratidao'?'active':''}" onclick="setMuralFiltro('gratidao')">🙌 Gratidões</div>
+      <div class="mural-filter-chip ${muralFiltro==='oracao'?'active':''}" onclick="setMuralFiltro('oracao')">🙏 Pedidos de oração</div>
+      <div class="mural-filter-chip ${muralFiltro==='meus'?'active':''}" onclick="setMuralFiltro('meus')">📝 Meus posts</div>
     </div>`;
+
+  const emptyMsg = muralFiltro === 'meus' ? 'Você ainda não compartilhou nada.'
+    : muralFiltro === 'oracao' ? 'Nenhum pedido de oração ainda — compartilhe o seu.'
+    : muralFiltro === 'gratidao' ? 'Nenhuma gratidão ainda — seja o primeiro a compartilhar!'
+    : 'Nenhuma publicação ainda — seja o primeiro a compartilhar!';
 
   const listHtml = visiveis.length
     ? visiveis.filter(g => !g.privado || muralFiltro === 'meus').map(g => renderGratCard(g)).join('')
-    : `<div class="mural-empty">${muralFiltro === 'meus' ? 'Você ainda não compartilhou nenhuma gratidão.' : 'Nenhuma gratidão ainda — seja o primeiro a compartilhar!'}</div>`;
+    : `<div class="mural-empty">${emptyMsg}</div>`;
 
   body.innerHTML = `
     ${composerHtml}
@@ -7332,17 +7006,29 @@ function renderComunidadeScreen() {
     ${listHtml}`;
 }
 
+let postTipoSelecionado = 'gratidao';
+function setPostTipo(tipo) {
+  postTipoSelecionado = tipo;
+  renderComunidadeScreen();
+  setTimeout(() => document.getElementById('grat-input')?.focus(), 50);
+}
+
 function renderGratCard(g) {
   const reacoes = g.reacoes || { coracao: 0, oracao: 0 };
   const minhasReacoes = getMinhasReacoes(g.id);
+  const isOracao = g.tipo === 'oracao';
+  const tagHtml = isOracao
+    ? '<span class="grat-tag oracao">🙏 Pedido de oração</span>'
+    : '<span class="grat-tag">🙌 Gratidão</span>';
   return `
-    <div class="grat-card">
+    <div class="grat-card ${isOracao ? 'oracao' : ''}">
       <div class="grat-card-hdr">
         <div class="grat-avatar">${g.avatar || '🌿'}</div>
         <div class="grat-meta">
           <div class="grat-name">${g.nome}${g.privado ? ' 🔒' : ''}</div>
           <div class="grat-time">${timeAgoGrat(g.ts)}</div>
         </div>
+        ${tagHtml}
       </div>
       <div class="grat-text">${g.texto}</div>
       <div class="grat-react-row">
@@ -7350,7 +7036,7 @@ function renderGratCard(g) {
           ❤️ ${reacoes.coracao || 0}
         </button>
         <button class="grat-react-btn ${minhasReacoes.oracao ? 'active' : ''}" onclick="reagirGratidao('${g.id}','oracao')">
-          🙏 ${reacoes.oracao || 0}
+          🙏 ${reacoes.oracao || 0} ${isOracao ? 'orando' : ''}
         </button>
       </div>
     </div>`;
@@ -7361,12 +7047,13 @@ function setMuralFiltro(f) {
   renderComunidadeScreen();
 }
 
-// ── Enviar gratidão ──────────────────────────────────────────────────
+// ── Enviar gratidão ou pedido de oração ──────────────────────────────
 function enviarGratidao() {
   const input = document.getElementById('grat-input');
   const texto = input?.value.trim();
   if (!texto) return;
   const privado = document.getElementById('grat-privado')?.checked || false;
+  const tipo = postTipoSelecionado || 'gratidao';
 
   const list = loadGratidoes();
   const novo = {
@@ -7374,6 +7061,7 @@ function enviarGratidao() {
     nome: ST.userName || 'Você',
     avatar: '🌿',
     texto,
+    tipo,
     ts: Date.now(),
     reacoes: { coracao: 0, oracao: 0 },
     privado,
@@ -7381,18 +7069,21 @@ function enviarGratidao() {
   list.unshift(novo);
   saveGratidoes(list);
 
-  // XP por compartilhar gratidão
+  // XP por compartilhar (gratidão ou pedido de oração)
   ST.xp = (ST.xp || 0) + 10;
   save(ST);
 
-  // Contribui ao progresso do PG como "bondade" simbólica
-  if (typeof bumpPgProgress === 'function') bumpPgProgress('bondades', 1);
+  // Contribui ao progresso do PG — gratidão como bondade, pedido como oração
+  if (typeof bumpPgProgress === 'function') {
+    bumpPgProgress(tipo === 'oracao' ? 'oracoes' : 'bondades', 1);
+  }
 
   input.value = '';
   document.getElementById('grat-privado').checked = false;
   document.getElementById('grat-send-btn').disabled = true;
 
   renderComunidadeScreen();
+
 }
 
 // ── Reações ────────────────────────────────────────────────────────
