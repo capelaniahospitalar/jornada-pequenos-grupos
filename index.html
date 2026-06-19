@@ -4861,9 +4861,9 @@ function initApp() {
   // ── Reset completo via ?resetar (apaga todos os dados locais) ────────
   const params = new URLSearchParams(window.location.search);
   if (params.get('resetar') !== null) {
-    Object.keys(localStorage).forEach(k => localStorage.removeItem(k));
+    localStorage.clear();
     sessionStorage.clear();
-    window.history.replaceState({}, '', window.location.pathname);
+    document.cookie = 'amj3=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;SameSite=Lax';
     window.location.replace(window.location.pathname);
     return;
   }
