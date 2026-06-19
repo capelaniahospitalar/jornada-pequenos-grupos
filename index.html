@@ -4807,19 +4807,12 @@ function startJourney() {
   ST.grupoNum  = meuGrupo.grupoNum;
   ST.grupoNome = meuGrupo.grupoNome;
   if (!ST.userName && meuGrupo.nome) ST.userName = meuGrupo.nome;
+  window._conviteGrupoNum = null;
   save(ST);
   showScreen('home');
   renderHome();
   renderCompanionFab();
-
-  // Se veio de convite e ainda não está no grupo convidado, abrir inscrição
-  if (window._conviteGrupoNum && meuGrupo.grupoNum !== window._conviteGrupoNum) {
-    setTimeout(() => { initGrupos(); openInscricao(window._conviteGrupoNum); }, 100);
-    window._conviteGrupoNum = null;
-  } else {
-    window._conviteGrupoNum = null;
-    setTimeout(initGrupos, 100);
-  }
+  setTimeout(initGrupos, 100);
 }
 
 // Restore welcome state: if already done, go straight to home
@@ -4838,39 +4831,49 @@ function initApp() {
   if (pgConvite) {
     const grupoNum = parseInt(pgConvite, 10);
     if (!isNaN(grupoNum) && grupoNum >= 1 && grupoNum <= 50) {
-      // Limpar o parâmetro da URL sem recarregar a página
-      const cleanUrl = window.location.pathname;
-      window.history.replaceState({}, '', cleanUrl);
-      // Se a pessoa já está inscrita na jornada, ir direto para a inscrição do grupo convidado
+      window.history.replaceState({}, '', window.location.pathname);
+      loadGrupos();
+      const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+      // Inscrever automaticamente no grupo convidado (sobrescreve qualquer grupo anterior)
+      if (g) {
+        saveMeuGrupo({
+          grupoNum: g.num,
+          grupoNome: g.nome || ('Grupo ' + g.num),
+          nome: ST.userName || '',
+          role: 'participante',
+          data: new Date().toLocaleDateString('pt-BR')
+        });
+        ST.grupoNum  = g.num;
+        ST.grupoNome = g.nome || ('Grupo ' + g.num);
+        save(ST);
+      }
+      const nomeGrupo = g && g.nome ? `"${g.nome}"` : `Grupo ${grupoNum}`;
       if (ST.welcomeDone) {
+        // Usuário já tem jornada — vai direto para a home
         showScreen('home');
         renderHome();
         renderCompanionFab();
-        setTimeout(() => {
-          initGrupos();
-          openInscricao(grupoNum);
-        }, 100);
+        setTimeout(initGrupos, 100);
       } else {
-        // Primeiro acesso — mostrar welcome mas já abrir grupo convidado ao entrar
+        // Primeiro acesso — welcome sem a etapa de escolher grupo
+        window._conviteGrupoNum = grupoNum;
         showScreen('welcome');
         setTimeout(() => {
           renderGrupoBarWelcome();
           renderGrupoPreviewWelcome();
           renderWelcomeLevelBadge();
-          // Mostrar um aviso de convite no topo da welcome
+          // Ocultar o passo de escolha de grupo (ele já está definido pelo convite)
+          const grupoStep = document.getElementById('step-grupo-card');
+          if (grupoStep) grupoStep.style.display = 'none';
+          // Mostrar aviso de convite
           const hdr = document.getElementById('welcome-level-badge');
           if (hdr && !document.getElementById('welcome-convite-aviso')) {
-            loadGrupos();
-            const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
-            const nomeGrupo = g && g.nome ? `"${g.nome}"` : `Grupo ${grupoNum}`;
             const aviso = document.createElement('div');
             aviso.id = 'welcome-convite-aviso';
-            aviso.style.cssText = 'background:rgba(255,215,0,0.12);border:0.5px solid rgba(255,215,0,0.35);border-radius:8px;padding:.6rem .9rem;font-size:14px;color:#FFD700;font-family:var(--ff-body);margin-bottom:.5rem;line-height:1.4';
-            aviso.innerHTML = `🎉 Você foi convidado para o <strong>${nomeGrupo}</strong>! Preencha os passos abaixo e entre no grupo.`;
+            aviso.style.cssText = 'background:rgba(14,123,108,0.12);border:0.5px solid rgba(14,123,108,0.4);border-radius:8px;padding:.75rem 1rem;font-size:15px;color:var(--teal);font-family:var(--ff-body);margin-bottom:.75rem;line-height:1.5';
+            aviso.innerHTML = `🎉 Você foi convidado! Entrará automaticamente no <strong>${nomeGrupo}</strong>.<br>Preencha seu nome abaixo e clique em "Entrar na Jornada".`;
             hdr.parentNode.insertBefore(aviso, hdr);
           }
-          // Guardar o grupo do convite para redirecionar após startJourney
-          window._conviteGrupoNum = grupoNum;
         }, 80);
       }
       return;
