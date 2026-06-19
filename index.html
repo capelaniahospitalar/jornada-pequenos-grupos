@@ -4250,6 +4250,7 @@ ST.lastDate= ST.lastDate || null;
 ST.obstacleActions = ST.obstacleActions || {};
 
 function updStreak() {
+  if (!ST.done || ST.done.length === 0) return; // só conta após completar ao menos um estudo
   const t = new Date().toDateString();
   if (ST.lastDate === t) return;
   const y = new Date(Date.now() - 864e5).toDateString();
