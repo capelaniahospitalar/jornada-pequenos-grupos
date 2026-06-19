@@ -1311,6 +1311,14 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
   font-size:13px;color:rgba(255,255,255,0.45);margin-top:.5rem;
   font-family:var(--ff-body);line-height:1.4
 }
+
+/* Texto branco nos elementos sobre fundo escuro da welcome screen */
+.profile-opt{border:0.5px solid var(--border);background:transparent}
+#screen-welcome .insc-tipo-label{color:#fff}
+#screen-welcome .insc-tipo-sub{color:rgba(255,255,255,0.55)}
+#screen-welcome .insc-tipo-radio{border-color:rgba(255,255,255,0.3)}
+#screen-welcome .profile-opt{border-color:rgba(255,255,255,0.12)}
+#screen-welcome .profile-opt:hover{background:rgba(255,255,255,0.07)}
 .welcome-grupo-btn{
   display:flex;align-items:center;justify-content:center;gap:8px;
   width:100%;background:var(--teal);color:#fff;border:none;
@@ -1552,20 +1560,17 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
   <!-- PASSOS — fundo escuro contínuo -->
   <div style="background:#0D2137;padding:0 1rem 6rem;display:flex;flex-direction:column;gap:.75rem;min-height:100%">
 
-    <!-- PASSO 1: Escolher o Pequeno Grupo (obrigatório) -->
-    <div class="welcome-step-card" id="step-grupo-card">
+    <!-- PASSO 1: Nome do Participante -->
+    <div class="welcome-step-card">
       <div class="welcome-step-hdr">
         <div class="welcome-step-num">1</div>
-        <div class="welcome-step-title">Escolha seu Pequeno Grupo</div>
+        <div class="welcome-step-title">Qual é o seu nome?</div>
       </div>
       <div class="welcome-step-body">
-        <div id="grupo-selecionado-preview" style="display:none">
-          <!-- Preenchido após inscrição -->
-        </div>
-        <button class="welcome-grupo-btn" id="btn-escolher-grupo" onclick="openGrupos()">
-          🌿 Ver os Pequenos Grupos disponíveis
-        </button>
-        <p class="welcome-step-hint">Você precisa estar inscrito em um Pequeno Grupo para iniciar a jornada.</p>
+        <input id="user-name-input" type="text" placeholder="Seu nome completo"
+          style="width:100%;border:0.5px solid rgba(255,255,255,0.15);border-radius:var(--radius-sm);padding:.7rem .85rem;font-size:17px;font-family:var(--ff-body);background:rgba(255,255,255,0.07);color:#fff;outline:none;box-sizing:border-box;transition:border .15s"
+          oninput="ST.userName=this.value.trim();save(ST)">
+        <p style="font-size:13px;color:rgba(255,255,255,0.45);margin-top:.4rem;font-family:var(--ff-body)">Usado para personalizar sua experiência no grupo.</p>
       </div>
     </div>
 
@@ -1577,28 +1582,28 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
       </div>
       <div class="welcome-step-body">
         <div class="insc-tipo-opts" id="grupo-select-bar-welcome">
-          <div class="profile-opt" id="popt-paciente" onclick="selectProfile('paciente')" style="border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.65rem .85rem;display:flex;align-items:center;gap:10px;cursor:pointer;background:transparent;transition:all .15s;margin-bottom:.4rem">
+          <div class="profile-opt" id="popt-paciente" onclick="selectProfile('paciente')" style="border-radius:var(--radius-sm);padding:.65rem .85rem;display:flex;align-items:center;gap:10px;cursor:pointer;transition:all .15s;margin-bottom:.4rem">
             <div class="insc-tipo-radio"></div>
             <div class="insc-tipo-info">
               <div class="insc-tipo-label">🏥 Paciente ou familiar</div>
               <div class="insc-tipo-sub">Estou recebendo cuidados no hospital</div>
             </div>
           </div>
-          <div class="profile-opt" id="popt-colaborador" onclick="selectProfile('colaborador')" style="border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.65rem .85rem;display:flex;align-items:center;gap:10px;cursor:pointer;background:transparent;transition:all .15s;margin-bottom:.4rem">
+          <div class="profile-opt" id="popt-colaborador" onclick="selectProfile('colaborador')" style="border-radius:var(--radius-sm);padding:.65rem .85rem;display:flex;align-items:center;gap:10px;cursor:pointer;transition:all .15s;margin-bottom:.4rem">
             <div class="insc-tipo-radio"></div>
             <div class="insc-tipo-info">
               <div class="insc-tipo-label">👔 Colaborador</div>
               <div class="insc-tipo-sub">Trabalho no Hospital Adventista Silvestre</div>
             </div>
           </div>
-          <div class="profile-opt" id="popt-amigo" onclick="selectProfile('amigo')" style="border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.65rem .85rem;display:flex;align-items:center;gap:10px;cursor:pointer;background:transparent;transition:all .15s;margin-bottom:.4rem">
+          <div class="profile-opt" id="popt-amigo" onclick="selectProfile('amigo')" style="border-radius:var(--radius-sm);padding:.65rem .85rem;display:flex;align-items:center;gap:10px;cursor:pointer;transition:all .15s;margin-bottom:.4rem">
             <div class="insc-tipo-radio"></div>
             <div class="insc-tipo-info">
               <div class="insc-tipo-label">🤝 Amigo dos Adventistas</div>
               <div class="insc-tipo-sub">Faço parte da comunidade ao redor</div>
             </div>
           </div>
-          <div class="profile-opt" id="popt-membro" onclick="selectProfile('membro')" style="border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.65rem .85rem;display:flex;align-items:center;gap:10px;cursor:pointer;background:transparent;transition:all .15s">
+          <div class="profile-opt" id="popt-membro" onclick="selectProfile('membro')" style="border-radius:var(--radius-sm);padding:.65rem .85rem;display:flex;align-items:center;gap:10px;cursor:pointer;transition:all .15s">
             <div class="insc-tipo-radio"></div>
             <div class="insc-tipo-info">
               <div class="insc-tipo-label">⛪ Membro IASD</div>
@@ -1609,17 +1614,20 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
       </div>
     </div>
 
-    <!-- PASSO 3: Nome do Participante -->
-    <div class="welcome-step-card">
+    <!-- PASSO 3: Escolher o Pequeno Grupo (obrigatório) -->
+    <div class="welcome-step-card" id="step-grupo-card">
       <div class="welcome-step-hdr">
         <div class="welcome-step-num">3</div>
-        <div class="welcome-step-title">Qual é o seu nome?</div>
+        <div class="welcome-step-title">Escolha seu Pequeno Grupo</div>
       </div>
       <div class="welcome-step-body">
-        <input id="user-name-input" type="text" placeholder="Seu nome completo"
-          style="width:100%;border:0.5px solid rgba(255,255,255,0.15);border-radius:var(--radius-sm);padding:.7rem .85rem;font-size:17px;font-family:var(--ff-body);background:rgba(255,255,255,0.07);color:#fff;outline:none;box-sizing:border-box;transition:border .15s"
-          oninput="ST.userName=this.value.trim();save(ST)">
-        <p style="font-size:13px;color:rgba(255,255,255,0.45);margin-top:.4rem;font-family:var(--ff-body)">Usado para personalizar sua experiência no grupo.</p>
+        <div id="grupo-selecionado-preview" style="display:none">
+          <!-- Preenchido após inscrição -->
+        </div>
+        <button class="welcome-grupo-btn" id="btn-escolher-grupo" onclick="openGrupos()">
+          🌿 Ver os Pequenos Grupos disponíveis
+        </button>
+        <p class="welcome-step-hint">Você precisa estar inscrito em um Pequeno Grupo para iniciar a jornada.</p>
         <div id="welcome-group-required" style="display:none;margin-top:.5rem;background:rgba(255,100,80,.12);border:0.5px solid rgba(255,100,80,.35);border-radius:var(--radius-sm);padding:.5rem .85rem;font-size:14px;color:#FF9980;font-family:var(--ff-body)">
           ⚠️ Inscreva-se em um Pequeno Grupo antes de continuar.
         </div>
@@ -3146,11 +3154,15 @@ function renderTutorGruposList(nome) {
     const reuniao = g.diaReuniao ? `${g.diaReuniao}${g.horaReuniao ? ' às ' + g.horaReuniao : ''}` : 'Não definido';
     const meuPapel = (g.tutor && g.tutor.trim().toLowerCase() === nome.trim().toLowerCase()) ? 'Tutor' : 'Coordenador';
 
+    const pennantCard = generatePennantSvg(g.num, g.nome || 'Grupo ' + g.num, {width:48, height:66});
     return `
       <div class="tutor-grupo-card" onclick="renderTutorGrupoDetalhe(${g.num}, '${nome.replace(/'/g,"\\'")}')">
-        <div class="tutor-grupo-card-hdr">
-          <div class="tutor-grupo-nome">🌿 ${g.nome || 'Grupo ' + g.num}</div>
-          <span class="tutor-grupo-papel-tag">${meuPapel}</span>
+        <div class="tutor-grupo-card-hdr" style="display:flex;align-items:center;gap:10px">
+          <div style="width:32px;height:44px;flex-shrink:0">${pennantCard}</div>
+          <div style="flex:1">
+            <div class="tutor-grupo-nome">${g.nome || 'Grupo ' + g.num}</div>
+            <span class="tutor-grupo-papel-tag">${meuPapel}</span>
+          </div>
         </div>
         <div class="tutor-grupo-info-line">🤝 Coordenador: <strong>${g.coordenador || '— não definido —'}</strong></div>
         <div class="tutor-grupo-info-line">📖 Último estudo concluído: <strong>${ultimoEstudoNome}</strong> (${progresso.estudos || 0}/13)</div>
@@ -3174,29 +3186,100 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
   if (!g) return;
   const progresso = getOrInitPgProgress(grupoNum);
-  const metas = getPgWeekMetas(grupoNum);
+  const metas     = getPgWeekMetas(grupoNum);
+  const pgLv      = getPgGrupoLevel(grupoNum);
+  const nextLv    = PG_GRUPO_LEVELS[PG_GRUPO_LEVELS.indexOf(PG_GRUPO_LEVELS.find(l => l.nome === pgLv.nome)) + 1];
+  const lvBarPct  = nextLv ? Math.round((pgLv.semanasCompletas - pgLv.min) / (nextLv.min - pgLv.min) * 100) : 100;
+
+  // ── Nível do PG ──────────────────────────────────────────────────────────
+  const nivelSection = `
+    <div class="panel-section">
+      <div class="panel-title">Nível do Pequeno Grupo</div>
+      <div style="display:flex;align-items:center;gap:12px;padding:.25rem 0">
+        <div style="font-size:32px;line-height:1">${pgLv.icon}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:16px;color:var(--teal);font-family:var(--ff-body)">Nível do PG: ${pgLv.nome}</div>
+          <div style="font-size:13px;color:var(--text3);font-family:var(--ff-body);margin-bottom:5px">${pgLv.semanasCompletas}/13 semanas com metas cumpridas</div>
+          <div style="height:6px;background:var(--bg);border-radius:99px;overflow:hidden">
+            <div style="height:100%;width:${lvBarPct}%;background:var(--teal);border-radius:99px"></div>
+          </div>
+          ${nextLv
+            ? `<div style="font-size:12px;color:var(--text3);margin-top:3px;font-family:var(--ff-body)">Próximo: ${nextLv.icon} ${nextLv.nome} — faltam ${nextLv.min - pgLv.semanasCompletas} sem.</div>`
+            : `<div style="font-size:12px;color:var(--teal);margin-top:3px;font-family:var(--ff-body)">🏆 Nível máximo!</div>`}
+        </div>
+      </div>
+    </div>`;
+
+  // ── Missões por participante ──────────────────────────────────────────────
+  const pgMissoes = loadPgMissoes(grupoNum);
+  // Missões de jornada (não campanha) para referência de label
+  const missaoJornada = JOURNEY_MISSIONS.filter(m => !m.id.startsWith('pg_'));
 
   const participantesHtml = g.participantes.length
-    ? g.participantes.map(p => `
-      <div class="tutor-participante-row">
-        <div class="tutor-participante-nome">${p.nome}</div>
-        <div class="tutor-participante-meta">${p.tipo === 'colaborador' ? '🏥 ' + (p.departamento||'Colaborador') : p.tipo === 'amigo' ? '🤝 Amigo' : p.tipo === 'membro' ? '⛪ Membro IASD' : p.tipo === 'tutor' ? '👨‍🏫 Tutor' : p.tipo === 'coordenador' ? '🤝 Coordenador' : '🌿 Participante'} · inscrito em ${p.dataInscricao || '—'}</div>
-      </div>`).join('')
+    ? g.participantes.map(p => {
+        const pData = pgMissoes[p.nome];
+        const tipoLabel = p.tipo === 'colaborador' ? '🏥 ' + (p.departamento||'Colaborador')
+          : p.tipo === 'amigo' ? '🤝 Amigo'
+          : p.tipo === 'membro' ? '⛪ Membro IASD'
+          : p.tipo === 'tutor' ? '👨‍🏫 Tutor'
+          : p.tipo === 'coordenador' ? '🤝 Coordenador'
+          : '🌿 Participante';
+
+        if (!pData) return `
+          <div class="tutor-participante-row">
+            <div class="tutor-participante-nome">${p.nome}</div>
+            <div class="tutor-participante-meta">${tipoLabel} · inscrito em ${p.dataInscricao || '—'}</div>
+            <div style="font-size:13px;color:var(--text3);padding:.2rem 0">Ainda não registrou missões pelo app.</div>
+          </div>`;
+
+        const done    = pData.missionsDone || [];
+        const studies = pData.studiesDone  || [];
+
+        // Missões concluídas
+        const doneMissions = missaoJornada.filter(m => done.includes(m.id));
+        // Missões visíveis mas pendentes (estudos necessários concluídos, mas não confirmada)
+        const pendingMissions = missaoJornada.filter(m =>
+          !done.includes(m.id) && m.unlock.every(i => studies.includes(i))
+        ).slice(0, 3); // máx 3 próximas
+
+        const doneHtml = doneMissions.length
+          ? `<div style="font-size:12px;color:var(--text3);margin:.3rem 0 .1rem;font-family:var(--ff-body)">✅ Concluídas (${doneMissions.length}): ${doneMissions.map(m => m.icon + ' ' + m.label).join(' · ')}</div>`
+          : '';
+        const pendHtml = pendingMissions.length
+          ? `<div style="font-size:12px;color:var(--text3);margin:.1rem 0;font-family:var(--ff-body)">⏳ A concluir: ${pendingMissions.map(m => m.icon + ' ' + m.label).join(' · ')}</div>`
+          : '';
+
+        return `
+          <div class="tutor-participante-row">
+            <div style="display:flex;justify-content:space-between;align-items:baseline">
+              <div class="tutor-participante-nome">${p.nome}</div>
+              <div style="font-size:12px;color:var(--teal);font-weight:600;font-family:var(--ff-body)">${pData.xp||0} XP · ${done.length} missões</div>
+            </div>
+            <div class="tutor-participante-meta">${tipoLabel} · atualizado em ${pData.atualizado || '—'}</div>
+            ${doneHtml}${pendHtml}
+          </div>`;
+      }).join('')
     : '<div style="font-size:15px;color:var(--text3);padding:.5rem 0">Nenhum participante inscrito ainda.</div>';
 
+  const pennantDetalhe = generatePennantSvg(grupoNum, g.nome || 'Grupo ' + grupoNum, {width:80, height:110});
   document.getElementById('tutorpanel-body').innerHTML = `
-    <div class="content-card">
-      <div class="phase-tag tag-content">🌿 ${g.nome || 'Grupo ' + g.num}</div>
-      <p class="body-text">Detalhes do Pequeno Grupo e seus participantes.</p>
+    <div class="content-card" style="display:flex;align-items:center;gap:14px">
+      <div style="width:56px;height:78px;flex-shrink:0">${pennantDetalhe}</div>
+      <div>
+        <div class="phase-tag tag-content" style="margin-bottom:4px">🌿 ${g.nome || 'Grupo ' + grupoNum}</div>
+        <p class="body-text" style="margin:0">Detalhes do Pequeno Grupo e seus participantes.</p>
+      </div>
     </div>
     <div class="panel-section">
-      <div class="panel-title">Progresso semanal do grupo</div>
+      <div class="panel-title">Progresso semanal</div>
       <div class="panel-stat"><span>📖 Estudos concluídos</span><strong>${progresso.estudos||0}/${metas.estudos.meta}</strong></div>
       <div class="panel-stat"><span>🙏 Pedidos de oração</span><strong>${progresso.oracoes||0}/${metas.oracoes.meta}</strong></div>
       <div class="panel-stat"><span>❤️ Atos de bondade</span><strong>${progresso.bondades||0}/${metas.bondades.meta}</strong></div>
     </div>
+    ${nivelSection}
+    ${renderCampanhasTutor(grupoNum, nome)}
     <div class="panel-section">
-      <div class="panel-title">Participantes (${g.participantes.length})</div>
+      <div class="panel-title">Participantes e Missões (${g.participantes.length})</div>
       ${participantesHtml}
     </div>
     <button onclick="renderTutorGruposList('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Voltar aos meus grupos</button>`;
@@ -3472,6 +3555,15 @@ const JOURNEY_MISSIONS = [
   { id:'mj_s13',     label:'Concluir o Estudo 13 — Alegria no Senhor',                   icon:'🌅', xp:40,  unlock:[11], check:()=>ST.done.includes(12) },
   // Conquista final
   { id:'mj_complete',label:'Completar toda a Jornada — 13 estudos concluídos',            icon:'👑', xp:200, unlock:[12], check:()=>ST.done.length>=13 },
+  // ── Missões de campanha dos Pequenos Grupos (desbloqueiam pelo mês) ──────
+  // unlockFn substitui unlock[] quando presente
+  { id:'pg_visita_jul',   label:'Visitar outro Pequeno Grupo em Julho — cantar e orar juntos',             icon:'🚶', xp:50,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=7, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_visita_jul') },
+  { id:'pg_emb_jul',      label:'Participar dos Embaixadores de Esperança — Julho',                        icon:'🌟', xp:40,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=7, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_emb_jul') },
+  { id:'pg_visita_ago',   label:'Visitar outro Pequeno Grupo em Agosto — cantar e orar juntos',            icon:'🚶', xp:50,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=8, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_visita_ago') },
+  { id:'pg_emb_ago',      label:'Participar dos Embaixadores de Esperança — Agosto',                       icon:'🌟', xp:40,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=8, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_emb_ago') },
+  { id:'pg_visita_set',   label:'Visitar outro Pequeno Grupo em Setembro — cantar e orar juntos',          icon:'🚶', xp:50,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=9, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_visita_set') },
+  { id:'pg_emb_set',      label:'Participar dos Embaixadores de Esperança — Setembro',                     icon:'🌟', xp:40,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=9, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_emb_set') },
+  { id:'pg_oracao',       label:'Participar da Semana de Oração com Pastor convidado',                     icon:'🙏', xp:60,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=9, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_oracao') },
 ];
 
 function confirmMission(id) {
@@ -3487,14 +3579,15 @@ function confirmMission(id) {
 function selectProfile(type) {
   ST.userProfile = type;
   save(ST);
+  const onWelcome = document.getElementById('screen-welcome')?.classList.contains('active');
   document.querySelectorAll('.profile-opt').forEach(el => {
-    el.style.borderColor = 'var(--border)';
+    el.style.borderColor = onWelcome ? 'rgba(255,255,255,0.12)' : 'var(--border)';
     el.style.background  = 'transparent';
   });
   const sel = document.getElementById('popt-' + type);
   if (sel) {
-    sel.style.borderColor = 'var(--teal)';
-    sel.style.background  = 'var(--teal-light)';
+    sel.style.borderColor = onWelcome ? 'var(--gold-mid)' : 'var(--teal)';
+    sel.style.background  = onWelcome ? 'rgba(212,160,23,0.12)' : 'var(--teal-light)';
   }
 }
 
@@ -3503,11 +3596,13 @@ function prefillWelcomeForm() {
   if (inp && ST.userName) inp.value = ST.userName;
   if (ST.userProfile) selectProfile(ST.userProfile);
   renderWelcomeLevelBadge();
+  if (typeof renderGrupoPreviewWelcome === 'function') renderGrupoPreviewWelcome();
 }
 
 // ── Atualiza badge de nível e barra de XP na tela de boas-vindas ────────
 function renderWelcomeLevelBadge() {
-  const lv = (typeof getRpgLevel === 'function') ? getRpgLevel() : null;
+  if (typeof getRpgLevel !== 'function' || typeof RPG_LEVELS === 'undefined') return;
+  const lv = getRpgLevel();
   if (!lv) return;
 
   const nameEl = document.getElementById('welcome-level-name');
@@ -3516,10 +3611,10 @@ function renderWelcomeLevelBadge() {
   const bar = document.getElementById('welcome-xp-bar');
   const label = document.getElementById('welcome-xp-label');
   const xp = ST.xp || 0;
-  const next = (typeof RPG_LEVELS !== 'undefined')
-    ? (RPG_LEVELS[lv.idx + 1] ? RPG_LEVELS[lv.idx + 1].xp : RPG_LEVELS[lv.idx].xp)
-    : lv.xpNext || 80;
-  const base = lv.xp || 0;
+  const idx = RPG_LEVELS.indexOf(lv);
+  const base = lv.min || 0;
+  const nextLv = RPG_LEVELS[idx + 1];
+  const next = nextLv ? nextLv.min : base + 200;
   const pct = next > base ? Math.min(100, Math.round((xp - base) / (next - base) * 100)) : 100;
 
   if (bar) bar.style.width = pct + '%';
@@ -3534,6 +3629,33 @@ function completeMission(id, xp){
   ST.missionsDone.push(id);
   ST.xp += xp;
   save(ST);
+  // Registra no progresso compartilhado do grupo para o tutor acompanhar
+  _syncMissaoParaGrupo(id);
+}
+
+const PG_MISSOES_KEY = 'jdpg_pg_missoes_v1';
+
+function _syncMissaoParaGrupo(missionId) {
+  try {
+    const meuGrupo = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
+    if (!meuGrupo || !ST.userName) return;
+    const all = JSON.parse(localStorage.getItem(PG_MISSOES_KEY) || '{}');
+    if (!all[meuGrupo.grupoNum]) all[meuGrupo.grupoNum] = {};
+    const part = all[meuGrupo.grupoNum][ST.userName] || { nome: ST.userName, missionsDone: [], studiesDone: [], xp: 0 };
+    if (!part.missionsDone.includes(missionId)) part.missionsDone.push(missionId);
+    part.studiesDone = [...(ST.done || [])];
+    part.xp = ST.xp || 0;
+    part.atualizado = new Date().toLocaleDateString('pt-BR');
+    all[meuGrupo.grupoNum][ST.userName] = part;
+    localStorage.setItem(PG_MISSOES_KEY, JSON.stringify(all));
+  } catch {}
+}
+
+function loadPgMissoes(grupoNum) {
+  try {
+    const all = JSON.parse(localStorage.getItem(PG_MISSOES_KEY) || '{}');
+    return all[grupoNum] || {};
+  } catch { return {}; }
 }
 
 function checkAutoMissions(){
@@ -3567,17 +3689,23 @@ function renderMissions(){
   checkAutoMissions();
   const done = ST.missionsDone || [];
 
-  // Missões visíveis = desbloqueadas (estudos necessários concluídos)
+  // Missões visíveis = desbloqueadas (por estudos concluídos ou por unlockFn)
   const visible = JOURNEY_MISSIONS.filter(m =>
-    m.unlock.every(i => ST.done.includes(i))
+    m.unlockFn ? m.unlockFn() : m.unlock.every(i => ST.done.includes(i))
   );
 
-  // Separa concluídas e pendentes
-  const completed = visible.filter(m => done.includes(m.id));
-  const pending   = visible.filter(m => !done.includes(m.id));
+  // Separa missões de jornada (estudo) e de campanha (PG, pelo mês)
+  const isCamp = m => m.id.startsWith('pg_');
+  const visibleJornada  = visible.filter(m => !isCamp(m));
+  const visibleCampanha = visible.filter(m =>  isCamp(m));
 
-  // Linhas das concluídas
-  const doneRows = completed.map(m => `
+  const completedJ = visibleJornada.filter(m =>  done.includes(m.id));
+  const pendingJ   = visibleJornada.filter(m => !done.includes(m.id));
+  const completedC = visibleCampanha.filter(m =>  done.includes(m.id));
+  const pendingC   = visibleCampanha.filter(m => !done.includes(m.id));
+
+  // ── Missões de jornada (fluxo sequencial) ────────────────────────────────
+  const doneRows = completedJ.map(m => `
     <div class="mission-item">
       <div class="mission-check done">✓</div>
       <div class="mission-info">
@@ -3587,8 +3715,7 @@ function renderMissions(){
       <div class="mission-xp" style="opacity:.4">+${m.xp} XP</div>
     </div>`).join('');
 
-  // Missão atual — apenas a primeira pendente visível, com nome e objetivo
-  const current = pending[0];
+  const current = pendingJ[0];
   const confirmBtn = current && current.manual
     ? `<button onclick="confirmMission('${current.id}')" style="margin-top:.5rem;width:100%;background:var(--teal);color:#fff;border:none;border-radius:var(--radius-sm);padding:.5rem;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--ff-body)">✓ Confirmar que fiz esta missão</button>`
     : '';
@@ -3605,8 +3732,7 @@ function renderMissions(){
       ${confirmBtn}
     </div>` : '';
 
-  // Próxima — cadeado sem revelar nada
-  const lockedRow = (current || completed.length > 0) ? `
+  const lockedRow = (current || completedJ.length > 0) ? `
     <div class="mission-item" style="opacity:.5;margin-top:.2rem">
       <div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🔒</div>
       <div class="mission-info">
@@ -3614,19 +3740,48 @@ function renderMissions(){
       </div>
     </div>` : '';
 
-  // Tela vazia — nenhuma missão desbloqueada ainda
-  const emptyMsg = (!completed.length && !current) ? `
+  const emptyMsg = (!completedJ.length && !current) ? `
     <div style="text-align:center;padding:1rem 0;font-size:16px;color:var(--text3)">
       🎯 Sua primeira missão será revelada em breve.<br>Continue sua jornada!
     </div>` : '';
 
-  // Missões cumpridas ficam dentro de um bloco colapsável
-  const doneToggle = completed.length > 0 ? `
+  const doneToggle = completedJ.length > 0 ? `
     <button onclick="toggleMissionsDone(this)" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text2);font-size:15px;font-weight:600;font-family:var(--ff-body);cursor:pointer;display:flex;align-items:center;gap:6px;padding:.6rem .75rem;width:100%;text-align:left;margin-bottom:.4rem">
       <span class="mdone-arrow" style="display:inline-block;transition:transform .2s">▸</span>
-      ${completed.length} missão(ões) cumprida(s) — toque para ver
+      ${completedJ.length} missão(ões) cumprida(s) — toque para ver
     </button>
     <div class="mdone-list" style="display:none;margin-bottom:.3rem">${doneRows}</div>` : '';
+
+  // ── Missões de campanha (paralelas, por mês) ──────────────────────────────
+  const campRows = visibleCampanha.map(m => {
+    const isDone = done.includes(m.id);
+    if (isDone) return `
+      <div class="mission-item">
+        <div class="mission-check done">✓</div>
+        <div class="mission-info">
+          <div class="mission-name" style="text-decoration:line-through;opacity:.4">${m.icon} ${m.label}</div>
+          <div class="mission-meta">${m.xp} XP conquistados</div>
+        </div>
+        <div class="mission-xp" style="opacity:.4">+${m.xp} XP</div>
+      </div>`;
+    const btn = `<button onclick="confirmMission('${m.id}')" style="margin-top:.5rem;width:100%;background:var(--teal);color:#fff;border:none;border-radius:var(--radius-sm);padding:.5rem;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--ff-body)">✓ Confirmar que fiz esta missão</button>`;
+    return `
+      <div style="background:var(--blue-pale);border-radius:var(--radius-sm);padding:.6rem .75rem;margin:.2rem 0">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:28px;height:28px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:17.5px;flex-shrink:0">${m.icon}</div>
+          <div class="mission-info">
+            <div class="mission-name" style="color:var(--navy)">${m.label}</div>
+          </div>
+          <div class="mission-xp">+${m.xp} XP</div>
+        </div>
+        ${btn}
+      </div>`;
+  }).join('');
+
+  const campSection = visibleCampanha.length ? `
+    <div style="border-top:0.5px solid var(--border);margin-top:.5rem;padding-top:.5rem">
+      ${campRows}
+    </div>` : '';
 
   document.getElementById('h-missions').innerHTML = `
     <div class="mission-section">
@@ -3635,6 +3790,7 @@ function renderMissions(){
       ${doneToggle}
       ${currentRow}
       ${lockedRow}
+      ${campSection}
     </div>`;
   document.getElementById('h-journal-btn').innerHTML=`
     <div style="margin:.75rem 1rem 0">
@@ -6125,6 +6281,121 @@ function checkStreakCelebration(streak) {
 
 
 // ══════════════════════════════════════
+//  FLÂMULAS DOS PEQUENOS GRUPOS
+// ══════════════════════════════════════
+
+const PENNANT_PALETTES = [
+  { bg:'#1B3A6B', text:'#F5C842', accent:'rgba(245,200,66,0.25)', border:'#F5C842' },
+  { bg:'#0E7B6C', text:'#FFFFFF', accent:'rgba(200,245,240,0.25)', border:'#C8F5F0' },
+  { bg:'#5C3D8F', text:'#EDD9FF', accent:'rgba(212,168,255,0.25)', border:'#C9A0FF' },
+  { bg:'#B8860B', text:'#FFFFFF', accent:'rgba(255,243,205,0.25)', border:'#FFE47A' },
+  { bg:'#C0392B', text:'#FFFFFF', accent:'rgba(255,213,208,0.25)', border:'#FFADA5' },
+  { bg:'#1A5276', text:'#E8F8FF', accent:'rgba(133,193,233,0.25)', border:'#85C1E9' },
+  { bg:'#1E8449', text:'#FFFFFF', accent:'rgba(213,245,227,0.25)', border:'#82E0AA' },
+  { bg:'#6E2C00', text:'#FDEBD0', accent:'rgba(240,178,122,0.25)', border:'#F0B27A' },
+  { bg:'#2C3E50', text:'#AED6F1', accent:'rgba(174,214,241,0.20)', border:'#AED6F1' },
+  { bg:'#7B241C', text:'#FDEDEC', accent:'rgba(241,148,138,0.25)', border:'#F1948A' },
+];
+
+// Símbolos SVG (path/shape centrado em cx,cy com raio ~12)
+const PENNANT_SYMBOLS = [
+  // Estrela de 5 pontas
+  (cx,cy,col) => `<polygon points="${starPoints(cx,cy,12,5,0.45)}" fill="${col}" opacity="0.9"/>`,
+  // Cruz
+  (cx,cy,col) => `<rect x="${cx-2}" y="${cy-10}" width="4" height="20" fill="${col}" opacity="0.9" rx="1"/>
+    <rect x="${cx-8}" y="${cy-3}" width="16" height="4" fill="${col}" opacity="0.9" rx="1"/>`,
+  // Coração
+  (cx,cy,col) => `<path d="M${cx},${cy+9} C${cx-14},${cy} ${cx-14},${cy-10} ${cx},${cy-5} C${cx+14},${cy-10} ${cx+14},${cy} ${cx},${cy+9}Z" fill="${col}" opacity="0.85"/>`,
+  // Pomba simplificada
+  (cx,cy,col) => `<ellipse cx="${cx-1}" cy="${cy}" rx="9" ry="6" fill="${col}" opacity="0.9" transform="rotate(-20,${cx},${cy})"/>
+    <ellipse cx="${cx+5}" cy="${cy-7}" rx="6" ry="4" fill="${col}" opacity="0.9" transform="rotate(30,${cx+5},${cy-7})"/>
+    <circle cx="${cx+8}" cy="${cy-10}" r="3" fill="${col}" opacity="0.9"/>`,
+  // Folha
+  (cx,cy,col) => `<ellipse cx="${cx}" cy="${cy}" rx="6" ry="12" fill="${col}" opacity="0.85" transform="rotate(-30,${cx},${cy})"/>
+    <line x1="${cx}" y1="${cy+12}" x2="${cx+5}" y2="${cy-8}" stroke="${col}" stroke-width="1.5" opacity="0.7"/>`,
+  // Chama
+  (cx,cy,col) => `<path d="M${cx},${cy+10} C${cx-10},${cy} ${cx-6},${cy-8} ${cx},${cy-12} C${cx+3},${cy-6} ${cx+2},${cy-2} ${cx+6},${cy-8} C${cx+10},${cy-2} ${cx+10},${cy} ${cx},${cy+10}Z" fill="${col}" opacity="0.9"/>`,
+  // Escudo
+  (cx,cy,col) => `<path d="M${cx},${cy-11} L${cx+10},${cy-6} L${cx+10},${cy+2} C${cx+10},${cy+8} ${cx},${cy+13} ${cx},${cy+13} C${cx},${cy+13} ${cx-10},${cy+8} ${cx-10},${cy+2} L${cx-10},${cy-6}Z" fill="${col}" opacity="0.85"/>`,
+  // Peixe (ictus)
+  (cx,cy,col) => `<path d="M${cx-10},${cy} C${cx-10},${cy-7} ${cx+8},${cy-7} ${cx+10},${cy} C${cx+8},${cy+7} ${cx-10},${cy+7} ${cx-10},${cy}Z" fill="${col}" opacity="0.85"/>
+    <path d="M${cx+8},${cy} L${cx+14},${cy-6} L${cx+14},${cy+6}Z" fill="${col}" opacity="0.85"/>`,
+];
+
+function starPoints(cx, cy, r, n, innerRatio) {
+  let pts = [];
+  for (let i = 0; i < n * 2; i++) {
+    const angle = (i * Math.PI / n) - Math.PI / 2;
+    const radius = i % 2 === 0 ? r : r * innerRatio;
+    pts.push(`${(cx + Math.cos(angle) * radius).toFixed(1)},${(cy + Math.sin(angle) * radius).toFixed(1)}`);
+  }
+  return pts.join(' ');
+}
+
+// Quebra o nome do grupo em até 2 linhas para caber na flâmula
+function splitPennantName(nome) {
+  const words = nome.split(/\s+/);
+  if (nome.length <= 10 || words.length === 1) return [nome];
+  const mid = Math.ceil(words.length / 2);
+  return [words.slice(0, mid).join(' '), words.slice(mid).join(' ')];
+}
+
+function generatePennantSvg(grupoNum, grupoNome, opts = {}) {
+  const { width = 120, height = 170, showLabel = true } = opts;
+  const pal = PENNANT_PALETTES[(grupoNum - 1) % PENNANT_PALETTES.length];
+  // Dois símbolos distintos por grupo
+  const sym1Idx = (grupoNum - 1)                    % PENNANT_SYMBOLS.length;
+  const sym2Idx = (grupoNum - 1 + 3)                % PENNANT_SYMBOLS.length;
+  const sym1 = PENNANT_SYMBOLS[sym1Idx];
+  const sym2 = PENNANT_SYMBOLS[sym2Idx];
+
+  const cx = width / 2;
+  const bodyBottom = height - 42;
+  const tip = height - 8;
+
+  // Nome
+  const nameLines = splitPennantName(grupoNome || `Grupo ${grupoNum}`);
+  const nameY = nameLines.length > 1 ? height * 0.48 : height * 0.52;
+  const nameHtml = nameLines.map((line, i) =>
+    `<text x="${cx}" y="${nameY + i * 16}" text-anchor="middle" font-size="11.5" font-weight="700" fill="${pal.text}" font-family="Georgia,serif" letter-spacing="0.3">${line}</text>`
+  ).join('');
+
+  // Número do grupo pequeno no canto
+  const numTag = `<text x="${width - 8}" y="22" text-anchor="end" font-size="9" fill="${pal.text}" opacity="0.6" font-family="Georgia,serif">Nº${grupoNum}</text>`;
+
+  return `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <filter id="ps${grupoNum}" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="1" dy="2" stdDeviation="2" flood-color="#0003"/>
+      </filter>
+    </defs>
+    <!-- Corpo da flâmula -->
+    <path d="M8,6 L${width-8},6 L${width-8},${bodyBottom} L${cx},${tip} L8,${bodyBottom} Z"
+          fill="${pal.bg}" filter="url(#ps${grupoNum})"/>
+    <!-- Borda -->
+    <path d="M8,6 L${width-8},6 L${width-8},${bodyBottom} L${cx},${tip} L8,${bodyBottom} Z"
+          fill="none" stroke="${pal.border}" stroke-width="1.5" opacity="0.7"/>
+    <!-- Haste horizontal no topo -->
+    <rect x="4" y="4" width="${width-8}" height="6" rx="3" fill="${pal.border}" opacity="0.5"/>
+    <!-- Faixa superior decorativa -->
+    <rect x="8" y="28" width="${width-16}" height="2" fill="${pal.border}" opacity="0.4"/>
+    <!-- Fundo central suave -->
+    <path d="M18,34 L${width-18},34 L${width-18},${bodyBottom-14} L${cx},${tip-12} L18,${bodyBottom-14} Z"
+          fill="${pal.accent}"/>
+    <!-- Símbolo superior -->
+    ${sym1(cx, height * 0.22, pal.border)}
+    <!-- Nome do grupo -->
+    ${nameHtml}
+    <!-- Símbolo inferior -->
+    ${sym2(cx, height * 0.76, pal.border)}
+    <!-- Faixa inferior decorativa -->
+    <path d="M18,${bodyBottom-20} L${width-18},${bodyBottom-20}" stroke="${pal.border}" stroke-width="1.5" opacity="0.4"/>
+    <!-- Número do grupo -->
+    ${numTag}
+  </svg>`;
+}
+
+// ══════════════════════════════════════
 //  SISTEMA DE PEQUENOS GRUPOS
 // ══════════════════════════════════════
 
@@ -6304,9 +6575,13 @@ function renderGrupoList(filtro = '') {
 
     const clickable = !cheio;
 
+    const badgeHtml = g.nome
+      ? `<div style="width:34px;height:48px;flex-shrink:0">${generatePennantSvg(g.num, g.nome, {width:60, height:84})}</div>`
+      : `<div class="grupo-num-badge${status==='vazio'?' vazio':''}">${g.num}</div>`;
+
     return `<div class="grupo-card ${cardCls}" onclick="${clickable ? `openInscricao(${g.num})` : ''}">
       <div class="grupo-card-inner">
-        <div class="grupo-num-badge${status==='vazio'?' vazio':''}">${g.num}</div>
+        ${badgeHtml}
         <div class="grupo-info">
           <div class="grupo-nome">${nomeDisplay}</div>
           <div class="grupo-meta">${metaDisplay}</div>
@@ -6352,8 +6627,14 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
   const podeGerenciar = !!jaInscrito; // só quem já está no grupo pode trocar papéis
 
   // ── Painel de status do grupo (o que já foi definido) ───────────────
+  const flamulaStatusHtml = g.nome
+    ? `<div style="text-align:center;padding:.75rem 0 .5rem">
+        <div style="display:inline-block;width:70px">${generatePennantSvg(g.num, g.nome, {width:100, height:140})}</div>
+       </div>` : '';
+
   const statusCard = `
     <div class="grupo-info-card">
+      ${flamulaStatusHtml}
       <div class="grupo-info-row">
         <span class="grupo-info-ico">🌿</span>
         <div class="grupo-info-txt">
@@ -6427,11 +6708,15 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
       <div class="papel-form-hdr participante">🌱 Você está criando este grupo!</div>
       <div class="papel-form-body">
         <p style="font-size:14.5px;color:var(--text2);font-family:var(--ff-body);line-height:1.5;margin-bottom:.7rem">
-          Este grupo ainda não existe. Ao se inscrever, você dá um nome ao Pequeno Grupo — toda a comunicação acontece aqui dentro do app, no Mural de Gratidão e Pedidos de Oração.
+          Escolham um nome criativo e especial para o Pequeno Grupo — pode ser algo inspirador, bíblico ou que represente a identidade do grupo. A flâmula será gerada automaticamente com esse nome!
         </p>
         <div class="insc-field" style="margin-bottom:.6rem">
           <label>Nome do Pequeno Grupo *</label>
-          <input class="insc-input" id="insc-grupo-nome-input" type="text" placeholder="Ex: Luz do Caminho, Fonte de Vida…">
+          <input class="insc-input" id="insc-grupo-nome-input" type="text" placeholder="Ex: Luz do Caminho, Fonte Viva, Raízes…" oninput="atualizarPreviewFlamula(this.value, ${g.num})">
+        </div>
+        <div id="flamula-preview-wrap" style="display:none;margin:.5rem 0 .75rem;text-align:center">
+          <div id="flamula-preview-svg" style="display:inline-block;width:90px"></div>
+          <div style="font-size:12px;color:var(--text3);margin-top:4px;font-family:var(--ff-body)">Prévia da flâmula do grupo</div>
         </div>
         <div class="insc-field-row">
           <div class="insc-field">
@@ -6544,6 +6829,17 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
     <button class="insc-submit-btn" id="insc-submit-btn" onclick="confirmarInscricao(${g.num})">
       🌿 Confirmar minha participação — Grupo ${g.num}
     </button>`;
+}
+
+// ── Preview ao vivo da flâmula durante criação do grupo ──────────────
+function atualizarPreviewFlamula(nome, grupoNum) {
+  const wrap = document.getElementById('flamula-preview-wrap');
+  const svgEl = document.getElementById('flamula-preview-svg');
+  if (!wrap || !svgEl) return;
+  const n = nome.trim();
+  if (!n) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  svgEl.innerHTML = generatePennantSvg(grupoNum, n, { width: 100, height: 140 });
 }
 
 // ── Seleção de papel/tipo ────────────────────────────────────────────
@@ -6850,14 +7146,17 @@ function renderGruposBtnHome() {
   div.id = 'grupos-home-btn';
   div.style.cssText = 'margin:.75rem 1rem 0';
   div.innerHTML = meuGrupo
-    ? `<button onclick="openInscricao(${meuGrupo.grupoNum})" style="display:flex;align-items:center;gap:9px;width:100%;background:var(--card);border:0.5px solid rgba(14,123,108,.35);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">
-        <span style="font-size:22px">🌿</span>
-        <div style="flex:1;text-align:left">
-          <div style="font-weight:600;color:var(--teal)">Grupo ${meuGrupo.grupoNum} — ${meuGrupo.grupoNome}</div>
-          <div style="font-size:13px;color:var(--text3)">${meuGrupo.tipo === 'colaborador' ? '🏥 ' + meuGrupo.departamento : meuGrupo.tipo === 'amigo' ? '🤝 Amigo dos Adventistas' : meuGrupo.tipo === 'membro' ? '⛪ Membro IASD' : '🌿 Participante'} · ${meuGrupo.dataInscricao || ''}</div>
-        </div>
-        <span style="color:var(--text3);font-size:18px">›</span>
-      </button>`
+    ? (() => {
+        const pennant = generatePennantSvg(meuGrupo.grupoNum, meuGrupo.grupoNome, {width:52, height:72});
+        return `<button onclick="openInscricao(${meuGrupo.grupoNum})" style="display:flex;align-items:center;gap:10px;width:100%;background:var(--card);border:0.5px solid rgba(14,123,108,.35);border-radius:var(--radius-sm);padding:.65rem 1rem;cursor:pointer;font-family:var(--ff-body)">
+          <div style="width:36px;height:50px;flex-shrink:0">${pennant}</div>
+          <div style="flex:1;text-align:left">
+            <div style="font-weight:600;font-size:15px;color:var(--teal)">Grupo ${meuGrupo.grupoNum} — ${meuGrupo.grupoNome}</div>
+            <div style="font-size:13px;color:var(--text3)">${meuGrupo.tipo === 'colaborador' ? '🏥 ' + meuGrupo.departamento : meuGrupo.tipo === 'amigo' ? '🤝 Amigo dos Adventistas' : meuGrupo.tipo === 'membro' ? '⛪ Membro IASD' : '🌿 Participante'} · ${meuGrupo.dataInscricao || ''}</div>
+          </div>
+          <span style="color:var(--text3);font-size:18px">›</span>
+        </button>`;
+      })()
     : `<button onclick="openGrupos()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--teal-light);border:0.5px solid rgba(14,123,108,.35);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;color:var(--teal);cursor:pointer;font-family:var(--ff-body);font-weight:600">
         🌿 Escolher meu Pequeno Grupo
       </button>`;
@@ -6876,11 +7175,12 @@ function renderGrupoPreviewWelcome() {
   if (meuGrupo) {
     const g = PEQUENOS_GRUPOS.find(x => x.num === meuGrupo.grupoNum);
     previewDiv.style.display = 'block';
+    const pennant = generatePennantSvg(meuGrupo.grupoNum, meuGrupo.grupoNome, {width:64, height:88});
     previewDiv.innerHTML = `
       <div class="grupo-preview-box">
-        <div class="grupo-preview-num">${meuGrupo.grupoNum}</div>
+        <div style="width:44px;height:60px;flex-shrink:0">${pennant}</div>
         <div class="grupo-preview-info">
-          <div class="grupo-preview-nome">🌿 ${meuGrupo.grupoNome}</div>
+          <div class="grupo-preview-nome">${meuGrupo.grupoNome}</div>
           <div class="grupo-preview-coord">👨‍🏫 Tutor: ${g ? g.tutor : ''}</div>
           <div class="grupo-preview-coord">🤝 Coordenador: ${g ? g.coordenador : ''}</div>
           <div class="grupo-preview-meta">Inscrito em ${meuGrupo.dataInscricao||''} · ${meuGrupo.tipo==='colaborador'?'🏥 '+meuGrupo.departamento:meuGrupo.tipo==='amigo'?'🤝 Amigo dos Adventistas':meuGrupo.tipo==='membro'?'⛪ Membro IASD':'🌿 Participante'}</div>
@@ -6968,7 +7268,289 @@ function bumpPgProgress(tipo, qty = 1) {
     const metas = getPgWeekMetas(meuGrupo.grupoNum);
     data[tipo] = Math.min(metas[tipo].meta, data[tipo] + qty);
     savePgProgress(data);
+    // Verifica se todas as metas foram atingidas nesta semana
+    const allDone = Object.keys(metas).every(k => data[k] >= metas[k].meta);
+    if (allDone) checkPgSemanaCompleta(meuGrupo.grupoNum, data.weekKey);
   }
+}
+
+// ══════════════════════════════════════
+//  NÍVEIS DOS PEQUENOS GRUPOS
+// ══════════════════════════════════════
+
+// Progressão baseada em semanas com 100% das metas cumpridas (0–13)
+const PG_GRUPO_LEVELS = [
+  { min:0,  icon:'🌱', nome:'Semente',          desc:'O grupo deu os primeiros passos.' },
+  { min:1,  icon:'🌿', nome:'Broto',             desc:'Primeiros frutos começando a surgir.' },
+  { min:3,  icon:'🪴', nome:'Raiz Firme',        desc:'O grupo está enraizado na Palavra.' },
+  { min:6,  icon:'🌳', nome:'Árvore Frutífera',  desc:'Crescimento sólido e constante.' },
+  { min:9,  icon:'🌟', nome:'Luz do Caminho',    desc:'Exemplo de dedicação e comunhão.' },
+  { min:12, icon:'👑', nome:'Comunhão Plena',    desc:'Jornada concluída com excelência!' },
+];
+
+const PG_NIVEL_KEY = 'jdpg_pg_nivel_v1';
+
+function loadPgNivel(grupoNum) {
+  try {
+    const all = JSON.parse(localStorage.getItem(PG_NIVEL_KEY) || '{}');
+    return all[grupoNum] || { semanasCompletas: 0, semanasMarcadas: [] };
+  } catch { return { semanasCompletas: 0, semanasMarcadas: [] }; }
+}
+
+function savePgNivel(grupoNum, data) {
+  try {
+    const all = JSON.parse(localStorage.getItem(PG_NIVEL_KEY) || '{}');
+    all[grupoNum] = data;
+    localStorage.setItem(PG_NIVEL_KEY, JSON.stringify(all));
+  } catch {}
+}
+
+function getPgGrupoLevel(grupoNum) {
+  const { semanasCompletas } = loadPgNivel(grupoNum);
+  let nivel = PG_GRUPO_LEVELS[0];
+  for (const lv of PG_GRUPO_LEVELS) {
+    if (semanasCompletas >= lv.min) nivel = lv;
+  }
+  return { ...nivel, semanasCompletas };
+}
+
+// Chamado quando uma semana é detectada como 100% completa — registra uma vez por semana
+function checkPgSemanaCompleta(grupoNum, weekKey) {
+  const nivelData = loadPgNivel(grupoNum);
+  if (nivelData.semanasMarcadas.includes(weekKey)) return false; // já contabilizada
+  nivelData.semanasMarcadas.push(weekKey);
+  nivelData.semanasCompletas = (nivelData.semanasCompletas || 0) + 1;
+  savePgNivel(grupoNum, nivelData);
+  return true; // nova semana completa!
+}
+
+// ══════════════════════════════════════
+//  MISSÕES DE CAMPANHA DOS PEQUENOS GRUPOS
+// ══════════════════════════════════════
+
+// mesInicio: mês do calendário em que a missão é desbloqueada (1=jan…12=dez)
+const PG_CAMPANHAS = [
+  {
+    id: 'visita_jul',
+    titulo: 'Visita entre PGs — Julho',
+    icon: '🚶',
+    periodo: 'Julho',
+    desc: 'Visitar outro Pequeno Grupo do hospital, cantar uma música e fazer uma oração juntos.',
+    tipo: 'visita',
+    mesInicio: 7,
+    cor: '#0E7B6C',
+    corLight: '#D5EDE9',
+  },
+  {
+    id: 'embaixadores_jul',
+    titulo: 'Embaixadores de Esperança — Julho',
+    icon: '🌟',
+    periodo: 'Julho',
+    desc: 'Campanha da Capelania para empoderar colaboradores na Missão do hospital. As atividades deste mês serão divulgadas em breve.',
+    tipo: 'participacao',
+    mesInicio: 7,
+    cor: '#B8860B',
+    corLight: '#FDF3DC',
+  },
+  {
+    id: 'visita_ago',
+    titulo: 'Visita entre PGs — Agosto',
+    icon: '🚶',
+    periodo: 'Agosto',
+    desc: 'Visitar outro Pequeno Grupo do hospital, cantar uma música e fazer uma oração juntos.',
+    tipo: 'visita',
+    mesInicio: 8,
+    cor: '#0E7B6C',
+    corLight: '#D5EDE9',
+  },
+  {
+    id: 'embaixadores_ago',
+    titulo: 'Embaixadores de Esperança — Agosto',
+    icon: '🌟',
+    periodo: 'Agosto',
+    desc: 'Campanha da Capelania para empoderar colaboradores na Missão do hospital. As atividades deste mês serão divulgadas em breve.',
+    tipo: 'participacao',
+    mesInicio: 8,
+    cor: '#B8860B',
+    corLight: '#FDF3DC',
+  },
+  {
+    id: 'visita_set',
+    titulo: 'Visita entre PGs — Setembro',
+    icon: '🚶',
+    periodo: 'Setembro',
+    desc: 'Visitar outro Pequeno Grupo do hospital, cantar uma música e fazer uma oração juntos.',
+    tipo: 'visita',
+    mesInicio: 9,
+    cor: '#0E7B6C',
+    corLight: '#D5EDE9',
+  },
+  {
+    id: 'embaixadores_set',
+    titulo: 'Embaixadores de Esperança — Setembro',
+    icon: '🌟',
+    periodo: 'Setembro',
+    desc: 'Campanha da Capelania para empoderar colaboradores na Missão do hospital. As atividades deste mês serão divulgadas em breve.',
+    tipo: 'participacao',
+    mesInicio: 9,
+    cor: '#B8860B',
+    corLight: '#FDF3DC',
+  },
+  {
+    id: 'semana_oracao',
+    titulo: 'Semana de Oração',
+    icon: '🙏',
+    periodo: 'Setembro',
+    desc: 'Semana de oração com Pastor convidado. Meta: pelo menos 70% dos membros do departamento presentes em 3 ou mais cultos.',
+    metaPct: 70,
+    tipo: 'presenca',
+    mesInicio: 9,
+    cor: '#5C3D8F',
+    corLight: '#EDE7F6',
+  },
+];
+
+const PG_CAMP_KEY = 'jdpg_campanhas_v1';
+
+function loadCampanhasProgress(grupoNum) {
+  try {
+    const all = JSON.parse(localStorage.getItem(PG_CAMP_KEY) || '{}');
+    return all[grupoNum] || {};
+  } catch { return {}; }
+}
+
+function saveCampanhasProgress(grupoNum, data) {
+  try {
+    const all = JSON.parse(localStorage.getItem(PG_CAMP_KEY) || '{}');
+    all[grupoNum] = data;
+    localStorage.setItem(PG_CAMP_KEY, JSON.stringify(all));
+  } catch {}
+}
+
+// Retorna apenas as campanhas cujo mês de início já chegou
+function campanhasAtivas() {
+  const mes = new Date().getMonth() + 1; // 1–12
+  return PG_CAMPANHAS.filter(c => mes >= c.mesInicio);
+}
+
+// ── Render das missões de campanha no painel do tutor/coordenador ───────────
+function renderCampanhasTutor(grupoNum, tutorNome) {
+  const prog = loadCampanhasProgress(grupoNum);
+
+  const ativas = campanhasAtivas();
+  if (!ativas.length) return `<div class="panel-section"><div class="panel-title">🎯 Missões da Campanha</div><p style="color:var(--text3);font-size:14px;padding:.5rem 0">As missões de campanha serão desbloqueadas a partir de julho.</p></div>`;
+
+  const cards = ativas.map(c => {
+    const p = prog[c.id] || {};
+    let statusHtml = '', inputHtml = '';
+
+    if (c.tipo === 'presenca' || c.tipo === 'participacao') {
+      const total     = p.total || 0;
+      const atingidos = p.atingidos || 0;
+      const pctReal   = total > 0 ? Math.round(atingidos / total * 100) : 0;
+      const meta      = c.metaPct;
+      const ok        = pctReal >= meta;
+
+      statusHtml = total > 0
+        ? `<div style="margin:.5rem 0;font-size:14px;color:${ok ? '#0E7B6C' : '#4A5868'}">
+             ${ok ? '✅' : '📊'} ${atingidos} de ${total} — <strong>${pctReal}%</strong> (meta: ${meta}%)
+           </div>`
+        : `<div style="font-size:13px;color:var(--text3);margin:.4rem 0">Aguardando registro do coordenador.</div>`;
+
+      inputHtml = `
+        <div style="display:flex;gap:8px;margin-top:.6rem;align-items:flex-end">
+          <div style="flex:1">
+            <label style="font-size:12px;color:var(--text3);display:block;margin-bottom:2px">Total no departamento</label>
+            <input type="number" min="0" id="camp-total-${c.id}"
+              value="${total || ''}" placeholder="ex: 20"
+              style="width:100%;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.5rem .7rem;font-size:15px;font-family:var(--ff-body);background:var(--bg);color:var(--text)">
+          </div>
+          <div style="flex:1">
+            <label style="font-size:12px;color:var(--text3);display:block;margin-bottom:2px">${c.tipo === 'presenca' ? 'Presentes 3+ vezes' : 'Participaram'}</label>
+            <input type="number" min="0" id="camp-ating-${c.id}"
+              value="${atingidos || ''}" placeholder="ex: 15"
+              style="width:100%;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.5rem .7rem;font-size:15px;font-family:var(--ff-body);background:var(--bg);color:var(--text)">
+          </div>
+          <button onclick="salvarCampanhaPresenca(${grupoNum},'${c.id}','${tutorNome}')"
+            style="background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);padding:.5rem .85rem;font-size:14px;cursor:pointer;font-family:var(--ff-body);white-space:nowrap">
+            Salvar
+          </button>
+        </div>`;
+
+    } else if (c.tipo === 'visita') {
+      const feita = !!p.feita;
+      const pgVisitado = p.pgVisitado || '';
+
+      statusHtml = feita
+        ? `<div style="font-size:14px;color:#0E7B6C;margin:.4rem 0">✅ Visita realizada — ${pgVisitado || 'PG visitado'}</div>`
+        : `<div style="font-size:13px;color:var(--text3);margin:.4rem 0">Visita ainda não registrada.</div>`;
+
+      inputHtml = feita ? `
+        <button onclick="desfazerVisita(${grupoNum},'${c.id}','${tutorNome}')"
+          style="font-size:13px;color:var(--text3);background:none;border:none;cursor:pointer;padding:.3rem 0;font-family:var(--ff-body)">
+          ↩ Desfazer registro
+        </button>` : `
+        <div style="margin-top:.6rem">
+          <label style="font-size:12px;color:var(--text3);display:block;margin-bottom:2px">Qual PG foi visitado?</label>
+          <input type="text" id="camp-pg-${c.id}" value="${pgVisitado}"
+            placeholder="ex: PG 5 — UTI, PG 12 — Recepção"
+            style="width:100%;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.5rem .7rem;font-size:15px;font-family:var(--ff-body);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:.4rem">
+          <button onclick="salvarCampanhaVisita(${grupoNum},'${c.id}','${tutorNome}')"
+            style="width:100%;background:var(--teal);color:#fff;border:none;border-radius:var(--radius-sm);padding:.6rem;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--ff-body)">
+            ✓ Confirmar visita realizada
+          </button>
+        </div>`;
+    }
+
+    return `
+      <div style="background:${c.corLight};border:0.5px solid ${c.cor}33;border-radius:var(--radius-sm);padding:.85rem 1rem;margin-bottom:.6rem">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:.3rem">
+          <span style="font-size:20px">${c.icon}</span>
+          <div>
+            <div style="font-size:15px;font-weight:700;color:${c.cor};font-family:var(--ff-body)">${c.titulo}</div>
+            <div style="font-size:12px;color:var(--text3);font-family:var(--ff-body)">${c.periodo}</div>
+          </div>
+        </div>
+        <div style="font-size:13.5px;color:var(--text2);line-height:1.5;font-family:var(--ff-body)">${c.desc}</div>
+        ${statusHtml}
+        ${inputHtml}
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="panel-section">
+      <div class="panel-title">🎯 Missões da Campanha</div>
+      <p style="font-size:14px;color:var(--text3);margin-bottom:.75rem;line-height:1.5;font-family:var(--ff-body)">
+        Registre aqui o progresso do seu PG nas campanhas da Capelania. Somente coordenadores e tutores têm acesso a este painel.
+      </p>
+      ${cards}
+    </div>`;
+}
+
+function salvarCampanhaPresenca(grupoNum, campId, tutorNome) {
+  const total     = parseInt(document.getElementById('camp-total-' + campId)?.value) || 0;
+  const atingidos = parseInt(document.getElementById('camp-ating-' + campId)?.value) || 0;
+  if (total <= 0) { alert('Informe o total de pessoas no departamento.'); return; }
+  if (atingidos > total) { alert('O número de participantes não pode ser maior que o total.'); return; }
+  const prog = loadCampanhasProgress(grupoNum);
+  prog[campId] = { total, atingidos, ts: Date.now() };
+  saveCampanhasProgress(grupoNum, prog);
+  renderTutorGrupoDetalhe(grupoNum, tutorNome);
+}
+
+function salvarCampanhaVisita(grupoNum, campId, tutorNome) {
+  const pgVisitado = document.getElementById('camp-pg-' + campId)?.value?.trim() || '';
+  const prog = loadCampanhasProgress(grupoNum);
+  prog[campId] = { feita: true, pgVisitado, ts: Date.now() };
+  saveCampanhasProgress(grupoNum, prog);
+  renderTutorGrupoDetalhe(grupoNum, tutorNome);
+}
+
+function desfazerVisita(grupoNum, campId, tutorNome) {
+  const prog = loadCampanhasProgress(grupoNum);
+  delete prog[campId];
+  saveCampanhasProgress(grupoNum, prog);
+  renderTutorGrupoDetalhe(grupoNum, tutorNome);
 }
 
 // ── Render da barra de progresso do PG na Home ──────────────────────
@@ -7017,6 +7599,29 @@ function renderPgProgressHome() {
     ? `<div class="pg-week-banner complete">🏆 Meta semanal do grupo concluída! Parabéns, ${meuGrupo.grupoNome}!</div>`
     : `<div class="pg-week-banner">📈 ${totalPct}% da meta semanal do grupo concluída — continue participando!</div>`;
 
+  // ── Nível do grupo ────────────────────────────────────────────────────────
+  const pgLv = getPgGrupoLevel(meuGrupo.grupoNum);
+  const maxSem = 13;
+  const lvIdx = PG_GRUPO_LEVELS.indexOf(PG_GRUPO_LEVELS.find(l => l.nome === pgLv.nome));
+  const nextLv = PG_GRUPO_LEVELS[lvIdx + 1];
+  const lvBarPct = nextLv
+    ? Math.round((pgLv.semanasCompletas - pgLv.min) / (nextLv.min - pgLv.min) * 100)
+    : 100;
+  const nivelHtml = `
+    <div style="padding:.65rem 1rem .5rem;border-top:0.5px solid var(--border);display:flex;align-items:center;gap:10px">
+      <div style="font-size:26px;line-height:1">${pgLv.icon}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
+          <span style="font-size:13px;font-weight:700;color:var(--teal);font-family:var(--ff-body)">Nível do PG: ${pgLv.nome}</span>
+          <span style="font-size:11px;color:var(--text3);font-family:var(--ff-body)">${pgLv.semanasCompletas}/${maxSem} sem. completas</span>
+        </div>
+        <div style="height:5px;background:var(--bg);border-radius:99px;overflow:hidden">
+          <div style="height:100%;width:${lvBarPct}%;background:var(--teal);border-radius:99px;transition:width .4s"></div>
+        </div>
+        ${nextLv ? `<div style="font-size:11px;color:var(--text3);margin-top:2px;font-family:var(--ff-body)">Próximo nível: ${nextLv.icon} ${nextLv.nome} em ${nextLv.min - pgLv.semanasCompletas} sem.</div>` : `<div style="font-size:11px;color:var(--teal);margin-top:2px;font-family:var(--ff-body)">🏆 Nível máximo alcançado!</div>`}
+      </div>
+    </div>`;
+
   const div = document.createElement('div');
   div.id = 'pg-progress-card';
   div.className = 'pg-progress-card';
@@ -7032,7 +7637,9 @@ function renderPgProgressHome() {
     <div class="pg-progress-body">
       ${goalsHtml}
       ${weekBanner}
-    </div>`;
+    </div>
+    ${nivelHtml}
+    `;
 
   anchor.after(div);
 }
