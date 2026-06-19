@@ -3285,7 +3285,8 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
       <div class="panel-title">Participantes e Missões (${g.participantes.length})</div>
       ${participantesHtml}
     </div>
-    <button onclick="renderTutorGruposList('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Voltar aos meus grupos</button>`;
+    <button onclick="renderTutorGruposList('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Voltar aos meus grupos</button>
+    <button onclick="tutorConfirmarZerarGrupo(${grupoNum},'${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:transparent;border:1px solid rgba(220,60,60,0.35);border-radius:var(--radius-sm);padding:.75rem;font-size:15px;color:#E05050;cursor:pointer;font-family:var(--ff-body)">🗑️ Zerar Pequeno Grupo</button>`;
 
   resetScroll();
 }
@@ -3320,6 +3321,44 @@ function tutorConfirmarTrocaPass(nome) {
   renderTutorGruposList(nome);
 }
 
+
+function tutorConfirmarZerarGrupo(grupoNum, nomeTutor) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  const nomeGrupo = g && g.nome ? g.nome : 'Grupo ' + grupoNum;
+  if (!confirm(`Zerar "${nomeGrupo}"?\n\nIsso apagará o progresso, nível, missões e participantes do grupo. Esta ação não pode ser desfeita.`)) return;
+
+  // Apagar progresso do PG
+  try {
+    const prog = JSON.parse(localStorage.getItem(PG_PROGRESS_KEY) || '{}');
+    delete prog[grupoNum];
+    localStorage.setItem(PG_PROGRESS_KEY, JSON.stringify(prog));
+  } catch {}
+
+  // Apagar nível do PG
+  try {
+    const nivel = JSON.parse(localStorage.getItem(PG_NIVEL_KEY) || '{}');
+    delete nivel[grupoNum];
+    localStorage.setItem(PG_NIVEL_KEY, JSON.stringify(nivel));
+  } catch {}
+
+  // Apagar missões do PG
+  try {
+    const missoes = JSON.parse(localStorage.getItem(PG_MISSOES_KEY) || '{}');
+    delete missoes[grupoNum];
+    localStorage.setItem(PG_MISSOES_KEY, JSON.stringify(missoes));
+  } catch {}
+
+  // Resetar o grupo na lista (limpar participantes, nome, tutor, coordenador)
+  loadGrupos();
+  const idx = PEQUENOS_GRUPOS.findIndex(x => x.num === grupoNum);
+  if (idx !== -1) {
+    PEQUENOS_GRUPOS[idx] = { num: grupoNum, nome: '', tutor: '', coordenador: '', participantes: [], diaReuniao: '', horaReuniao: '' };
+    saveGrupos();
+  }
+
+  alert(`"${nomeGrupo}" foi zerado com sucesso.`);
+  renderTutorGruposList(nomeTutor);
+}
 
 function openPanel() {
   showScreen('panel');
