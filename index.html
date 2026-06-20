@@ -1589,6 +1589,13 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
               <div class="insc-tipo-sub">Capelão ou responsável espiritual pelo grupo</div>
             </div>
           </div>
+          <div class="profile-opt" id="popt-coordenador" onclick="selectProfile('coordenador')" style="border-radius:var(--radius-sm);padding:.65rem .85rem;display:flex;align-items:center;gap:10px;cursor:pointer;transition:all .15s;margin-bottom:.4rem">
+            <div class="insc-tipo-radio"></div>
+            <div class="insc-tipo-info">
+              <div class="insc-tipo-label">🤝 Serei o Coordenador do grupo</div>
+              <div class="insc-tipo-sub">Responsável pela organização local do grupo</div>
+            </div>
+          </div>
           <div class="profile-opt" id="popt-paciente" onclick="selectProfile('paciente')" style="border-radius:var(--radius-sm);padding:.65rem .85rem;display:flex;align-items:center;gap:10px;cursor:pointer;transition:all .15s;margin-bottom:.4rem">
             <div class="insc-tipo-radio"></div>
             <div class="insc-tipo-info">
@@ -4914,6 +4921,9 @@ function initApp() {
           // Ocultar o passo de escolha de grupo (ele já está definido pelo convite)
           const grupoStep = document.getElementById('step-grupo-card');
           if (grupoStep) grupoStep.style.display = 'none';
+          // Ocultar opções de tutor/coordenador se o grupo já os tiver
+          if (g && g.tutor) { const el = document.getElementById('popt-tutor'); if (el) el.style.display = 'none'; }
+          if (g && g.coordenador) { const el = document.getElementById('popt-coordenador'); if (el) el.style.display = 'none'; }
           // Mostrar aviso de convite
           const hdr = document.getElementById('welcome-level-badge');
           if (hdr && !document.getElementById('welcome-convite-aviso')) {
@@ -6679,13 +6689,6 @@ function openInscricao(num) {
 
   renderInscricaoBody(g, jaInscrito, meuGrupo);
   showScreen('inscricao');
-  // Se o perfil da welcome for tutor, pré-selecionar o papel automaticamente
-  if (ST.userProfile === 'tutor' && !g.tutor) {
-    setTimeout(() => {
-      const el = document.getElementById('tipo-opt-tutor');
-      if (el) el.click();
-    }, 100);
-  }
 }
 
 function renderInscricaoBody(g, jaInscrito, meuGrupo) {
@@ -6826,70 +6829,10 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
       </div>
     </div>
 
-    <div class="insc-block">
-      <div class="insc-block-hdr">👤 Qual é o seu papel neste grupo?</div>
-      <div class="insc-block-body">
-        <div class="insc-tipo-opts">
-
-          ${!g.tutor ? `
-          <div class="insc-tipo-opt" id="tipo-opt-tutor" onclick="selecionarTipo('tutor')">
-            <div class="insc-tipo-radio"></div>
-            <div class="insc-tipo-info">
-              <div class="insc-tipo-label">👨‍🏫 Sou o Tutor deste grupo</div>
-              <div class="insc-tipo-sub">Capelão ou responsável espiritual pelo grupo</div>
-            </div>
-          </div>` : ''}
-
-          ${!g.coordenador ? `
-          <div class="insc-tipo-opt" id="tipo-opt-coordenador" onclick="selecionarTipo('coordenador')">
-            <div class="insc-tipo-radio"></div>
-            <div class="insc-tipo-info">
-              <div class="insc-tipo-label">🤝 Sou o Coordenador deste grupo</div>
-              <div class="insc-tipo-sub">Responsável pela organização local do grupo</div>
-            </div>
-          </div>` : ''}
-
-          <div class="insc-tipo-opt" id="tipo-opt-colaborador" onclick="selecionarTipo('colaborador')">
-            <div class="insc-tipo-radio"></div>
-            <div class="insc-tipo-info">
-              <div class="insc-tipo-label">🏥 Colaborador do Hospital/Clínica Adventista</div>
-              <div class="insc-tipo-sub">Trabalho em uma unidade de saúde adventista</div>
-            </div>
-          </div>
-
-          <div class="insc-tipo-opt" id="tipo-opt-amigo" onclick="selecionarTipo('amigo')">
-            <div class="insc-tipo-radio"></div>
-            <div class="insc-tipo-info">
-              <div class="insc-tipo-label">🤝 Amigo dos Adventistas</div>
-              <div class="insc-tipo-sub">Simpatizante ou convidado da comunidade adventista</div>
-            </div>
-          </div>
-
-          <div class="insc-tipo-opt" id="tipo-opt-membro" onclick="selecionarTipo('membro')">
-            <div class="insc-tipo-radio"></div>
-            <div class="insc-tipo-info">
-              <div class="insc-tipo-label">⛪ Membro de Igreja Adventista</div>
-              <div class="insc-tipo-sub">Sou membro de uma Igreja Adventista do Sétimo Dia</div>
-            </div>
-          </div>
-
-          <div class="insc-tipo-opt" id="tipo-opt-outro" onclick="selecionarTipo('outro')">
-            <div class="insc-tipo-radio"></div>
-            <div class="insc-tipo-info">
-              <div class="insc-tipo-label">🌿 Outra situação</div>
-              <div class="insc-tipo-sub">Soube da jornada por outro meio</div>
-            </div>
-          </div>
-
-        </div>
-
-        <div id="dept-wrap" style="display:none">
-          <div class="insc-field">
-            <label>Departamento onde trabalha</label>
-            <input class="insc-input" id="insc-dept" type="text" placeholder="Ex: Enfermagem, UTI, RH, Nutrição…">
-          </div>
-        </div>
-
+    <div id="dept-wrap" style="display:${ST.userProfile === 'colaborador' ? 'block' : 'none'};padding:0 1rem .5rem">
+      <div class="insc-field">
+        <label>Departamento onde trabalha</label>
+        <input class="insc-input" id="insc-dept" type="text" placeholder="Ex: Enfermagem, UTI, RH, Nutrição…">
       </div>
     </div>
 
@@ -6933,10 +6876,12 @@ function confirmarInscricao(grupoNum) {
   const wa   = document.getElementById('insc-wa')?.value.replace(/\D/g,'');
   const dept = document.getElementById('insc-dept')?.value.trim();
 
+  // Usar perfil escolhido na tela de boas-vindas
+  tipoSelecionado = ST.userProfile || 'participante';
+
   // Validações dos dados pessoais
   if (!nome) { mostrarErroInsc('Por favor, informe seu nome completo.'); return; }
   if (!wa || wa.length < 10) { mostrarErroInsc('Informe um WhatsApp pessoal válido com DDD.'); return; }
-  if (!tipoSelecionado) { mostrarErroInsc('Selecione qual é o seu papel neste grupo.'); return; }
   if (tipoSelecionado === 'colaborador' && !dept) { mostrarErroInsc('Informe o departamento onde você trabalha.'); return; }
 
   // Validações de criação do grupo (só se for o primeiro a entrar)
