@@ -4939,6 +4939,24 @@ function initApp() {
     }
   }
 
+  // ── Navegar diretamente para uma tela via ?tela=X (uso interno/dev) ──
+  const telaParam = params.get('tela');
+  if (telaParam && ST.welcomeDone) {
+    const telaMap = {
+      home: () => { showScreen('home'); renderHome(); renderCompanionFab(); setTimeout(initGrupos, 80); },
+      grupos: () => { showScreen('home'); renderHome(); renderCompanionFab(); setTimeout(() => { initGrupos(); openGrupos(); }, 100); },
+      journal: () => { showScreen('home'); renderHome(); setTimeout(() => showScreen('journal'), 100); },
+      progresso: () => { showScreen('home'); renderHome(); setTimeout(openPanel, 100); },
+      share: () => { showScreen('home'); renderHome(); setTimeout(openShare, 100); },
+      ai: () => { showScreen('home'); renderHome(); setTimeout(() => showScreen('ai'), 100); },
+      tutor: () => { showScreen('tutorpanel'); renderTutorLogin(); },
+      comunidade: () => { showScreen('home'); renderHome(); setTimeout(openComunidade, 100); },
+      companion: () => { showScreen('home'); renderHome(); renderCompanionFab(); setTimeout(() => showScreen('companion'), 200); },
+    };
+    window.history.replaceState({}, '', window.location.pathname);
+    if (telaMap[telaParam]) { telaMap[telaParam](); return; }
+  }
+
   if (ST.welcomeDone) {
     showScreen('home');
     renderHome();
