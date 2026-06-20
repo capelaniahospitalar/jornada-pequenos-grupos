@@ -1582,6 +1582,13 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
       </div>
       <div class="welcome-step-body">
         <div class="insc-tipo-opts" id="grupo-select-bar-welcome">
+          <div class="profile-opt" id="popt-tutor" onclick="selectProfile('tutor')" style="border-radius:var(--radius-sm);padding:.65rem .85rem;display:flex;align-items:center;gap:10px;cursor:pointer;transition:all .15s;margin-bottom:.4rem">
+            <div class="insc-tipo-radio"></div>
+            <div class="insc-tipo-info">
+              <div class="insc-tipo-label">👨‍🏫 Serei o Tutor do grupo</div>
+              <div class="insc-tipo-sub">Capelão ou responsável espiritual pelo grupo</div>
+            </div>
+          </div>
           <div class="profile-opt" id="popt-paciente" onclick="selectProfile('paciente')" style="border-radius:var(--radius-sm);padding:.65rem .85rem;display:flex;align-items:center;gap:10px;cursor:pointer;transition:all .15s;margin-bottom:.4rem">
             <div class="insc-tipo-radio"></div>
             <div class="insc-tipo-info">
@@ -6672,6 +6679,13 @@ function openInscricao(num) {
 
   renderInscricaoBody(g, jaInscrito, meuGrupo);
   showScreen('inscricao');
+  // Se o perfil da welcome for tutor, pré-selecionar o papel automaticamente
+  if (ST.userProfile === 'tutor' && !g.tutor) {
+    setTimeout(() => {
+      const el = document.getElementById('tipo-opt-tutor');
+      if (el) el.click();
+    }, 100);
+  }
 }
 
 function renderInscricaoBody(g, jaInscrito, meuGrupo) {
