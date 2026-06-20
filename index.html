@@ -4651,10 +4651,20 @@ function completeStudy() {
   document.getElementById('c-sub').textContent = `"${s.title}" — mais um passo na caminhada com Jesus.`;
   document.getElementById('c-xp').textContent = '+' + s.xp + ' XP ganhos';
 
+  // Mostrar subida de nível (tem prioridade sobre o badge genérico)
+  const lvlBefore = typeof getLevelIndex === 'function' ? getLevelIndex(xpBefore) : -1;
+  const lvlAfter  = typeof getLevelIndex === 'function' ? getLevelIndex(ST.xp)    : -1;
+  const leveledUp = lvlAfter > lvlBefore && typeof RPG_LEVELS !== 'undefined' && RPG_LEVELS[lvlAfter];
+
   const bd = document.getElementById('c-badge');
-  bd.innerHTML = newBadge
-    ? `<div class="comp-badge-wrap"><div class="comp-badge-ico">${newBadge.icon}</div><div class="comp-badge-lbl">Nova conquista</div><div class="comp-badge-name">${newBadge.name}</div></div>`
-    : '';
+  if (leveledUp) {
+    const lv = RPG_LEVELS[lvlAfter];
+    bd.innerHTML = `<div class="comp-badge-wrap"><div class="comp-badge-ico">${lv.icon}</div><div class="comp-badge-lbl">Subiu de nível!</div><div class="comp-badge-name">${lv.name}</div></div>`;
+  } else {
+    bd.innerHTML = newBadge
+      ? `<div class="comp-badge-wrap"><div class="comp-badge-ico">${newBadge.icon}</div><div class="comp-badge-lbl">Nova conquista</div><div class="comp-badge-name">${newBadge.name}</div></div>`
+      : '';
+  }
 
   const ni = ST.done.length;
   const cn = document.getElementById('c-next');
