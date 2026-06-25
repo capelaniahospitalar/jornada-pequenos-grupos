@@ -6551,6 +6551,7 @@ function saveGrupos() {
     }));
     localStorage.setItem(GRUPOS_KEY, JSON.stringify(dadosSalvar));
   } catch {}
+  saveGruposToFirebase();
 }
 
 function loadMeuGrupo() {
@@ -6561,6 +6562,210 @@ function loadMeuGrupo() {
 }
 function saveMeuGrupo(dados) {
   try { localStorage.setItem(MEU_GRUPO_KEY, JSON.stringify(dados)); } catch {}
+}
+
+// ── Firebase Firestore Sync ──────────────────────────────────────────────
+const FB_CONFIG_KEY = 'jdpg_fb_config';
+const FB_COLL = 'jdpg';
+const FB_DOC  = 'grupos';
+let   fbPollTimer = null;
+let   fbSyncing   = false;
+
+function loadFbConfig() {
+  try { return JSON.parse(localStorage.getItem(FB_CONFIG_KEY) || 'null'); }
+  catch { return null; }
+}
+function saveFbConfig(cfg) {
+  try { localStorage.setItem(FB_CONFIG_KEY, JSON.stringify(cfg)); } catch {}
+}
+function fbDocUrl(cfg) {
+  return `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/${FB_COLL}/${FB_DOC}?key=${cfg.apiKey}`;
+}
+
+async function fbReadGrupos(cfg) {
+  const r = await fetch(fbDocUrl(cfg));
+  if (r.status === 404) return null;
+  if (!r.ok) { const t = await r.text(); throw new Error('HTTP ' + r.status + ': ' + t.slice(0,120)); }
+  const doc = await r.json();
+  const s = doc.fields?.dados?.stringValue;
+  return s ? JSON.parse(s) : null;
+}
+
+async function fbWriteGrupos(cfg, data) {
+  const body = {
+    fields: {
+      dados: { stringValue: JSON.stringify(data) },
+      ts:    { integerValue: String(Date.now()) }
+    }
+  };
+  const r = await fetch(fbDocUrl(cfg), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) { const t = await r.text(); throw new Error('HTTP ' + r.status + ': ' + t.slice(0,120)); }
+}
+
+function applyGruposData(salvo) {
+  if (!Array.isArray(salvo)) return;
+  salvo.forEach(g => {
+    const idx = PEQUENOS_GRUPOS.findIndex(pg => pg.num === g.num);
+    if (idx < 0) return;
+    PEQUENOS_GRUPOS[idx].nome          = g.nome          ?? null;
+    PEQUENOS_GRUPOS[idx].tutor         = g.tutor         ?? null;
+    PEQUENOS_GRUPOS[idx].coordenador   = g.coordenador   ?? null;
+    PEQUENOS_GRUPOS[idx].diaReuniao    = g.diaReuniao    ?? null;
+    PEQUENOS_GRUPOS[idx].horaReuniao   = g.horaReuniao   ?? null;
+    PEQUENOS_GRUPOS[idx].participantes = g.participantes || [];
+  });
+}
+
+async function syncFromFirebase() {
+  const cfg = loadFbConfig();
+  if (!cfg || fbSyncing) return false;
+  fbSyncing = true;
+  try {
+    const data = await fbReadGrupos(cfg);
+    if (data) {
+      applyGruposData(data);
+      try { localStorage.setItem(GRUPOS_KEY, JSON.stringify(data)); } catch {}
+      return true;
+    }
+  } catch (e) {
+    console.warn('Firebase sync:', e);
+  } finally {
+    fbSyncing = false;
+  }
+  return false;
+}
+
+async function saveGruposToFirebase() {
+  const cfg = loadFbConfig();
+  if (!cfg) return;
+  const dadosSalvar = PEQUENOS_GRUPOS.map(g => ({
+    num: g.num, nome: g.nome, tutor: g.tutor,
+    coordenador: g.coordenador, diaReuniao: g.diaReuniao,
+    horaReuniao: g.horaReuniao, participantes: g.participantes,
+  }));
+  try { await fbWriteGrupos(cfg, dadosSalvar); }
+  catch (e) { console.warn('Firebase save:', e); }
+}
+
+function startFbPoll() {
+  stopFbPoll();
+  fbPollTimer = setInterval(async () => {
+    const updated = await syncFromFirebase();
+    if (updated) {
+      const active = document.querySelector('.screen.active')?.id;
+      if (active === 'screen-grupos') renderGrupoList();
+    }
+  }, 30000);
+}
+function stopFbPoll() {
+  if (fbPollTimer) { clearInterval(fbPollTimer); fbPollTimer = null; }
+}
+
+function renderGrupoSyncBadge() {
+  const cfg = loadFbConfig();
+  let badge = document.getElementById('fb-sync-badge');
+  if (!badge) {
+    const hdr = document.querySelector('#screen-grupos .grupo-hdr');
+    if (!hdr) return;
+    badge = document.createElement('div');
+    badge.id = 'fb-sync-badge';
+    badge.style.cssText = 'text-align:center;padding:.15rem 1rem .35rem;font-family:var(--ff-body);font-size:12px;cursor:pointer';
+    hdr.appendChild(badge);
+  }
+  if (cfg) {
+    badge.innerHTML = `<span style="color:var(--teal)" onclick="openFbSetup()">☁️ Sincronização em nuvem ativa ✓</span>`;
+  } else {
+    badge.innerHTML = `<span style="color:var(--gold);text-decoration:underline" onclick="openFbSetup()">⚠️ Sincronização não configurada — toque para ativar</span>`;
+  }
+}
+
+function openFbSetup() {
+  const cfg = loadFbConfig() || {};
+  let overlay = document.getElementById('fb-setup-overlay');
+  if (overlay) overlay.remove();
+  overlay = document.createElement('div');
+  overlay.id = 'fb-setup-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:1.25rem;box-sizing:border-box';
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border-radius:16px;padding:1.5rem;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,.5);box-sizing:border-box">
+      <div style="font-family:var(--ff-head);font-size:1.1rem;color:var(--text1);margin-bottom:.3rem">☁️ Sincronização em Nuvem</div>
+      <div style="font-family:var(--ff-body);font-size:13px;color:var(--text3);margin-bottom:1.1rem;line-height:1.6">
+        Cole aqui as credenciais do Firebase para que todos os dispositivos compartilhem os grupos automaticamente.
+        <br><br>
+        <strong style="color:var(--text2)">Como obter:</strong><br>
+        1. Acesse <a href="https://console.firebase.google.com" target="_blank" style="color:var(--teal)">console.firebase.google.com</a><br>
+        2. Crie um projeto (ou use um existente)<br>
+        3. Ative o <strong>Firestore Database</strong> em modo de teste<br>
+        4. Em <em>Configurações do projeto → Geral → Seus apps</em>, adicione um app Web e copie o <code>projectId</code> e <code>apiKey</code>
+      </div>
+      <label style="font-family:var(--ff-body);font-size:13px;color:var(--text2);display:block;margin-bottom:.25rem">Project ID</label>
+      <input id="fb-setup-pid" type="text" value="${cfg.projectId||''}" placeholder="meu-projeto-12345"
+        style="width:100%;box-sizing:border-box;padding:.65rem .85rem;border:1px solid var(--border);border-radius:8px;font-size:15px;font-family:var(--ff-body);background:var(--surface2,#f5f5f5);color:var(--text1);margin-bottom:.85rem">
+      <label style="font-family:var(--ff-body);font-size:13px;color:var(--text2);display:block;margin-bottom:.25rem">API Key</label>
+      <input id="fb-setup-apikey" type="text" value="${cfg.apiKey||''}" placeholder="AIzaSy…"
+        style="width:100%;box-sizing:border-box;padding:.65rem .85rem;border:1px solid var(--border);border-radius:8px;font-size:15px;font-family:var(--ff-body);background:var(--surface2,#f5f5f5);color:var(--text1);margin-bottom:1rem">
+      <div id="fb-setup-status" style="font-family:var(--ff-body);font-size:13px;color:var(--text3);min-height:1.3em;margin-bottom:.75rem"></div>
+      <div style="display:flex;gap:8px">
+        <button onclick="testarFbConfig()" style="flex:1;padding:.7rem;border-radius:8px;border:1px solid var(--teal);background:none;color:var(--teal);font-size:14px;font-family:var(--ff-body);cursor:pointer">Testar</button>
+        <button onclick="salvarFbConfig()" style="flex:2;padding:.7rem;border-radius:8px;border:none;background:var(--teal);color:#fff;font-size:14px;font-family:var(--ff-body);cursor:pointer">✓ Salvar e Ativar</button>
+      </div>
+      <button onclick="document.getElementById('fb-setup-overlay').remove()" style="width:100%;margin-top:.5rem;padding:.5rem;border:none;background:none;color:var(--text3);font-size:13px;font-family:var(--ff-body);cursor:pointer">Cancelar</button>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function testarFbConfig() {
+  const pid    = document.getElementById('fb-setup-pid')?.value.trim();
+  const apiKey = document.getElementById('fb-setup-apikey')?.value.trim();
+  const status = document.getElementById('fb-setup-status');
+  if (!pid || !apiKey) { status.textContent = '⚠️ Preencha os dois campos.'; return; }
+  status.style.color = 'var(--text3)';
+  status.textContent = '⏳ Testando conexão…';
+  try {
+    await fbReadGrupos({ projectId: pid, apiKey });
+    status.style.color = '#2A9D5C';
+    status.textContent = '✅ Conexão com Firebase OK!';
+  } catch (e) {
+    status.style.color = '#E05050';
+    status.textContent = '❌ ' + e.message;
+  }
+}
+
+async function salvarFbConfig() {
+  const pid    = document.getElementById('fb-setup-pid')?.value.trim();
+  const apiKey = document.getElementById('fb-setup-apikey')?.value.trim();
+  const status = document.getElementById('fb-setup-status');
+  if (!pid || !apiKey) { status.textContent = '⚠️ Preencha os dois campos.'; return; }
+  status.style.color = 'var(--text3)';
+  status.textContent = '⏳ Salvando e sincronizando…';
+  const cfg = { projectId: pid, apiKey };
+  saveFbConfig(cfg);
+  try {
+    const existing = await fbReadGrupos(cfg);
+    if (existing) {
+      applyGruposData(existing);
+      try { localStorage.setItem(GRUPOS_KEY, JSON.stringify(existing)); } catch {}
+    } else {
+      const dadosSalvar = PEQUENOS_GRUPOS.map(g => ({
+        num: g.num, nome: g.nome, tutor: g.tutor,
+        coordenador: g.coordenador, diaReuniao: g.diaReuniao,
+        horaReuniao: g.horaReuniao, participantes: g.participantes,
+      }));
+      await fbWriteGrupos(cfg, dadosSalvar);
+    }
+    document.getElementById('fb-setup-overlay')?.remove();
+    renderGrupoSyncBadge();
+    renderGrupoList();
+    startFbPoll();
+    alert('✅ Sincronização ativada! Os grupos agora são compartilhados automaticamente entre todos os dispositivos.');
+  } catch (e) {
+    status.style.color = '#E05050';
+    status.textContent = '❌ Erro: ' + e.message;
+  }
 }
 
 // ── Estado de formação de um grupo ───────────────────────────────────
@@ -6595,7 +6800,12 @@ function isGrupoAcessivel(g) {
 function openGrupos() {
   loadGrupos();
   showScreen('grupos');
+  renderGrupoSyncBadge();
   renderGrupoList();
+  syncFromFirebase().then(updated => {
+    if (updated) renderGrupoList();
+  });
+  startFbPoll();
 }
 
 // ── Render: lista de grupos ────────────────────────────────────────────
@@ -6699,6 +6909,12 @@ function filterGrupos(val) {
 // ── Render: tela de criação / inscrição ─────────────────────────────────
 function openInscricao(num) {
   loadGrupos();
+  syncFromFirebase().then(updated => {
+    if (updated) {
+      const g2 = PEQUENOS_GRUPOS.find(x => x.num === num);
+      if (g2) renderInscricaoBody(g2, loadMeuGrupo()?.grupoNum === num, loadMeuGrupo());
+    }
+  });
   const g = PEQUENOS_GRUPOS.find(x => x.num === num);
   if (!g) return;
 
@@ -7948,6 +8164,12 @@ setTimeout(initE8, 100);
 // Service Worker removido temporariamente — causava cache de versões antigas
 // durante o desenvolvimento ativo. Se desejar reativar no futuro (app em produção
 // estável), descomente o bloco abaixo e gere um service-worker.js atualizado.
+// ── Inicializar sync Firebase ao carregar ────────────────────────────────
+if (loadFbConfig()) {
+  syncFromFirebase();
+  startFbPoll();
+}
+
 if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
   // Desregistra qualquer service worker antigo que possa estar em cache no navegador
   navigator.serviceWorker.getRegistrations().then(regs => {
