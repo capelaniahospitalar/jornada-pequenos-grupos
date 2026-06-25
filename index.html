@@ -7409,14 +7409,16 @@ function initGrupos() {
 
 // Tela de grupos acessível via botão na home
 function renderGruposBtnHome() {
-  const existing = document.getElementById('grupos-home-btn');
-  if (existing) return;
   const tutor = document.getElementById('h-tutor-area');
   if (!tutor) return;
+  let div = document.getElementById('grupos-home-btn');
+  if (!div) {
+    div = document.createElement('div');
+    div.id = 'grupos-home-btn';
+    div.style.cssText = 'margin:.75rem 1rem 0';
+    tutor.after(div);
+  }
   const meuGrupo = loadMeuGrupo();
-  const div = document.createElement('div');
-  div.id = 'grupos-home-btn';
-  div.style.cssText = 'margin:.75rem 1rem 0';
   div.innerHTML = meuGrupo
     ? (() => {
         const pennant = generatePennantSvg(meuGrupo.grupoNum, meuGrupo.grupoNome, {width:52, height:72});
@@ -7432,7 +7434,6 @@ function renderGruposBtnHome() {
     : `<button onclick="openGrupos()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--teal-light);border:0.5px solid rgba(14,123,108,.35);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;color:var(--teal);cursor:pointer;font-family:var(--ff-body);font-weight:600">
         🌿 Escolher meu Pequeno Grupo
       </button>`;
-  tutor.after(div);
 }
 
 
