@@ -6568,12 +6568,19 @@ function saveMeuGrupo(dados) {
 const FB_CONFIG_KEY = 'jdpg_fb_config';
 const FB_COLL = 'jdpg';
 const FB_DOC  = 'grupos';
+const FB_DEFAULT_CONFIG = {
+  projectId: 'jornada-pequenos-grupos',
+  apiKey: 'AIzaSyDPuoP221leqvON_d-K3auyANOoH7eal9U'
+};
 let   fbPollTimer = null;
 let   fbSyncing   = false;
 
 function loadFbConfig() {
-  try { return JSON.parse(localStorage.getItem(FB_CONFIG_KEY) || 'null'); }
-  catch { return null; }
+  try {
+    const stored = JSON.parse(localStorage.getItem(FB_CONFIG_KEY) || 'null');
+    return stored || FB_DEFAULT_CONFIG;
+  }
+  catch { return FB_DEFAULT_CONFIG; }
 }
 function saveFbConfig(cfg) {
   try { localStorage.setItem(FB_CONFIG_KEY, JSON.stringify(cfg)); } catch {}
