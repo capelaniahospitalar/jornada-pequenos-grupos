@@ -3232,8 +3232,9 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
   // Missões de jornada (não campanha) para referência de label
   const missaoJornada = JOURNEY_MISSIONS.filter(m => !m.id.startsWith('pg_'));
 
-  const participantesHtml = g.participantes.length
-    ? g.participantes.map(p => {
+  const participantesSemDup = g.participantes.filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
+  const participantesHtml = participantesSemDup.length
+    ? participantesSemDup.map(p => {
         const pData = pgMissoes[p.nome];
         const tipoLabel = p.tipo === 'colaborador' ? '🏥 ' + (p.departamento||'Colaborador')
           : p.tipo === 'amigo' ? '🤝 Amigo'
@@ -6618,7 +6619,8 @@ function applyGruposData(salvo) {
     PEQUENOS_GRUPOS[idx].coordenador   = g.coordenador   ?? null;
     PEQUENOS_GRUPOS[idx].diaReuniao    = g.diaReuniao    ?? null;
     PEQUENOS_GRUPOS[idx].horaReuniao   = g.horaReuniao   ?? null;
-    PEQUENOS_GRUPOS[idx].participantes = g.participantes || [];
+    const partic = g.participantes || [];
+    PEQUENOS_GRUPOS[idx].participantes = partic.filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
   });
 }
 
@@ -7000,8 +7002,8 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
         <span class="grupo-info-ico">👥</span>
         <div class="grupo-info-txt">
           <div class="grupo-info-lbl">Participantes inscritos</div>
-          <div class="grupo-info-val">${g.participantes.length}</div>
-          ${g.participantes.length > 0 ? `<div style="margin-top:.4rem;display:flex;flex-direction:column;gap:.15rem">${g.participantes.map(p => `<span style="font-size:13px;color:var(--text2);font-family:var(--ff-body)">• ${p.nome}</span>`).join('')}</div>` : ''}
+          <div class="grupo-info-val">${[...new Map(g.participantes.map(p => [p.nome.trim().toLowerCase(), p])).values()].length}</div>
+          ${g.participantes.length > 0 ? `<div style="margin-top:.4rem;display:flex;flex-direction:column;gap:.15rem">${[...new Map(g.participantes.map(p => [p.nome.trim().toLowerCase(), p])).values()].map(p => `<span style="font-size:13px;color:var(--text2);font-family:var(--ff-body)">• ${p.nome}</span>`).join('')}</div>` : ''}
         </div>
       </div>
     </div>`;
@@ -7149,6 +7151,9 @@ function confirmarInscricao(grupoNum) {
   if (!nome) { mostrarErroInsc('Por favor, informe seu nome completo.'); return; }
   if (!wa || wa.length < 10) { mostrarErroInsc('Informe um WhatsApp pessoal válido com DDD.'); return; }
   if (tipoSelecionado === 'colaborador' && !dept) { mostrarErroInsc('Informe o departamento onde você trabalha.'); return; }
+  if (g.participantes && g.participantes.some(p => p.nome.trim().toLowerCase() === nome.toLowerCase())) {
+    mostrarErroInsc('Este nome já está inscrito neste grupo. Verifique se você já se cadastrou antes.'); return;
+  }
 
   // Validações de criação do grupo (só se for o primeiro a entrar)
   let grupoNomeInput = null, grupoDiaInput = null, grupoHoraInput = null;
