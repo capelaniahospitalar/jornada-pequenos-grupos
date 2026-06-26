@@ -3325,18 +3325,10 @@ function tutorConfirmarZerarGrupo(grupoNum, nomeTutor) {
   const nomeGrupo = g && g.nome ? g.nome : 'Grupo ' + grupoNum;
   if (!confirm(`Zerar "${nomeGrupo}"?\n\nIsso apagará o progresso, nível, missões e participantes do grupo. Esta ação não pode ser desfeita.`)) return;
 
-  // Apagar progresso do PG
+  // Apagar progresso e nível do PG (agora no Firebase via PEQUENOS_GRUPOS)
   try {
-    const prog = JSON.parse(localStorage.getItem(PG_PROGRESS_KEY) || '{}');
-    delete prog[grupoNum];
-    localStorage.setItem(PG_PROGRESS_KEY, JSON.stringify(prog));
-  } catch {}
-
-  // Apagar nível do PG
-  try {
-    const nivel = JSON.parse(localStorage.getItem(PG_NIVEL_KEY) || '{}');
-    delete nivel[grupoNum];
-    localStorage.setItem(PG_NIVEL_KEY, JSON.stringify(nivel));
+    const gObj = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+    if (gObj) { gObj.pgProgress = null; gObj.pgNivel = null; }
   } catch {}
 
   // Apagar missões do PG
@@ -6672,6 +6664,8 @@ function applyGruposData(salvo) {
     const partic = g.participantes || [];
     PEQUENOS_GRUPOS[idx].participantes = partic.filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
     PEQUENOS_GRUPOS[idx].gratidoes = g.gratidoes || [];
+    PEQUENOS_GRUPOS[idx].pgProgress = g.pgProgress || null;
+    PEQUENOS_GRUPOS[idx].pgNivel = g.pgNivel || null;
   });
 }
 
@@ -7565,49 +7559,13 @@ function renderGrupoPreviewWelcome() {
 //  PROGRESSO DO MEU PEQUENO GRUPO (específico)
 // ══════════════════════════════════════
 
-const PG_PROGRESS_KEY = 'jdpg_pg_progress_v1';
-
-// Metas semanais padrão de um Pequeno Grupo (ajustáveis por grupo)
-function getPgWeekMetas(grupoNum) {
-  // Seed simples baseado no número do grupo para variar um pouco entre grupos
-  const seed = grupoNum % 5;
+// Metas semanais — simples e alcançáveis para um grupo de 3–8 pessoas
+function getPgWeekMetas() {
   return {
-    estudos:   { meta: 12 + seed,  label: 'Estudos concluídos',   icon:'📖', color:'#1E5F8C' },
-    oracoes:   { meta: 15 + seed,  label: 'Pedidos de oração atendidos', icon:'🙏', color:'#5C3D8F' },
-    bondades:  { meta: 8 + seed,   label: 'Atos de bondade registrados', icon:'❤️', color:'#C0392B' },
+    estudos:   { meta: 3,  label: 'Estudos concluídos',          icon:'📖', color:'#1E5F8C' },
+    oracoes:   { meta: 5,  label: 'Pedidos de oração registrados', icon:'🙏', color:'#5C3D8F' },
+    bondades:  { meta: 3,  label: 'Atos de bondade registrados',  icon:'❤️', color:'#C0392B' },
   };
-}
-
-function loadPgProgress() {
-  try {
-    const s = localStorage.getItem(PG_PROGRESS_KEY);
-    return s ? JSON.parse(s) : null;
-  } catch { return null; }
-}
-
-function savePgProgress(data) {
-  try { localStorage.setItem(PG_PROGRESS_KEY, JSON.stringify(data)); } catch {}
-}
-
-// Gera (ou recupera) o progresso real do grupo desta semana — começa zerado
-function getOrInitPgProgress(grupoNum) {
-  let data = loadPgProgress();
-  const weekKey = getISOWeekPg();
-
-  if (!data || data.grupoNum !== grupoNum || data.weekKey !== weekKey) {
-    // Nova semana ou grupo novo — começa sempre zerado.
-    // O progresso só avança com ações reais dos participantes
-    // (completar estudo, orar, registrar bondade, etc).
-    data = {
-      grupoNum,
-      weekKey,
-      estudos: 0,
-      oracoes: 0,
-      bondades: 0,
-    };
-    savePgProgress(data);
-  }
-  return data;
 }
 
 function getISOWeekPg() {
@@ -7618,18 +7576,44 @@ function getISOWeekPg() {
   return `${d.getUTCFullYear()}-W${Math.ceil((((d - yearStart) / 86400000) + 1) / 7)}`;
 }
 
+// Lê pgProgress do grupo no array Firebase
+function loadPgProgress(grupoNum) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  return g ? (g.pgProgress || null) : null;
+}
+
+// Salva pgProgress no grupo e envia para Firebase
+function savePgProgress(grupoNum, data) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return;
+  g.pgProgress = data;
+  saveGrupos();
+}
+
+// Garante que há um registro de progresso válido para a semana atual
+function getOrInitPgProgress(grupoNum) {
+  let data = loadPgProgress(grupoNum);
+  const weekKey = getISOWeekPg();
+  if (!data || data.weekKey !== weekKey) {
+    data = { grupoNum, weekKey, estudos: 0, oracoes: 0, bondades: 0 };
+    savePgProgress(grupoNum, data);
+  }
+  return data;
+}
+
 // Incrementa o progresso do grupo quando o usuário completa uma ação
 function bumpPgProgress(tipo, qty = 1) {
   const meuGrupo = loadMeuGrupo ? loadMeuGrupo() : null;
   if (!meuGrupo) return;
-  const data = getOrInitPgProgress(meuGrupo.grupoNum);
+  const grupoNum = meuGrupo.grupoNum;
+  loadGrupos();
+  const data = getOrInitPgProgress(grupoNum);
   if (data[tipo] !== undefined) {
-    const metas = getPgWeekMetas(meuGrupo.grupoNum);
+    const metas = getPgWeekMetas();
     data[tipo] = Math.min(metas[tipo].meta, data[tipo] + qty);
-    savePgProgress(data);
-    // Verifica se todas as metas foram atingidas nesta semana
+    savePgProgress(grupoNum, data);
     const allDone = Object.keys(metas).every(k => data[k] >= metas[k].meta);
-    if (allDone) checkPgSemanaCompleta(meuGrupo.grupoNum, data.weekKey);
+    if (allDone) checkPgSemanaCompleta(grupoNum, data.weekKey);
   }
 }
 
@@ -7637,7 +7621,6 @@ function bumpPgProgress(tipo, qty = 1) {
 //  NÍVEIS DOS PEQUENOS GRUPOS
 // ══════════════════════════════════════
 
-// Progressão baseada em semanas com 100% das metas cumpridas (0–13)
 const PG_GRUPO_LEVELS = [
   { min:0,  icon:'🌱', nome:'Semente',          desc:'O grupo deu os primeiros passos.' },
   { min:1,  icon:'🌿', nome:'Broto',             desc:'Primeiros frutos começando a surgir.' },
@@ -7647,21 +7630,18 @@ const PG_GRUPO_LEVELS = [
   { min:12, icon:'👑', nome:'Comunhão Plena',    desc:'Jornada concluída com excelência!' },
 ];
 
-const PG_NIVEL_KEY = 'jdpg_pg_nivel_v1';
-
+// Lê pgNivel do grupo no array Firebase
 function loadPgNivel(grupoNum) {
-  try {
-    const all = JSON.parse(localStorage.getItem(PG_NIVEL_KEY) || '{}');
-    return all[grupoNum] || { semanasCompletas: 0, semanasMarcadas: [] };
-  } catch { return { semanasCompletas: 0, semanasMarcadas: [] }; }
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  return (g && g.pgNivel) ? g.pgNivel : { semanasCompletas: 0, semanasMarcadas: [] };
 }
 
+// Salva pgNivel no grupo e envia para Firebase
 function savePgNivel(grupoNum, data) {
-  try {
-    const all = JSON.parse(localStorage.getItem(PG_NIVEL_KEY) || '{}');
-    all[grupoNum] = data;
-    localStorage.setItem(PG_NIVEL_KEY, JSON.stringify(all));
-  } catch {}
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return;
+  g.pgNivel = data;
+  saveGrupos();
 }
 
 function getPgGrupoLevel(grupoNum) {
@@ -7673,14 +7653,15 @@ function getPgGrupoLevel(grupoNum) {
   return { ...nivel, semanasCompletas };
 }
 
-// Chamado quando uma semana é detectada como 100% completa — registra uma vez por semana
+// Registra uma semana completa — chamado quando todos os 3 objetivos são atingidos
 function checkPgSemanaCompleta(grupoNum, weekKey) {
+  loadGrupos();
   const nivelData = loadPgNivel(grupoNum);
-  if (nivelData.semanasMarcadas.includes(weekKey)) return false; // já contabilizada
-  nivelData.semanasMarcadas.push(weekKey);
+  if ((nivelData.semanasMarcadas || []).includes(weekKey)) return false;
+  nivelData.semanasMarcadas = [...(nivelData.semanasMarcadas || []), weekKey];
   nivelData.semanasCompletas = (nivelData.semanasCompletas || 0) + 1;
   savePgNivel(grupoNum, nivelData);
-  return true; // nova semana completa!
+  return true;
 }
 
 // ══════════════════════════════════════
