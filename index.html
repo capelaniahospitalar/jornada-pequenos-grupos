@@ -7226,6 +7226,15 @@ function openInscricao(num) {
   const meuGrupo = loadMeuGrupo();
   const jaInscrito = meuGrupo && meuGrupo.grupoNum === g.num;
 
+  // Correção retroativa: se o usuário já está inscrito como tutor/coordenador
+  // mas o campo do grupo está vazio (não gravado no Firestore), corrige agora.
+  if (jaInscrito && meuGrupo.nome) {
+    let corrigido = false;
+    if (meuGrupo.papel === 'tutor' && !g.tutor) { g.tutor = meuGrupo.nome; corrigido = true; }
+    if (meuGrupo.papel === 'coordenador' && !g.coordenador) { g.coordenador = meuGrupo.nome; corrigido = true; }
+    if (corrigido) saveGrupos();
+  }
+
   renderInscricaoBody(g, jaInscrito, meuGrupo);
   showScreen('inscricao');
 }
@@ -8502,13 +8511,14 @@ async function seedTutorsToFirebase() {
     const result = await fbReadDoc(cfg);
     if (result && (!result.tutores || result.tutores.length === 0)) {
       TUTORS = _TUTORS_BOOTSTRAP;
-      await fbWriteGrupos(cfg,
+      const newTs = await fbWriteGrupos(cfg,
         result.dados || PEQUENOS_GRUPOS.map(g => ({
           num:g.num,nome:g.nome,tutor:g.tutor,coordenador:g.coordenador,
           diaReuniao:g.diaReuniao,horaReuniao:g.horaReuniao,participantes:g.participantes
         })),
         _TUTORS_BOOTSTRAP
       );
+      if (newTs) fbLastKnownTs = newTs; // evita falso conflito na próxima gravação
       console.log('V3: tutores semeados no Firestore com sucesso.');
     }
   } catch(e) { console.warn('seedTutors:', e); }
