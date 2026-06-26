@@ -5015,10 +5015,10 @@ function getCompanionPool() {
     .map((p, i) => ({
       name: p.nome,
       icon: COMPANION_ICONS[i % COMPANION_ICONS.length],
-      fase: 'iniciante',  // não temos XP de outros participantes ainda — neutro por padrão
+      fase: 'iniciante',
       xp: 0,
       streak: 0,
-      prayerRequest: '',
+      prayerRequest: p.pedidoOracao || '',
       missionDone: false,
     }));
 }
@@ -5038,6 +5038,48 @@ function loadCP() {
 }
 function saveCP() {
   try { localStorage.setItem(COMPANION_KEY, JSON.stringify(CP)); } catch {}
+}
+
+function sendMyPrayer() {
+  const texto = document.getElementById('my-prayer-input')?.value.trim();
+  if (!texto) return;
+  const meuGrupo = loadMeuGrupo();
+  if (meuGrupo) {
+    loadGrupos();
+    const g = PEQUENOS_GRUPOS.find(x => x.num === meuGrupo.grupoNum);
+    if (g) {
+      const eu = g.participantes.find(p => p.nome === meuGrupo.nome);
+      if (eu) {
+        eu.pedidoOracao = texto;
+        eu.pedidoOracaoData = new Date().toLocaleDateString('pt-BR');
+        saveGrupos();
+      }
+    }
+  }
+  CP.myPrayerRequest = texto;
+  CP.myPrayerDate = new Date().toLocaleDateString('pt-BR');
+  saveCP();
+  renderCompanionScreen();
+}
+
+function clearMyPrayer() {
+  const meuGrupo = loadMeuGrupo();
+  if (meuGrupo) {
+    loadGrupos();
+    const g = PEQUENOS_GRUPOS.find(x => x.num === meuGrupo.grupoNum);
+    if (g) {
+      const eu = g.participantes.find(p => p.nome === meuGrupo.nome);
+      if (eu) {
+        eu.pedidoOracao = '';
+        eu.pedidoOracaoData = null;
+        saveGrupos();
+      }
+    }
+  }
+  CP.myPrayerRequest = '';
+  CP.myPrayerDate = null;
+  saveCP();
+  renderCompanionScreen();
 }
 
 function getISOWeek() {
