@@ -4898,53 +4898,48 @@ function initApp() {
     const grupoNum = parseInt(pgConvite, 10);
     if (!isNaN(grupoNum) && grupoNum >= 1 && grupoNum <= 50) {
       window.history.replaceState({}, '', window.location.pathname);
-      loadGrupos();
-      const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
-      // Inscrever automaticamente no grupo convidado (sobrescreve qualquer grupo anterior)
-      if (g) {
-        saveMeuGrupo({
-          grupoNum: g.num,
-          grupoNome: g.nome || ('Grupo ' + g.num),
-          nome: ST.userName || '',
-          role: 'participante',
-          data: new Date().toLocaleDateString('pt-BR')
-        });
-        ST.grupoNum  = g.num;
-        ST.grupoNome = g.nome || ('Grupo ' + g.num);
-        save(ST);
-      }
-      const nomeGrupo = g && g.nome ? `"${g.nome}"` : `Grupo ${grupoNum}`;
-      if (ST.welcomeDone) {
-        // Usuário já tem jornada — vai direto para a home
-        showScreen('home');
-        renderHome();
-        renderCompanionFab();
-        setTimeout(initGrupos, 100);
-      } else {
-        // Primeiro acesso — welcome sem a etapa de escolher grupo
+      // Sincronizar Firebase antes para ter dados atualizados do grupo
+      syncFromFirebase().then(() => {
+        loadGrupos();
+        const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+        const nomeGrupo = g && g.nome ? `"${g.nome}"` : `Grupo ${grupoNum}`;
+        // Guardar número do grupo convidado — a inscrição formal acontece na tela de inscrição
         window._conviteGrupoNum = grupoNum;
-        showScreen('welcome');
-        setTimeout(() => {
-          renderGrupoBarWelcome();
-          renderGrupoPreviewWelcome();
-          renderWelcomeLevelBadge();
-          // Ocultar o passo de escolha de grupo (ele já está definido pelo convite)
-          const grupoStep = document.getElementById('step-grupo-card');
-          if (grupoStep) grupoStep.style.display = 'none';
-          // Ocultar opções de tutor/coordenador se o grupo já os tiver
-          if (g && g.tutor) { const el = document.getElementById('popt-tutor'); if (el) el.style.display = 'none'; }
-          if (g && g.coordenador) { const el = document.getElementById('popt-coordenador'); if (el) el.style.display = 'none'; }
-          // Mostrar aviso de convite
-          const hdr = document.getElementById('welcome-level-badge');
-          if (hdr && !document.getElementById('welcome-convite-aviso')) {
-            const aviso = document.createElement('div');
-            aviso.id = 'welcome-convite-aviso';
-            aviso.style.cssText = 'background:rgba(14,123,108,0.12);border:0.5px solid rgba(14,123,108,0.4);border-radius:8px;padding:.75rem 1rem;font-size:15px;color:var(--teal);font-family:var(--ff-body);margin-bottom:.75rem;line-height:1.5';
-            aviso.innerHTML = `🎉 Você foi convidado! Entrará automaticamente no <strong>${nomeGrupo}</strong>.<br>Preencha seu nome abaixo e clique em "Entrar na Jornada".`;
-            hdr.parentNode.insertBefore(aviso, hdr);
-          }
-        }, 80);
-      }
+
+        if (ST.welcomeDone) {
+          // Usuário já tem jornada — abrir tela de inscrição do grupo convidado
+          showScreen('home');
+          renderHome();
+          renderCompanionFab();
+          setTimeout(() => {
+            initGrupos();
+            openInscricao(grupoNum);
+          }, 150);
+        } else {
+          // Primeiro acesso — welcome, depois inscrição
+          showScreen('welcome');
+          setTimeout(() => {
+            renderGrupoBarWelcome();
+            renderGrupoPreviewWelcome();
+            renderWelcomeLevelBadge();
+            // Ocultar o passo de escolha de grupo (já definido pelo convite)
+            const grupoStep = document.getElementById('step-grupo-card');
+            if (grupoStep) grupoStep.style.display = 'none';
+            // Ocultar papéis já ocupados
+            if (g && g.tutor)       { const el = document.getElementById('popt-tutor');       if (el) el.style.display = 'none'; }
+            if (g && g.coordenador) { const el = document.getElementById('popt-coordenador'); if (el) el.style.display = 'none'; }
+            // Mostrar aviso de convite
+            const hdr = document.getElementById('welcome-level-badge');
+            if (hdr && !document.getElementById('welcome-convite-aviso')) {
+              const aviso = document.createElement('div');
+              aviso.id = 'welcome-convite-aviso';
+              aviso.style.cssText = 'background:rgba(14,123,108,0.12);border:0.5px solid rgba(14,123,108,0.4);border-radius:8px;padding:.75rem 1rem;font-size:15px;color:var(--teal);font-family:var(--ff-body);margin-bottom:.75rem;line-height:1.5';
+              aviso.innerHTML = `🎉 Você foi convidado! Entrará no <strong>${nomeGrupo}</strong>.<br>Preencha seu nome abaixo e clique em "Entrar na Jornada".`;
+              hdr.parentNode.insertBefore(aviso, hdr);
+            }
+          }, 80);
+        }
+      });
       return;
     }
   }
@@ -5015,7 +5010,7 @@ function getCompanionPool() {
 
   // Excluir a própria pessoa da lista de possíveis companheiros
   return g.participantes
-    .filter(p => p.ts !== meuGrupo.ts)
+    .filter(p => !meuGrupo.ts || !p.ts || p.ts !== meuGrupo.ts)
     .map((p, i) => ({
       name: p.nome,
       icon: COMPANION_ICONS[i % COMPANION_ICONS.length],
@@ -6917,9 +6912,21 @@ function filterGrupos(val) {
 function openInscricao(num) {
   loadGrupos();
   syncFromFirebase().then(updated => {
-    if (updated) {
-      const g2 = PEQUENOS_GRUPOS.find(x => x.num === num);
-      if (g2) renderInscricaoBody(g2, loadMeuGrupo()?.grupoNum === num, loadMeuGrupo());
+    if (!updated) return;
+    const g2 = PEQUENOS_GRUPOS.find(x => x.num === num);
+    if (!g2) return;
+    // Só re-renderiza o corpo se o usuário ainda não começou a preencher
+    const nomeInput = document.getElementById('insc-nome');
+    const jaComeçou = nomeInput && nomeInput.value.trim().length > 0;
+    if (!jaComeçou) {
+      renderInscricaoBody(g2, loadMeuGrupo()?.grupoNum === num, loadMeuGrupo());
+    }
+    // Sempre atualiza o cabeçalho da tela
+    const headerTutor = document.getElementById('insc-grupo-tutor');
+    if (headerTutor) {
+      headerTutor.textContent = (g2.tutor || g2.coordenador)
+        ? `${g2.tutor ? 'Tutor: '+g2.tutor : ''}${g2.tutor && g2.coordenador ? ' · ' : ''}${g2.coordenador ? 'Coordenador: '+g2.coordenador : ''}`
+        : 'Grupo em formação';
     }
   });
   const g = PEQUENOS_GRUPOS.find(x => x.num === num);
