@@ -3010,12 +3010,24 @@ function getTutorPassStore() {
 }
 function setTutorPass(nome, pass) {
   const store = getTutorPassStore();
-  store[nome] = pass;
-  try { localStorage.setItem('amjTutorPass', JSON.stringify(store)); } catch {}
+  store[nome] = hashPass(pass);
+  try { localStorage.setItem('amjTutorPass', JSON.stringify(store)); }
+  catch(e) { console.warn('setTutorPass:', e); }
 }
 function getTutorPass(nome) {
   const store = getTutorPassStore();
   return store.hasOwnProperty(nome) ? store[nome] : undefined;
+}
+function verifyTutorPass(nome, pass) {
+  const stored = getTutorPass(nome);
+  if (stored === undefined) return false;
+  // Migração: senhas antigas sem hash (não começam com 'h') — compara direto e atualiza
+  if (!stored.startsWith('h')) {
+    if (stored !== pass) return false;
+    setTutorPass(nome, pass); // upgrade para hash
+    return true;
+  }
+  return hashPass(pass) === stored;
 }
 function tutorHasPass(nome) {
   const p = getTutorPass(nome);
@@ -3071,7 +3083,7 @@ function renderTutorCreatePass(nome, errorMsg) {
   const body = document.getElementById('tutorpanel-body');
   body.innerHTML = `
     <div class="content-card">
-      <div class="phase-tag tag-content">Olá, ${nome}!</div>
+      <div class="phase-tag tag-content">Olá, ${sanitize(nome)}!</div>
       <p class="body-text">Este é o primeiro acesso com esse nome. Crie uma senha para proteger seu painel — assim, outras pessoas não conseguem ver as informações dos seus grupos usando seu nome.</p>
     </div>
     <div class="panel-section">
@@ -3098,7 +3110,7 @@ function renderTutorPassLogin(nome, errorMsg) {
   const body = document.getElementById('tutorpanel-body');
   body.innerHTML = `
     <div class="content-card">
-      <div class="phase-tag tag-content">Olá, ${nome}!</div>
+      <div class="phase-tag tag-content">Olá, ${sanitize(nome)}!</div>
       <p class="body-text">Digite sua senha para acessar o painel dos seus Pequenos Grupos.</p>
     </div>
     <div class="panel-section">
@@ -3114,7 +3126,7 @@ function renderTutorPassLogin(nome, errorMsg) {
 
 function tutorConfirmarLogin(nome) {
   const pass = document.getElementById('tp-pass-login')?.value;
-  if (pass !== getTutorPass(nome)) { renderTutorPassLogin(nome, 'Senha incorreta.'); return; }
+  if (!verifyTutorPass(nome, pass)) { renderTutorPassLogin(nome, 'Senha incorreta.'); return; }
   ST.tutorPanelAuth = nome;
   save(ST);
   renderTutorGruposList(nome);
@@ -3134,7 +3146,7 @@ function renderTutorGruposList(nome) {
   if (!grupos.length) {
     document.getElementById('tutorpanel-body').innerHTML = `
       <div class="content-card">
-        <div class="phase-tag tag-content">${nome}</div>
+        <div class="phase-tag tag-content">${sanitize(nome)}</div>
         <p class="body-text">Nenhum Pequeno Grupo encontrado sob seus cuidados no momento.</p>
       </div>
       <button onclick="tutorLogout()" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Sair</button>`;
@@ -3156,11 +3168,11 @@ function renderTutorGruposList(nome) {
         <div class="tutor-grupo-card-hdr" style="display:flex;align-items:center;gap:10px">
           <div style="width:32px;height:44px;flex-shrink:0">${pennantCard}</div>
           <div style="flex:1">
-            <div class="tutor-grupo-nome">${g.nome || 'Grupo ' + g.num}</div>
+            <div class="tutor-grupo-nome">${sanitize(g.nome || 'Grupo ' + g.num)}</div>
             <span class="tutor-grupo-papel-tag">${meuPapel}</span>
           </div>
         </div>
-        <div class="tutor-grupo-info-line">🤝 Coordenador: <strong>${g.coordenador || '— não definido —'}</strong></div>
+        <div class="tutor-grupo-info-line">🤝 Coordenador: <strong>${sanitize(g.coordenador || '— não definido —')}</strong></div>
         <div class="tutor-grupo-info-line">📖 Último estudo concluído: <strong>${ultimoEstudoNome}</strong> (${progresso.estudos || 0}/13)</div>
         <div class="tutor-grupo-info-line">🗓️ Reunião: <strong>${reuniao}</strong></div>
         <div class="tutor-grupo-info-line">👥 ${g.participantes.length} participante${g.participantes.length===1?'':'s'} — toque para ver detalhes</div>
@@ -3169,7 +3181,7 @@ function renderTutorGruposList(nome) {
 
   document.getElementById('tutorpanel-body').innerHTML = `
     <div class="content-card">
-      <div class="phase-tag tag-content">${nome}</div>
+      <div class="phase-tag tag-content">${sanitize(nome)}</div>
       <p class="body-text">${grupos.length} Pequeno${grupos.length===1?'':'s'} Grupo${grupos.length===1?'':'s'} sob seus cuidados.</p>
     </div>
     ${cards}
@@ -3224,15 +3236,15 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
 
         if (!prog) return `
           <div class="tutor-participante-row">
-            <div class="tutor-participante-nome">${p.nome}</div>
-            <div class="tutor-participante-meta">${tipoLabel} · inscrito em ${p.dataInscricao || '—'}</div>
+            <div class="tutor-participante-nome">${sanitize(p.nome)}</div>
+            <div class="tutor-participante-meta">${tipoLabel} · inscrito em ${sanitize(p.dataInscricao || '—')}</div>
             <div style="font-size:13px;color:var(--text3);padding:.2rem 0">Ainda não iniciou estudos pelo app.</div>
           </div>`;
 
         return `
           <div class="tutor-participante-row">
             <div style="display:flex;justify-content:space-between;align-items:baseline">
-              <div class="tutor-participante-nome">${p.nome}</div>
+              <div class="tutor-participante-nome">${sanitize(p.nome)}</div>
               <div style="font-size:12px;color:var(--teal);font-weight:600;font-family:var(--ff-body)">${prog.xp||0} XP · ${prog.estudosConcluidos||0}/13 estudos</div>
             </div>
             <div class="tutor-participante-meta">${tipoLabel} · 🔥 ${prog.streak||0} dias · atualizado em ${prog.atualizado||'—'}</div>
@@ -3246,7 +3258,7 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
     <div class="content-card" style="display:flex;align-items:center;gap:14px">
       <div style="width:56px;height:78px;flex-shrink:0">${pennantDetalhe}</div>
       <div>
-        <div class="phase-tag tag-content" style="margin-bottom:4px">🌿 ${g.nome || 'Grupo ' + grupoNum}</div>
+        <div class="phase-tag tag-content" style="margin-bottom:4px">🌿 ${sanitize(g.nome || 'Grupo ' + grupoNum)}</div>
         <p class="body-text" style="margin:0">Detalhes do Pequeno Grupo e seus participantes.</p>
       </div>
     </div>
@@ -3348,7 +3360,7 @@ function renderTutorResetPassScreen(nome, errorMsg) {
 function tutorConfirmarTrocaPass(nome) {
   const oldPass = document.getElementById('tp-old-pass')?.value;
   const newPass = document.getElementById('tp-new-pass')?.value;
-  if (oldPass !== getTutorPass(nome)) { renderTutorResetPassScreen(nome, 'Senha atual incorreta.'); return; }
+  if (!verifyTutorPass(nome, oldPass)) { renderTutorResetPassScreen(nome, 'Senha atual incorreta.'); return; }
   if (!newPass || newPass.length < 4) { renderTutorResetPassScreen(nome, 'A nova senha precisa ter pelo menos 4 caracteres.'); return; }
   setTutorPass(nome, newPass);
   alert('Senha alterada com sucesso!');
@@ -3365,14 +3377,14 @@ function tutorConfirmarZerarGrupo(grupoNum, nomeTutor) {
   try {
     const gObj = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
     if (gObj) { gObj.pgProgress = null; gObj.pgNivel = null; }
-  } catch {}
+  } catch(e) { console.warn('zerarGrupo/progress:', e); }
 
   // Apagar missões do PG
   try {
     const missoes = JSON.parse(localStorage.getItem(PG_MISSOES_KEY) || '{}');
     delete missoes[grupoNum];
     localStorage.setItem(PG_MISSOES_KEY, JSON.stringify(missoes));
-  } catch {}
+  } catch(e) { console.warn('sairGrupo/missoes:', e); }
 
   // Resetar o grupo na lista (limpar participantes, nome, tutor, coordenador)
   loadGrupos();
@@ -3716,7 +3728,7 @@ function _syncMissaoParaGrupo(missionId) {
     part.atualizado = new Date().toLocaleDateString('pt-BR');
     all[meuGrupo.grupoNum][ST.userName] = part;
     localStorage.setItem(PG_MISSOES_KEY, JSON.stringify(all));
-  } catch {}
+  } catch(e) { console.warn('syncMissionToGroup:', e); }
   syncProgressoParaFirebase();
 }
 
@@ -3737,7 +3749,7 @@ function syncProgressoParaFirebase() {
       atualizado: new Date().toLocaleDateString('pt-BR'),
     };
     saveGrupos();
-  } catch {}
+  } catch(e) { console.warn('syncProgressoParaFirebase:', e); }
 }
 
 function loadPgMissoes(grupoNum) {
@@ -4049,12 +4061,10 @@ const STUDY_ATTRS = [
   { amor:15, missao:15, perseveranca:10 },          // 13 Alegria no Senhor
 ];
 
-const TUTORS = [
-  { name:'Capelão Wladimir', icon:'🙏', wa:'5521979389804', pass:null },
-  { name:'Capelão Renan',    icon:'✝️', wa:'5521993795269', pass:null },
-  { name:'Capelão Ualace',   icon:'📖', wa:'5521980465780', pass:null },
-  { name:'Capelão Felipe',   icon:'🌿', wa:'5521967793085', pass:null }
-];
+// V3: números de WhatsApp removidos do código-fonte.
+// Armazenados no Firestore (campo "tutores" em jdpg/grupos) e carregados via syncFromFirebase().
+// Para atualizar: edite o documento no Firebase Console → campo tutores (array de objetos {name,icon,wa}).
+let TUTORS = [];
 
 function getAttrs() {
   const base = { sabedoria:0, oracao:0, amor:0, perseveranca:0, saude:0, missao:0 };
@@ -4292,6 +4302,38 @@ const PHASE_TAG_CSS = {
 };
 
 // ══════════════════════════════════════
+//  UTILITÁRIOS DE SEGURANÇA
+// ══════════════════════════════════════
+
+// A1: Escapa caracteres HTML para prevenir XSS em innerHTML
+function sanitize(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
+// V2: Hash de senha (djb2 — previne leitura direta no localStorage)
+function hashPass(str) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = (Math.imul(h, 33) ^ str.charCodeAt(i)) | 0;
+  return 'h' + (h >>> 0).toString(36);
+}
+
+// M5: Formata tempo decorrido para o badge de sync
+function formatTimeAgo(ts) {
+  const diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 15) return 'agora mesmo';
+  if (diff < 60) return `há ${diff}s`;
+  const m = Math.floor(diff / 60);
+  if (m < 60) return `há ${m} min`;
+  return `há ${Math.floor(m / 60)}h`;
+}
+
+// ══════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════
 function getTutorNameForSync() {
@@ -4300,34 +4342,67 @@ function getTutorNameForSync() {
   return '';
 }
 
+// V4: codifica dados antes de salvar (ofuscação — impede leitura casual)
+function encodeState(s) {
+  s._v = 1;
+  try { return btoa(unescape(encodeURIComponent(JSON.stringify(s)))); }
+  catch { return JSON.stringify(s); }
+}
+// V4: decodifica — suporta formato antigo (JSON puro) para migração automática
+function decodeState(raw) {
+  if (!raw) return null;
+  try { return JSON.parse(decodeURIComponent(escape(atob(raw)))); }
+  catch { try { return JSON.parse(raw); } catch { return null; } }
+}
+
 function save(s) {
-  const data = JSON.stringify(s);
-  try { localStorage.setItem('amj3', data); } catch {}
-  try { sessionStorage.setItem('amj3', data); } catch {}
+  const data = encodeState(s);
+  try { localStorage.setItem('amj3', data); }
+  catch(e) {
+    if (e.name === 'QuotaExceededError') console.warn('localStorage cheio — progresso pode não ser salvo.');
+    else console.warn('save localStorage:', e);
+  }
+  try { sessionStorage.setItem('amj3', data); } catch(_) {}
   try {
     const exp = new Date();
     exp.setFullYear(exp.getFullYear() + 1);
     document.cookie = 'amj3=' + encodeURIComponent(data) + ';expires=' + exp.toUTCString() + ';path=/;SameSite=Lax';
-  } catch {}
+  } catch(_) {}
 }
 
 function load() {
-  // Tenta localStorage primeiro
   try {
     const ls = localStorage.getItem('amj3');
-    if (ls) return JSON.parse(ls);
-  } catch {}
-  // Tenta sessionStorage
+    const parsed = decodeState(ls);
+    if (parsed) return migrateState(parsed);
+  } catch(e) { console.warn('load localStorage:', e); }
   try {
     const ss = sessionStorage.getItem('amj3');
-    if (ss) return JSON.parse(ss);
-  } catch {}
-  // Tenta cookie
+    const parsed = decodeState(ss);
+    if (parsed) return migrateState(parsed);
+  } catch(e) { console.warn('load sessionStorage:', e); }
   try {
     const match = document.cookie.match(/amj3=([^;]+)/);
-    if (match) return JSON.parse(decodeURIComponent(match[1]));
-  } catch {}
+    if (match) {
+      const parsed = decodeState(decodeURIComponent(match[1]));
+      if (parsed) return migrateState(parsed);
+    }
+  } catch(e) { console.warn('load cookie:', e); }
   return {};
+}
+
+// A4: migrações de schema — adicione novos casos conforme o app evolui
+function migrateState(s) {
+  if (!s) return {};
+  // v0 → v1: garantir campos obrigatórios
+  if (!s._v || s._v < 1) {
+    s.xp      = s.xp      || 0;
+    s.done    = s.done    || [];
+    s.badges  = s.badges  || [];
+    s.streak  = s.streak  || 0;
+    s._v = 1;
+  }
+  return s;
 }
 let ST = load();
 ST.xp      = ST.xp || 0;
@@ -5067,10 +5142,11 @@ function loadCP() {
   try {
     const s = localStorage.getItem(COMPANION_KEY);
     if (s) CP = { ...CP, ...JSON.parse(s) };
-  } catch {}
+  } catch(e) { console.warn('loadCP:', e); }
 }
 function saveCP() {
-  try { localStorage.setItem(COMPANION_KEY, JSON.stringify(CP)); } catch {}
+  try { localStorage.setItem(COMPANION_KEY, JSON.stringify(CP)); }
+  catch(e) { console.warn('saveCP:', e); }
 }
 
 function sendMyPrayer() {
@@ -5809,8 +5885,8 @@ let E7 = {
   },
 };
 
-function loadE7() { try { const s=localStorage.getItem(E7_KEY); if(s) E7={...E7,...JSON.parse(s)}; } catch{} }
-function saveE7() { try { localStorage.setItem(E7_KEY,JSON.stringify(E7)); } catch{} }
+function loadE7() { try { const s=localStorage.getItem(E7_KEY); if(s) E7={...E7,...JSON.parse(s)}; } catch(e){ console.warn('loadE7:',e); } }
+function saveE7() { try { localStorage.setItem(E7_KEY,JSON.stringify(E7)); } catch(e){ console.warn('saveE7:',e); } }
 
 // ── Navegação ─────────────────────────────────────────────────────────────
 function openEncontros()  { loadE7(); showScreen('encontros');  showBottomBar('encontros');  renderEncList(); }
@@ -6190,8 +6266,8 @@ let E8 = {
   celebs: [],               // lista de celebrações comunitárias
   journeyCompleted: false,  // se abriu a tela de encerramento
 };
-function loadE8() { try { const s=localStorage.getItem(E8_KEY); if(s) E8={...E8,...JSON.parse(s)}; } catch{} }
-function saveE8() { try { localStorage.setItem(E8_KEY,JSON.stringify(E8)); } catch{} }
+function loadE8() { try { const s=localStorage.getItem(E8_KEY); if(s) E8={...E8,...JSON.parse(s)}; } catch(e){ console.warn('loadE8:',e); } }
+function saveE8() { try { localStorage.setItem(E8_KEY,JSON.stringify(E8)); } catch(e){ console.warn('saveE8:',e); } }
 
 // ── Verificar level-up após ganhar XP ────────────────────────────────────
 function checkLevelUp(xpBefore) {
@@ -6642,7 +6718,7 @@ function loadGrupos() {
         }
       });
     }
-  } catch {}
+  } catch(e) { console.warn('loadGrupos:', e); }
 }
 
 function saveGrupos() {
@@ -6658,7 +6734,7 @@ function saveGrupos() {
       gratidoes: g.gratidoes || [],
     }));
     localStorage.setItem(GRUPOS_KEY, JSON.stringify(dadosSalvar));
-  } catch {}
+  } catch(e) { console.warn('saveGrupos localStorage:', e); }
   saveGruposToFirebase();
 }
 
@@ -6669,10 +6745,16 @@ function loadMeuGrupo() {
   } catch { return null; }
 }
 function saveMeuGrupo(dados) {
-  try { localStorage.setItem(MEU_GRUPO_KEY, JSON.stringify(dados)); } catch {}
+  try { localStorage.setItem(MEU_GRUPO_KEY, JSON.stringify(dados)); }
+  catch(e) { console.warn('saveMeuGrupo:', e); }
 }
 
 // ── Firebase Firestore Sync ──────────────────────────────────────────────
+// V1 SEGURANÇA: a apiKey abaixo é pública (inevitável em apps estáticos sem backend).
+// MITIGAÇÃO OBRIGATÓRIA: restrinja esta chave no Firebase Console →
+//   APIs & Services → Credentials → Restrições de aplicativo → Referenciadores HTTP
+//   Domínio autorizado: capelania.github.io (ou o domínio de produção atual)
+// Com essa restrição, a chave é inútil se copiada para outro domínio.
 const FB_CONFIG_KEY = 'jdpg_fb_config';
 const FB_COLL = 'jdpg';
 const FB_DOC  = 'grupos';
@@ -6691,34 +6773,55 @@ function loadFbConfig() {
   catch { return FB_DEFAULT_CONFIG; }
 }
 function saveFbConfig(cfg) {
-  try { localStorage.setItem(FB_CONFIG_KEY, JSON.stringify(cfg)); } catch {}
+  try { localStorage.setItem(FB_CONFIG_KEY, JSON.stringify(cfg)); }
+  catch(e) { console.warn('saveFbConfig:', e); }
 }
 function fbDocUrl(cfg) {
   return `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/${FB_COLL}/${FB_DOC}?key=${cfg.apiKey}`;
 }
 
-async function fbReadGrupos(cfg) {
+// A2: timestamp do último documento lido — usado para detectar conflito antes de escrever
+let fbLastKnownTs = null;
+// M5: timestamp da última sincronização bem-sucedida — usado no badge
+let fbLastSyncTime = null;
+
+// Lê o documento completo e retorna { dados, tutores, ts }
+async function fbReadDoc(cfg) {
   const r = await fetch(fbDocUrl(cfg));
   if (r.status === 404) return null;
   if (!r.ok) { const t = await r.text(); throw new Error('HTTP ' + r.status + ': ' + t.slice(0,120)); }
   const doc = await r.json();
   const s = doc.fields?.dados?.stringValue;
-  return s ? JSON.parse(s) : null;
+  const t = doc.fields?.ts?.integerValue;
+  const tutoresStr = doc.fields?.tutores?.stringValue;
+  return {
+    dados: s ? JSON.parse(s) : null,
+    tutores: tutoresStr ? JSON.parse(tutoresStr) : null,
+    ts: t ? String(t) : null,
+  };
 }
 
-async function fbWriteGrupos(cfg, data) {
-  const body = {
-    fields: {
-      dados: { stringValue: JSON.stringify(data) },
-      ts:    { integerValue: String(Date.now()) }
-    }
+// Mantido para compatibilidade com testarFbConfig / salvarFbConfig
+async function fbReadGrupos(cfg) {
+  const result = await fbReadDoc(cfg);
+  return result ? result.dados : null;
+}
+
+async function fbWriteGrupos(cfg, data, tutoresData) {
+  const fields = {
+    dados: { stringValue: JSON.stringify(data) },
+    ts:    { integerValue: String(Date.now()) },
   };
+  if (tutoresData) fields.tutores = { stringValue: JSON.stringify(tutoresData) };
+  const body = { fields };
   const r = await fetch(fbDocUrl(cfg), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
   if (!r.ok) { const t = await r.text(); throw new Error('HTTP ' + r.status + ': ' + t.slice(0,120)); }
+  const saved = await r.json();
+  return saved.fields?.ts?.integerValue ? String(saved.fields.ts.integerValue) : null;
 }
 
 function applyGruposData(salvo) {
@@ -6739,18 +6842,45 @@ function applyGruposData(salvo) {
   });
 }
 
+// A2: merge de listas de participantes — une por ts para evitar perda de inscrições concorrentes
+function mergeGruposData(remoteList, localGroups) {
+  if (!Array.isArray(remoteList)) return localGroups.map(g => ({ ...g }));
+  return remoteList.map(rg => {
+    const lg = localGroups.find(g => g.num === rg.num);
+    if (!lg) return rg;
+    const remoteParts = rg.participantes || [];
+    const localParts  = lg.participantes || [];
+    const merged = [...remoteParts];
+    localParts.forEach(lp => {
+      const tsKey = lp.ts || lp.nome;
+      if (!merged.find(rp => (rp.ts || rp.nome) === tsKey)) merged.push(lp);
+    });
+    return { ...rg, participantes: merged,
+      nome: lg.nome ?? rg.nome, tutor: lg.tutor ?? rg.tutor,
+      coordenador: lg.coordenador ?? rg.coordenador,
+      diaReuniao: lg.diaReuniao ?? rg.diaReuniao,
+      horaReuniao: lg.horaReuniao ?? rg.horaReuniao,
+    };
+  });
+}
+
 async function syncFromFirebase() {
   const cfg = loadFbConfig();
   if (!cfg || fbSyncing) return false;
   fbSyncing = true;
   try {
-    const data = await fbReadGrupos(cfg);
-    if (data) {
-      applyGruposData(data);
-      try { localStorage.setItem(GRUPOS_KEY, JSON.stringify(data)); } catch {}
+    const result = await fbReadDoc(cfg);
+    if (result && result.dados) {
+      fbLastKnownTs = result.ts;
+      applyGruposData(result.dados);
+      // V3: carrega tutores do Firestore se disponível
+      if (Array.isArray(result.tutores) && result.tutores.length > 0) TUTORS = result.tutores;
+      try { localStorage.setItem(GRUPOS_KEY, JSON.stringify(result.dados)); } catch(e) { console.warn('sync localStorage:', e); }
+      fbLastSyncTime = Date.now();
+      renderGrupoSyncBadge();
       return true;
     }
-  } catch (e) {
+  } catch(e) {
     console.warn('Firebase sync:', e);
   } finally {
     fbSyncing = false;
@@ -6767,8 +6897,26 @@ async function saveGruposToFirebase() {
     horaReuniao: g.horaReuniao, participantes: g.participantes,
     gratidoes: g.gratidoes || [],
   }));
-  try { await fbWriteGrupos(cfg, dadosSalvar); }
-  catch (e) { console.warn('Firebase save:', e); }
+  try {
+    // A2: detecta conflito — se o Firestore foi modificado por outro dispositivo, faz merge
+    const remote = await fbReadDoc(cfg);
+    if (remote && remote.ts && remote.ts !== fbLastKnownTs) {
+      console.warn('Firebase: conflito detectado — fazendo merge de participantes');
+      const merged = mergeGruposData(remote.dados, PEQUENOS_GRUPOS);
+      applyGruposData(merged);
+      // Recalcula dadosSalvar após merge
+      const dadosMerged = PEQUENOS_GRUPOS.map(g => ({
+        num: g.num, nome: g.nome, tutor: g.tutor,
+        coordenador: g.coordenador, diaReuniao: g.diaReuniao,
+        horaReuniao: g.horaReuniao, participantes: g.participantes,
+      }));
+      const newTs = await fbWriteGrupos(cfg, dadosMerged, TUTORS.length ? TUTORS : undefined);
+      if (newTs) fbLastKnownTs = newTs;
+    } else {
+      const newTs = await fbWriteGrupos(cfg, dadosSalvar, TUTORS.length ? TUTORS : undefined);
+      if (newTs) fbLastKnownTs = newTs;
+    }
+  } catch(e) { console.warn('Firebase save:', e); }
 }
 
 function startFbPoll() {
@@ -6786,6 +6934,17 @@ function stopFbPoll() {
   if (fbPollTimer) { clearInterval(fbPollTimer); fbPollTimer = null; }
 }
 
+// M4: pausa o polling quando a aba não está visível — retoma ao voltar
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    stopFbPoll();
+  } else {
+    const active = document.querySelector('.screen.active')?.id;
+    if (active === 'screen-grupos') startFbPoll();
+  }
+});
+
+// M5: badge com status de sincronização detalhado
 function renderGrupoSyncBadge() {
   const cfg = loadFbConfig();
   let badge = document.getElementById('fb-sync-badge');
@@ -6798,7 +6957,8 @@ function renderGrupoSyncBadge() {
     hdr.appendChild(badge);
   }
   if (cfg) {
-    badge.innerHTML = `<span style="color:var(--teal)" onclick="openFbSetup()">☁️ Sincronização em nuvem ativa ✓</span>`;
+    const agoText = fbLastSyncTime ? '· ' + formatTimeAgo(fbLastSyncTime) : '';
+    badge.innerHTML = `<span style="color:var(--teal)" onclick="openFbSetup()">☁️ Nuvem ativa ${agoText} ✓</span>`;
   } else {
     badge.innerHTML = `<span style="color:var(--gold);text-decoration:underline" onclick="openFbSetup()">⚠️ Sincronização não configurada — toque para ativar</span>`;
   }
@@ -6866,17 +7026,19 @@ async function salvarFbConfig() {
   const cfg = { projectId: pid, apiKey };
   saveFbConfig(cfg);
   try {
-    const existing = await fbReadGrupos(cfg);
-    if (existing) {
-      applyGruposData(existing);
-      try { localStorage.setItem(GRUPOS_KEY, JSON.stringify(existing)); } catch {}
+    const result = await fbReadDoc(cfg);
+    if (result && result.dados) {
+      applyGruposData(result.dados);
+      if (Array.isArray(result.tutores) && result.tutores.length > 0) TUTORS = result.tutores;
+      fbLastKnownTs = result.ts;
+      try { localStorage.setItem(GRUPOS_KEY, JSON.stringify(result.dados)); } catch(_) {}
     } else {
       const dadosSalvar = PEQUENOS_GRUPOS.map(g => ({
         num: g.num, nome: g.nome, tutor: g.tutor,
         coordenador: g.coordenador, diaReuniao: g.diaReuniao,
         horaReuniao: g.horaReuniao, participantes: g.participantes,
       }));
-      await fbWriteGrupos(cfg, dadosSalvar);
+      await fbWriteGrupos(cfg, dadosSalvar, TUTORS.length ? TUTORS : undefined);
     }
     document.getElementById('fb-setup-overlay')?.remove();
     renderGrupoSyncBadge();
@@ -7001,7 +7163,7 @@ function renderGrupoList(filtro = '') {
           ? '<span class="grupo-vagas vagas-ok">✓ Meu grupo</span>'
           : `<span class="grupo-vagas vagas-ok">${total} inscrito${total===1?'':'s'}</span>`;
       nomeDisplay = g.nome;
-      metaDisplay = `👨‍🏫 ${g.tutor} · 🤝 ${g.coordenador}`;
+      metaDisplay = `👨‍🏫 ${sanitize(g.tutor)} · 🤝 ${sanitize(g.coordenador)}`;
     }
 
     const clickable = !cheio;
@@ -7834,7 +7996,7 @@ function saveCampanhasProgress(grupoNum, data) {
     const all = JSON.parse(localStorage.getItem(PG_CAMP_KEY) || '{}');
     all[grupoNum] = data;
     localStorage.setItem(PG_CAMP_KEY, JSON.stringify(all));
-  } catch {}
+  } catch(e) { console.warn('saveCampanhasProgress:', e); }
 }
 
 // Retorna apenas as campanhas cujo mês de início já chegou
@@ -8070,7 +8232,8 @@ function loadGratidoes() {
   try { return JSON.parse(localStorage.getItem(GRAT_KEY) || '[]'); } catch { return []; }
 }
 function saveGratidoes(list) {
-  try { localStorage.setItem(GRAT_KEY, JSON.stringify(list)); } catch {}
+  try { localStorage.setItem(GRAT_KEY, JSON.stringify(list)); }
+  catch(e) { console.warn('saveGratidoes:', e); }
 }
 
 function timeAgoGrat(ts) {
@@ -8182,7 +8345,7 @@ function renderGratCard(g) {
       <div class="grat-card-hdr">
         <div class="grat-avatar">${g.avatar || '🌿'}</div>
         <div class="grat-meta">
-          <div class="grat-name">${g.nome}${g.privado ? ' 🔒' : ''}</div>
+          <div class="grat-name">${sanitize(g.nome)}${g.privado ? ' 🔒' : ''}</div>
           <div class="grat-time">${timeAgoGrat(g.ts)}</div>
         </div>
         ${tagHtml}
@@ -8272,7 +8435,7 @@ function reagirGratidao(postId, tipo) {
       const ex = GRAT_EXAMPLES.find(g => g.id === postId);
       if (ex) ex.reacoes[tipo] = Math.max(0, (ex.reacoes[tipo] || 0) + (jaReagiu ? -1 : 1));
     }
-  } catch {}
+  } catch(e) { console.warn('reagirPost:', e); }
   renderComunidadeScreen();
 }
 
@@ -8311,8 +8474,44 @@ setTimeout(initE8, 100);
 // estável), descomente o bloco abaixo e gere um service-worker.js atualizado.
 // ── Inicializar sync Firebase ao carregar ────────────────────────────────
 if (loadFbConfig()) {
-  syncFromFirebase();
+  syncFromFirebase().then(updated => {
+    // V3: se o Firestore não tem o campo tutores ainda, semeia com os dados de bootstrap
+    // (definidos temporariamente abaixo — remova após confirmação no Firebase Console)
+    if (updated && TUTORS.length === 0) seedTutorsToFirebase();
+  });
   startFbPoll();
+}
+
+// V3: tutores de bootstrap — apenas para semear o Firestore na primeira execução após deploy.
+// ATENÇÃO: atualize as Firestore Security Rules no Console para permitir o campo "tutores":
+//   allow write: if request.resource.data.keys().hasOnly(['dados','ts','tutores'])
+//     && request.resource.data.dados is string
+//     && request.resource.data.dados.size() < 500000
+//     && (!('tutores' in request.resource.data) || request.resource.data.tutores is string);
+// Após confirmar que o campo "tutores" existe no Firestore e TUTORS != [], remova este bloco.
+const _TUTORS_BOOTSTRAP = [
+  { name:'Capelão Wladimir', icon:'🙏', wa:'5521979389804' },
+  { name:'Capelão Renan',    icon:'✝️', wa:'5521993795269' },
+  { name:'Capelão Ualace',   icon:'📖', wa:'5521980465780' },
+  { name:'Capelão Felipe',   icon:'🌿', wa:'5521967793085' }
+];
+async function seedTutorsToFirebase() {
+  const cfg = loadFbConfig();
+  if (!cfg) return;
+  try {
+    const result = await fbReadDoc(cfg);
+    if (result && (!result.tutores || result.tutores.length === 0)) {
+      TUTORS = _TUTORS_BOOTSTRAP;
+      await fbWriteGrupos(cfg,
+        result.dados || PEQUENOS_GRUPOS.map(g => ({
+          num:g.num,nome:g.nome,tutor:g.tutor,coordenador:g.coordenador,
+          diaReuniao:g.diaReuniao,horaReuniao:g.horaReuniao,participantes:g.participantes
+        })),
+        _TUTORS_BOOTSTRAP
+      );
+      console.log('V3: tutores semeados no Firestore com sucesso.');
+    }
+  } catch(e) { console.warn('seedTutors:', e); }
 }
 
 if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
