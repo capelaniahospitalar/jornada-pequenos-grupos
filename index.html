@@ -7001,6 +7001,7 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
         <div class="grupo-info-txt">
           <div class="grupo-info-lbl">Participantes inscritos</div>
           <div class="grupo-info-val">${g.participantes.length}</div>
+          ${g.participantes.length > 0 ? `<div style="margin-top:.4rem;display:flex;flex-direction:column;gap:.15rem">${g.participantes.map(p => `<span style="font-size:13px;color:var(--text2);font-family:var(--ff-body)">• ${p.nome}</span>`).join('')}</div>` : ''}
         </div>
       </div>
     </div>`;
