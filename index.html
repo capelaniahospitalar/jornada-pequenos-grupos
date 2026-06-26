@@ -6549,6 +6549,7 @@ const PEQUENOS_GRUPOS = Array.from({length:50}, (_, i) => ({
   diaReuniao: null,   // dia da semana em que o PG se reúne
   horaReuniao: null,  // horário da reunião (HH:MM)
   participantes: [],
+  gratidoes: [],
   maxParticipantes: null, // null = ilimitado
 }));
 
@@ -6570,6 +6571,7 @@ function loadGrupos() {
           PEQUENOS_GRUPOS[idx].diaReuniao = g.diaReuniao ?? null;
           PEQUENOS_GRUPOS[idx].horaReuniao = g.horaReuniao ?? null;
           PEQUENOS_GRUPOS[idx].participantes = g.participantes || [];
+          PEQUENOS_GRUPOS[idx].gratidoes = g.gratidoes || [];
         }
       });
     }
@@ -6586,6 +6588,7 @@ function saveGrupos() {
       diaReuniao: g.diaReuniao,
       horaReuniao: g.horaReuniao,
       participantes: g.participantes,
+      gratidoes: g.gratidoes || [],
     }));
     localStorage.setItem(GRUPOS_KEY, JSON.stringify(dadosSalvar));
   } catch {}
@@ -6663,6 +6666,7 @@ function applyGruposData(salvo) {
     PEQUENOS_GRUPOS[idx].horaReuniao   = g.horaReuniao   ?? null;
     const partic = g.participantes || [];
     PEQUENOS_GRUPOS[idx].participantes = partic.filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
+    PEQUENOS_GRUPOS[idx].gratidoes = g.gratidoes || [];
   });
 }
 
@@ -6692,6 +6696,7 @@ async function saveGruposToFirebase() {
     num: g.num, nome: g.nome, tutor: g.tutor,
     coordenador: g.coordenador, diaReuniao: g.diaReuniao,
     horaReuniao: g.horaReuniao, participantes: g.participantes,
+    gratidoes: g.gratidoes || [],
   }));
   try { await fbWriteGrupos(cfg, dadosSalvar); }
   catch (e) { console.warn('Firebase save:', e); }
@@ -6704,6 +6709,7 @@ function startFbPoll() {
     if (updated) {
       const active = document.querySelector('.screen.active')?.id;
       if (active === 'screen-grupos') renderGrupoList();
+      if (active === 'screen-comunidade') renderComunidade();
     }
   }, 30000);
 }
@@ -7489,6 +7495,26 @@ function renderGruposBtnHome() {
     : `<button onclick="openGrupos()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--teal-light);border:0.5px solid rgba(14,123,108,.35);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;color:var(--teal);cursor:pointer;font-family:var(--ff-body);font-weight:600">
         🌿 Escolher meu Pequeno Grupo
       </button>`;
+
+  // Botão Mural de Gratidão (só aparece se estiver em um grupo)
+  const meuGrupoAtual = loadMeuGrupo();
+  if (meuGrupoAtual) {
+    let muralBtn = document.getElementById('mural-home-btn');
+    if (!muralBtn) {
+      muralBtn = document.createElement('div');
+      muralBtn.id = 'mural-home-btn';
+      muralBtn.style.cssText = 'margin:.5rem 1rem 0';
+      div.after(muralBtn);
+    }
+    muralBtn.innerHTML = `<button onclick="openComunidade()" style="display:flex;align-items:center;gap:10px;width:100%;background:var(--gold-pale);border:0.5px solid rgba(184,134,11,.35);border-radius:var(--radius-sm);padding:.65rem 1rem;cursor:pointer;font-family:var(--ff-body)">
+      <span style="font-size:22px">❤️</span>
+      <div style="flex:1;text-align:left">
+        <div style="font-weight:600;font-size:15px;color:var(--gold)">Mural de Gratidão</div>
+        <div style="font-size:13px;color:var(--text3)">Compartilhe gratidões e pedidos de oração</div>
+      </div>
+      <span style="color:var(--text3);font-size:18px">›</span>
+    </button>`;
+  }
 }
 
 
@@ -8238,6 +8264,93 @@ if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
   navigator.serviceWorker.getRegistrations().then(regs => {
     regs.forEach(reg => reg.unregister());
   });
+}
+
+// ══════════════════════════════════════
+//  MURAL DE GRATIDÃO / COMUNIDADE
+// ══════════════════════════════════════
+
+let gratTipo = 'gratidao'; // chip selecionado no composer
+
+function openComunidade() {
+  loadGrupos();
+  renderComunidade();
+  showScreen('comunidade');
+}
+
+function renderComunidade() {
+  const meuGrupo = loadMeuGrupo();
+  if (!meuGrupo) return;
+  const g = PEQUENOS_GRUPOS.find(x => x.num === meuGrupo.grupoNum);
+  if (!g) return;
+
+  const lista = (g.gratidoes || []).slice().sort((a, b) => b.ts - a.ts);
+
+  const cards = lista.length ? lista.map(item => {
+    const isOracao = item.tipo === 'oracao';
+    const tagLabel = isOracao ? '🙏 Pedido' : '🌿 Gratidão';
+    const tagClass = isOracao ? 'grat-tag oracao' : 'grat-tag';
+    const cardClass = isOracao ? 'grat-card oracao' : 'grat-card';
+    const icone = isOracao ? '🙏' : '🌿';
+    return `
+      <div class="${cardClass}">
+        <div class="grat-card-hdr">
+          <div class="grat-avatar">${icone}</div>
+          <div class="grat-meta">
+            <div class="grat-name">${item.autor}</div>
+            <div class="grat-time">${item.data}</div>
+          </div>
+          <span class="${tagClass}">${tagLabel}</span>
+        </div>
+        <div class="grat-text">${item.texto}</div>
+      </div>`;
+  }).join('') : `<p class="mural-empty">Nenhuma publicação ainda. Seja o primeiro a compartilhar!</p>`;
+
+  document.getElementById('comunidade-body').innerHTML = `
+    <div class="grat-composer">
+      <div class="grat-composer-hdr">✏️ Compartilhar com o grupo</div>
+      <div class="grat-composer-body">
+        <div class="grat-tipo-row">
+          <button class="grat-tipo-chip ${gratTipo==='gratidao'?'active':''}" onclick="setGratTipo('gratidao')">🌿 Gratidão</button>
+          <button class="grat-tipo-chip oracao ${gratTipo==='oracao'?'active':''}" onclick="setGratTipo('oracao')">🙏 Pedido de Oração</button>
+        </div>
+        <div class="grat-prefix">${gratTipo==='gratidao'?'Hoje sou grato(a) por…':'Peço oração por…'}</div>
+        <textarea class="grat-textarea" id="grat-input" rows="3"
+          placeholder="${gratTipo==='gratidao'?'Escreva sua gratidão…':'Escreva seu pedido de oração…'}"
+          oninput="document.getElementById('grat-enviar').disabled=!this.value.trim()"></textarea>
+        <div class="grat-send-row">
+          <button class="grat-send-btn" id="grat-enviar" onclick="enviarGratidao()" disabled>Publicar</button>
+        </div>
+      </div>
+    </div>
+    <div class="mural-section-title">📋 Publicações do grupo</div>
+    ${cards}`;
+}
+
+function setGratTipo(tipo) {
+  gratTipo = tipo;
+  renderComunidade();
+}
+
+function enviarGratidao() {
+  const texto = document.getElementById('grat-input')?.value.trim();
+  if (!texto) return;
+  const meuGrupo = loadMeuGrupo();
+  if (!meuGrupo) return;
+  loadGrupos();
+  const g = PEQUENOS_GRUPOS.find(x => x.num === meuGrupo.grupoNum);
+  if (!g) return;
+  if (!g.gratidoes) g.gratidoes = [];
+  g.gratidoes.push({
+    id: Date.now(),
+    autor: meuGrupo.nome,
+    texto,
+    tipo: gratTipo,
+    data: new Date().toLocaleDateString('pt-BR'),
+    ts: Date.now(),
+  });
+  saveGrupos();
+  renderComunidade();
 }
 
 </script>
