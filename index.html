@@ -3235,7 +3235,7 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
   const participantesSemDup = g.participantes.filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
   const participantesHtml = participantesSemDup.length
     ? participantesSemDup.map(p => {
-        const pData = pgMissoes[p.nome];
+        const prog = p.progresso || null;
         const tipoLabel = p.tipo === 'colaborador' ? '🏥 ' + (p.departamento||'Colaborador')
           : p.tipo === 'amigo' ? '🤝 Amigo'
           : p.tipo === 'membro' ? '⛪ Membro IASD'
@@ -3243,38 +3243,21 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
           : p.tipo === 'coordenador' ? '🤝 Coordenador'
           : '🌿 Participante';
 
-        if (!pData) return `
+        if (!prog) return `
           <div class="tutor-participante-row">
             <div class="tutor-participante-nome">${p.nome}</div>
             <div class="tutor-participante-meta">${tipoLabel} · inscrito em ${p.dataInscricao || '—'}</div>
-            <div style="font-size:13px;color:var(--text3);padding:.2rem 0">Ainda não registrou missões pelo app.</div>
+            <div style="font-size:13px;color:var(--text3);padding:.2rem 0">Ainda não iniciou estudos pelo app.</div>
           </div>`;
-
-        const done    = pData.missionsDone || [];
-        const studies = pData.studiesDone  || [];
-
-        // Missões concluídas
-        const doneMissions = missaoJornada.filter(m => done.includes(m.id));
-        // Missões visíveis mas pendentes (estudos necessários concluídos, mas não confirmada)
-        const pendingMissions = missaoJornada.filter(m =>
-          !done.includes(m.id) && m.unlock.every(i => studies.includes(i))
-        ).slice(0, 3); // máx 3 próximas
-
-        const doneHtml = doneMissions.length
-          ? `<div style="font-size:12px;color:var(--text3);margin:.3rem 0 .1rem;font-family:var(--ff-body)">✅ Concluídas (${doneMissions.length}): ${doneMissions.map(m => m.icon + ' ' + m.label).join(' · ')}</div>`
-          : '';
-        const pendHtml = pendingMissions.length
-          ? `<div style="font-size:12px;color:var(--text3);margin:.1rem 0;font-family:var(--ff-body)">⏳ A concluir: ${pendingMissions.map(m => m.icon + ' ' + m.label).join(' · ')}</div>`
-          : '';
 
         return `
           <div class="tutor-participante-row">
             <div style="display:flex;justify-content:space-between;align-items:baseline">
               <div class="tutor-participante-nome">${p.nome}</div>
-              <div style="font-size:12px;color:var(--teal);font-weight:600;font-family:var(--ff-body)">${pData.xp||0} XP · ${done.length} missões</div>
+              <div style="font-size:12px;color:var(--teal);font-weight:600;font-family:var(--ff-body)">${prog.xp||0} XP · ${prog.estudosConcluidos||0}/13 estudos</div>
             </div>
-            <div class="tutor-participante-meta">${tipoLabel} · atualizado em ${pData.atualizado || '—'}</div>
-            ${doneHtml}${pendHtml}
+            <div class="tutor-participante-meta">${tipoLabel} · 🔥 ${prog.streak||0} dias · atualizado em ${prog.atualizado||'—'}</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:.2rem;font-family:var(--ff-body)">✅ ${prog.missoesConcluidas||0} missões concluídas</div>
           </div>`;
       }).join('')
     : '<div style="font-size:15px;color:var(--text3);padding:.5rem 0">Nenhum participante inscrito ainda.</div>';
@@ -3705,6 +3688,27 @@ function _syncMissaoParaGrupo(missionId) {
     part.atualizado = new Date().toLocaleDateString('pt-BR');
     all[meuGrupo.grupoNum][ST.userName] = part;
     localStorage.setItem(PG_MISSOES_KEY, JSON.stringify(all));
+  } catch {}
+  syncProgressoParaFirebase();
+}
+
+function syncProgressoParaFirebase() {
+  try {
+    const meuGrupo = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
+    if (!meuGrupo || !ST.userName) return;
+    loadGrupos();
+    const g = PEQUENOS_GRUPOS.find(x => x.num === meuGrupo.grupoNum);
+    if (!g) return;
+    const eu = g.participantes.find(p => p.nome === ST.userName);
+    if (!eu) return;
+    eu.progresso = {
+      xp: ST.xp || 0,
+      estudosConcluidos: (ST.done || []).length,
+      missoesConcluidas: (ST.missionsDone || []).length,
+      streak: ST.streak || 0,
+      atualizado: new Date().toLocaleDateString('pt-BR'),
+    };
+    saveGrupos();
   } catch {}
 }
 
@@ -4638,6 +4642,7 @@ function completeStudy() {
     if (ST.done.length >= 13 && [10,11,12].every(i=>ST.done.includes(i))                       && !ST.badges.includes('nivel5'))   { ST.badges.push('nivel5');   newBadge = BADGES[4]; }
     if (ST.done.length >= 13                                                                    && !ST.badges.includes('complete')) { ST.badges.push('complete'); newBadge = BADGES[5]; }
     save(ST);
+    syncProgressoParaFirebase();
     // Disparar celebração de level-up
     if (typeof checkLevelUp === 'function') setTimeout(() => checkLevelUp(xpBefore), 1200);
     // Verificar streak
@@ -5016,10 +5021,10 @@ function getCompanionPool() {
       name: p.nome,
       icon: COMPANION_ICONS[i % COMPANION_ICONS.length],
       fase: 'iniciante',
-      xp: 0,
-      streak: 0,
+      xp: p.progresso?.xp || 0,
+      streak: p.progresso?.streak || 0,
       prayerRequest: p.pedidoOracao || '',
-      missionDone: false,
+      missionDone: (p.progresso?.missoesConcluidas || 0) > 0,
     }));
 }
 
