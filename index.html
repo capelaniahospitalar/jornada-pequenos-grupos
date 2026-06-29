@@ -6980,7 +6980,7 @@ function applyGruposData(salvo) {
     PEQUENOS_GRUPOS[idx].diaReuniao    = g.diaReuniao    ?? null;
     PEQUENOS_GRUPOS[idx].horaReuniao   = g.horaReuniao   ?? null;
     const partic = g.participantes || [];
-    PEQUENOS_GRUPOS[idx].participantes = partic.filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
+    PEQUENOS_GRUPOS[idx].participantes = partic.filter((p, i, arr) => arr.findIndex(x => (x.nome||'').trim().toLowerCase() === (p.nome||'').trim().toLowerCase()) === i);
     PEQUENOS_GRUPOS[idx].gratidoes = g.gratidoes || [];
     PEQUENOS_GRUPOS[idx].pgProgress = g.pgProgress || null;
     PEQUENOS_GRUPOS[idx].pgNivel = g.pgNivel || null;
@@ -7016,8 +7016,8 @@ async function syncFromFirebase() {
   try {
     const result = await fbReadDoc(cfg);
     if (result && result.dados) {
-      fbLastKnownTs = result.ts;
       applyGruposData(result.dados);
+      fbLastKnownTs = result.ts;
       // V3: carrega tutores do Firestore se disponível
       if (Array.isArray(result.tutores) && result.tutores.length > 0) TUTORS = result.tutores;
       try { localStorage.setItem(GRUPOS_KEY, JSON.stringify(result.dados)); } catch(e) { console.warn('sync localStorage:', e); }
@@ -7045,6 +7045,15 @@ async function saveGruposToFirebase() {
   try {
     // A2: detecta conflito — se o Firestore foi modificado por outro dispositivo, faz merge
     const remote = await fbReadDoc(cfg);
+    // Proteção contra apagamento: nunca gravar lista vazia por cima de uma nuvem que tem dados
+    const localTemDados  = PEQUENOS_GRUPOS.some(g => g.nome || (g.participantes && g.participantes.length));
+    const remoteTemDados = remote && Array.isArray(remote.dados) && remote.dados.some(g => g.nome || (g.participantes && g.participantes.length));
+    if (!localTemDados && remoteTemDados) {
+      console.warn('Proteção: gravação cancelada (local vazio, nuvem com dados). Recuperando dados da nuvem.');
+      applyGruposData(remote.dados);
+      fbLastKnownTs = remote.ts;
+      return;
+    }
     if (remote && remote.ts && remote.ts !== fbLastKnownTs) {
       console.warn('Firebase: conflito detectado — fazendo merge de participantes');
       const merged = mergeGruposData(remote.dados, PEQUENOS_GRUPOS);
