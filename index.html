@@ -3195,6 +3195,7 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
   if (!g) return;
   const progresso = getOrInitPgProgress(grupoNum);
   const metas     = getPgWeekMetas(grupoNum);
+  const grpW      = (typeof getPgGroupWeek === 'function') ? getPgGroupWeek(grupoNum) : { oracoes:0, bondades:0, estudosMedia:0 };
   const pgLv      = getPgGrupoLevel(grupoNum);
   const nextLv    = PG_GRUPO_LEVELS[PG_GRUPO_LEVELS.indexOf(PG_GRUPO_LEVELS.find(l => l.nome === pgLv.nome)) + 1];
   const lvBarPct  = nextLv ? Math.round((pgLv.semanasCompletas - pgLv.min) / (nextLv.min - pgLv.min) * 100) : 100;
@@ -3263,10 +3264,9 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
       </div>
     </div>
     <div class="panel-section">
-      <div class="panel-title">Progresso semanal</div>
-      <div class="panel-stat"><span>📖 Estudo da semana</span><strong>${progresso.estudos||0}/${metas.estudos.meta}</strong></div>
-      <div class="panel-stat"><span>🙏 Pedidos de oração</span><strong>${progresso.oracoes||0}/${metas.oracoes.meta}</strong></div>
-      <div class="panel-stat"><span>❤️ Atos de bondade</span><strong>${progresso.bondades||0}/${metas.bondades.meta}</strong></div>
+      <div class="panel-title">Progresso semanal do grupo</div>
+      <div class="panel-stat"><span>🙏 Pedidos de oração</span><strong>${grpW.oracoes}/${metas.oracoes.meta}</strong></div>
+      <div class="panel-stat"><span>❤️ Atos de bondade</span><strong>${grpW.bondades}/${metas.bondades.meta}</strong></div>
     </div>
     ${nivelSection}
     ${renderCampanhasTutor(grupoNum, nome)}
@@ -3742,11 +3742,13 @@ function syncProgressoParaFirebase() {
     const eu = g.participantes.find(p => p.nome === ST.userName);
     if (!eu) return;
     eu.progresso = {
+      ...(eu.progresso || {}),
       xp: ST.xp || 0,
       estudosConcluidos: (ST.done || []).length,
       missoesConcluidas: (ST.missionsDone || []).length,
       streak: ST.streak || 0,
       atualizado: new Date().toLocaleDateString('pt-BR'),
+      updatedAt: Date.now(),
     };
     saveGrupos();
   } catch(e) { console.warn('syncProgressoParaFirebase:', e); }
@@ -6998,7 +7000,15 @@ function mergeGruposData(remoteList, localGroups) {
     const merged = [...remoteParts];
     localParts.forEach(lp => {
       const tsKey = lp.ts || lp.nome;
-      if (!merged.find(rp => (rp.ts || rp.nome) === tsKey)) merged.push(lp);
+      const idx = merged.findIndex(rp => (rp.ts || rp.nome) === tsKey);
+      if (idx < 0) {
+        merged.push(lp);
+      } else {
+        // Participante existe nos dois lados: mantém a versão mais recente (evita perder progresso próprio)
+        const ru = merged[idx]?.progresso?.updatedAt || 0;
+        const lu = lp?.progresso?.updatedAt || 0;
+        if (lu >= ru) merged[idx] = lp;
+      }
     });
     return { ...rg, participantes: merged,
       nome: lg.nome ?? rg.nome, tutor: lg.tutor ?? rg.tutor,
@@ -7964,6 +7974,27 @@ function getPgWeekMetas() {
   };
 }
 
+// Totais do grupo (somados a partir da contribuição de cada participante) — todos veem o mesmo
+function getPgGroupWeek(grupoNum) {
+  const g = (typeof PEQUENOS_GRUPOS !== 'undefined') ? PEQUENOS_GRUPOS.find(x => x.num === grupoNum) : null;
+  const wk = (typeof getISOWeekPg === 'function') ? getISOWeekPg() : null;
+  let estudos = 0, oracoes = 0, bondades = 0, estudosSomados = 0, membros = 0;
+  if (g && g.participantes) {
+    g.participantes.forEach(p => {
+      membros++;
+      const pr = p.progresso || {};
+      if (pr.contrib && pr.contrib.weekKey === wk) {
+        estudos  += pr.contrib.estudos  || 0;
+        oracoes  += pr.contrib.oracoes  || 0;
+        bondades += pr.contrib.bondades || 0;
+      }
+      estudosSomados += pr.estudosConcluidos || 0;
+    });
+  }
+  const estudosMedia = membros ? Math.round(estudosSomados / membros) : 0;
+  return { estudos, oracoes, bondades, estudosMedia: Math.min(13, estudosMedia), membros };
+}
+
 function getISOWeekPg() {
   const now = new Date();
   const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
@@ -8002,12 +8033,28 @@ function bumpPgProgress(tipo, qty = 1) {
   const meuGrupo = loadMeuGrupo ? loadMeuGrupo() : null;
   if (!meuGrupo) return;
   const grupoNum = meuGrupo.grupoNum;
+  // Contribuição individual desta semana — gravada no meu registro (sincroniza e SOMA no grupo)
+  if (tipo === 'estudos' || tipo === 'oracoes' || tipo === 'bondades') {
+    loadGrupos();
+    const gMe = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+    const eu = gMe && gMe.participantes ? gMe.participantes.find(p => p.nome === (meuGrupo.nome || (typeof ST !== 'undefined' && ST.userName))) : null;
+    if (eu) {
+      const wk = getISOWeekPg();
+      const c = (eu.progresso && eu.progresso.contrib && eu.progresso.contrib.weekKey === wk)
+        ? eu.progresso.contrib : { weekKey: wk, estudos: 0, oracoes: 0, bondades: 0 };
+      c[tipo] = (c[tipo] || 0) + qty;
+      eu.progresso = { ...(eu.progresso || {}), contrib: c, updatedAt: Date.now() };
+      saveGrupos();
+    }
+  }
   const data = getOrInitPgProgress(grupoNum);
   if (data[tipo] !== undefined) {
     const metas = getPgWeekMetas();
     data[tipo] = Math.min(metas[tipo].meta, data[tipo] + qty);
     savePgProgress(grupoNum, data);
-    const allDone = Object.keys(metas).every(k => data[k] >= metas[k].meta);
+    // Semana completa = METAS DO GRUPO atingidas (somando todos os participantes)
+    const grp = getPgGroupWeek(grupoNum);
+    const allDone = Object.keys(metas).every(k => (grp[k] || 0) >= metas[k].meta);
     if (allDone) checkPgSemanaCompleta(grupoNum, data.weekKey);
   }
 }
@@ -8307,8 +8354,10 @@ function renderPgProgressHome() {
   })();
 
   const goalKeys = Object.keys(metas);
-  // 📖 Estudos concluídos: barra da JORNADA (0/13) — acompanha os 13 estudos, não a semana
-  const estudosJornada = Math.min(13, (typeof ST !== 'undefined' && Array.isArray(ST.done)) ? ST.done.length : 0);
+  const grp = (typeof getPgGroupWeek === 'function') ? getPgGroupWeek(meuGrupo.grupoNum) : { oracoes:0, bondades:0, estudosMedia:0 };
+  const groupVals = { oracoes: grp.oracoes, bondades: grp.bondades };
+  // 📖 Estudos concluídos: progresso do grupo na jornada (média dos participantes), 0/13
+  const estudosJornada = grp.estudosMedia || 0;
   const estudosJornadaPct = Math.round(estudosJornada / 13 * 100);
   const estudosBar = `
       <div class="pg-goal-row">
@@ -8322,7 +8371,7 @@ function renderPgProgressHome() {
       </div>`;
   const goalsHtml = estudosBar + goalKeys.filter(k => k !== 'estudos').map(key => {
     const m = metas[key];
-    const val = data[key] || 0;
+    const val = (groupVals[key] != null) ? groupVals[key] : (data[key] || 0);
     const pct = Math.min(100, Math.round(val / m.meta * 100));
     return `
       <div class="pg-goal-row">
@@ -8337,9 +8386,10 @@ function renderPgProgressHome() {
   }).join('');
 
   // Verificar se todas as metas foram atingidas
-  const allComplete = goalKeys.every(k => data[k] >= metas[k].meta);
+  const valOf = (k) => (grp[k] != null ? grp[k] : (data[k] || 0));
+  const allComplete = goalKeys.every(k => valOf(k) >= metas[k].meta);
   const totalPct = Math.round(
-    goalKeys.reduce((acc, k) => acc + Math.min(1, data[k] / metas[k].meta), 0) / goalKeys.length * 100
+    goalKeys.reduce((acc, k) => acc + Math.min(1, valOf(k) / metas[k].meta), 0) / goalKeys.length * 100
   );
 
   const weekBanner = allComplete
