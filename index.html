@@ -5127,6 +5127,9 @@ function openCompanion() {
   loadCP();
   showScreen('companion');
   renderCompanionScreen();
+  if (typeof syncFromFirebase === 'function') {
+    syncFromFirebase().then(u => { if (u) renderCompanionScreen(); });
+  }
 }
 
 // ── FAB Companheiro ──────────────────────────────────────────────────────
@@ -5154,61 +5157,102 @@ function renderCompanionScreen() {
   const el = document.getElementById('companion-main-content');
   if (!el) return;
 
-  if (CP.companionIdx === null) {
-    renderCompanionSelector(el);
-  } else {
+  loadGrupos();
+  const eu = cpMyParticipant();
+  if (eu && eu.compParceiro) {
     renderCompanionDashboard(el);
+  } else {
+    renderCompanionSelector(el);
   }
 }
 
 // ── Seletor de companheiro ───────────────────────────────────────────────
 function renderCompanionSelector(el) {
-  const myFase = (() => {
-    const done = ST.done.length;
-    if (done >= 10) return 'comprometido';
-    if (done >= 6)  return 'discipulo';
-    if (done >= 3)  return 'aprendiz';
-    return 'iniciante';
-  })();
+  loadGrupos();
+  const mg = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
+  const g  = cpMyGroup();
+  const eu = cpMyParticipant();
 
-  const pool = getCompanionPool();
-
-  if (!pool.length) {
+  if (!mg || !g || !eu) {
     el.innerHTML = `
       <div class="cp-selector">
-        <div class="cp-selector-hdr">🤝 Escolha seu Companheiro de Jornada</div>
+        <div class="cp-selector-hdr">🤝 Companheiro de Jornada</div>
         <div class="cp-selector-body">
           <p style="font-size:15px;color:var(--text3);text-align:center;padding:1rem 0;font-family:var(--ff-body);line-height:1.6">
-            Ainda não há outros participantes inscritos no seu Pequeno Grupo.<br>
-            Quando mais pessoas se inscreverem, elas aparecerão aqui para você escolher um companheiro de jornada.
+            Para escolher um companheiro de jornada, primeiro entre em um Pequeno Grupo.
           </p>
         </div>
       </div>`;
     return;
   }
 
-  const cards = pool.map((p, i) => `
-    <div class="cp-card${CP.companionIdx === i ? ' selected' : ''}" id="cp-card-${i}" onclick="selectCompanion(${i})">
-      <div class="cp-avatar-sm">${p.icon}</div>
-      <div class="cp-info">
-        <div class="cp-name">${p.name}</div>
-        <div class="cp-lvl">${FASE_LABELS_COMP[p.fase] || p.fase}</div>
-      </div>
-      <div class="cp-check" id="cp-check-${i}">${CP.companionIdx === i ? '✓' : ''}</div>
-    </div>`).join('');
+  const outros = (g.participantes || []).filter(p =>
+    !((mg.ts && p.ts === mg.ts) || p.nome === mg.nome));
+
+  const convitesRecebidos = eu.compConvites || [];
+
+  // Convites recebidos (no topo)
+  const convitesHtml = convitesRecebidos.length ? `
+    <div style="margin-bottom:1rem">
+      <div style="font-size:12.5px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--purple);margin-bottom:.5rem;font-family:var(--ff-body)">📨 Convites recebidos</div>
+      ${convitesRecebidos.map(c => `
+        <div class="cp-card" style="border-color:var(--purple)">
+          <div class="cp-avatar-sm">💌</div>
+          <div class="cp-info">
+            <div class="cp-name">${c.de}</div>
+            <div class="cp-lvl">convidou você para ser companheiro</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button onclick="acceptCompanion('${escAttr(c.de)}', ${c.deTs || 'null'})" style="background:var(--teal);color:#fff;border:none;border-radius:8px;padding:.45rem .7rem;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--ff-body)">Aceitar</button>
+            <button onclick="declineCompanion('${escAttr(c.de)}', ${c.deTs || 'null'})" style="background:none;color:var(--text3);border:0.5px solid var(--border);border-radius:8px;padding:.45rem .7rem;font-size:13px;cursor:pointer;font-family:var(--ff-body)">Recusar</button>
+          </div>
+        </div>`).join('')}
+    </div>` : '';
+
+  // Lista de membros para convidar
+  let listaHtml;
+  if (!outros.length) {
+    listaHtml = `<p style="font-size:15px;color:var(--text3);text-align:center;padding:1rem 0;font-family:var(--ff-body);line-height:1.6">
+      Ainda não há outros participantes inscritos no seu Pequeno Grupo.<br>
+      Quando mais pessoas entrarem, elas aparecerão aqui para você convidar.
+    </p>`;
+  } else {
+    listaHtml = outros.map((p, i) => {
+      const icon = COMPANION_ICONS[i % COMPANION_ICONS.length];
+      const meConvidou = convitesRecebidos.some(c => (c.deTs && p.ts && c.deTs === p.ts) || c.de === p.nome);
+      const euConvidei = (p.compConvites || []).some(c => (c.deTs && mg.ts && c.deTs === mg.ts) || c.de === mg.nome);
+      const btnBase = 'width:100%;border:none;border-radius:8px;padding:.6rem .8rem;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--ff-body)';
+      let acao;
+      if (p.compParceiro) {
+        acao = `<span class="cp-lvl" style="display:block;text-align:center;color:var(--text3)">já tem companheiro</span>`;
+      } else if (meConvidou) {
+        acao = `<button onclick="acceptCompanion('${escAttr(p.nome)}', ${p.ts || 'null'})" style="${btnBase};background:var(--teal);color:#fff">Aceitar</button>`;
+      } else if (euConvidei) {
+        acao = `<span class="cp-lvl" style="display:block;text-align:center;color:var(--gold)">convite enviado ⏳</span>`;
+      } else {
+        acao = `<button onclick="inviteCompanion('${escAttr(p.nome)}', ${p.ts || 'null'})" style="${btnBase};background:var(--purple);color:#fff">Convidar como Companheiro de Jornada</button>`;
+      }
+      return `
+        <div class="cp-card" style="flex-wrap:wrap;cursor:default">
+          <div class="cp-avatar-sm">${icon}</div>
+          <div class="cp-info">
+            <div class="cp-name">${p.nome}</div>
+            <div class="cp-lvl">${p.departamento || 'Participante do grupo'}</div>
+          </div>
+          <div style="flex-basis:100%">${acao}</div>
+        </div>`;
+    }).join('');
+  }
 
   el.innerHTML = `
     <div class="cp-selector">
       <div class="cp-selector-hdr">🤝 Escolha seu Companheiro de Jornada</div>
       <div class="cp-selector-body">
+        ${convitesHtml}
         <p style="font-size:15px;color:var(--text3);margin-bottom:.85rem;font-family:var(--ff-body);line-height:1.5">
-          Um companheiro caminha com você, ora por você e compartilha a jornada. Escolha alguém do seu grupo:
+          Um companheiro caminha com você, ora por você e compartilha a jornada. Convide alguém do seu grupo — a pessoa recebe o convite e precisa aceitar.
         </p>
-        ${cards}
-        ${CP.companionIdx !== null ? `
-        <button onclick="confirmCompanion()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--purple);color:#fff;border:none;border-radius:var(--radius-sm);padding:.85rem;font-size:17px;font-weight:600;cursor:pointer;font-family:var(--ff-body);margin-top:.75rem">
-          🤝 Confirmar companheiro
-        </button>` : ''}
+        ${listaHtml}
       </div>
     </div>
 
@@ -5221,31 +5265,118 @@ function renderCompanionSelector(el) {
     </div>`;
 }
 
-function selectCompanion(idx) {
-  CP.companionIdx = idx;
-  saveCP();
-  // Atualizar visual dos cards
-  getCompanionPool().forEach((_, i) => {
-    const card  = document.getElementById('cp-card-' + i);
-    const check = document.getElementById('cp-check-' + i);
-    if (card)  { card.classList.toggle('selected', i === idx); }
-    if (check) { check.textContent = (i === idx) ? '✓' : ''; }
-  });
-  // Mostrar botão confirmar
+// ── Identidade dentro do meu Pequeno Grupo ──────────────────────────────
+function cpMyGroup() {
+  const mg = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
+  if (!mg || typeof PEQUENOS_GRUPOS === 'undefined') return null;
+  return PEQUENOS_GRUPOS.find(x => x.num === mg.grupoNum) || null;
+}
+function cpFindParticipant(g, nome, ts) {
+  if (!g || !g.participantes) return null;
+  return (ts && g.participantes.find(p => p.ts === ts)) ||
+         g.participantes.find(p => p.nome === nome) || null;
+}
+function cpMyParticipant() {
+  const mg = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
+  if (!mg) return null;
+  return cpFindParticipant(cpMyGroup(), mg.nome, mg.ts);
+}
+function cpDisplay(p, i) {
+  return {
+    name: p.nome, ts: p.ts || null,
+    icon: COMPANION_ICONS[(i || 0) % COMPANION_ICONS.length],
+    fase: 'iniciante',
+    streak: p.progresso?.streak || 0,
+    prayerRequest: p.pedidoOracao || '',
+    missionDone: (p.progresso?.missoesConcluidas || 0) > 0,
+  };
+}
+function escAttr(s){ return String(s).replace(/\\/g,'\\\\').replace(/"/g,'&quot;').replace(/'/g,"\\'"); }
+
+// ── Convidar / aceitar / recusar / encerrar companheiro ─────────────────
+async function inviteCompanion(nome, ts) {
+  loadGrupos();
+  try { if (typeof syncFromFirebase === 'function') await syncFromFirebase(); } catch {}
+  const mg = loadMeuGrupo(); const g = cpMyGroup();
+  if (!mg || !g) return;
+  const eu = cpMyParticipant();
+  const alvo = cpFindParticipant(g, nome, ts);
+  if (!eu || !alvo) { showCompanionToast('Não foi possível enviar o convite.'); return; }
+  if (eu.compParceiro)   { showCompanionToast('Você já tem um companheiro.'); renderCompanionScreen(); return; }
+  if (alvo.compParceiro) { showCompanionToast(nome.split(' ')[0] + ' já tem um companheiro.'); renderCompanionScreen(); return; }
+  if (!alvo.compConvites) alvo.compConvites = [];
+  const jaConvidou = alvo.compConvites.some(c => (mg.ts && c.deTs === mg.ts) || c.de === mg.nome);
+  if (!jaConvidou) alvo.compConvites.push({ de: mg.nome, deTs: mg.ts || null, ts: Date.now() });
+  saveGrupos();
+  showCompanionToast('🤝 Convite enviado a ' + nome.split(' ')[0] + '. Aguardando o aceite.');
   renderCompanionScreen();
 }
 
-function confirmCompanion() {
-  if (CP.companionIdx === null) return;
-  saveCP();
-  showCompanionToast('🤝 Companheiro escolhido! A jornada fica mais leve junto.');
+async function acceptCompanion(deNome, deTs) {
+  loadGrupos();
+  try { if (typeof syncFromFirebase === 'function') await syncFromFirebase(); } catch {}
+  const mg = loadMeuGrupo(); const g = cpMyGroup();
+  if (!mg || !g) return;
+  const eu = cpMyParticipant();
+  const outro = cpFindParticipant(g, deNome, deTs);
+  if (!eu || !outro) { showCompanionToast('Convite não encontrado.'); renderCompanionScreen(); return; }
+  if (outro.compParceiro) {
+    showCompanionToast(deNome.split(' ')[0] + ' já escolheu outro companheiro.');
+    eu.compConvites = (eu.compConvites || []).filter(c => !((deTs && c.deTs === deTs) || c.de === deNome));
+    saveGrupos(); renderCompanionScreen(); return;
+  }
+  eu.compParceiro    = { nome: outro.nome, ts: outro.ts || null };
+  outro.compParceiro = { nome: eu.nome,    ts: eu.ts    || null };
+  // Remove convites pendentes envolvendo qualquer um dos dois (em todo o grupo)
+  (g.participantes || []).forEach(p => {
+    if (p.compConvites && p.compConvites.length) {
+      p.compConvites = p.compConvites.filter(c =>
+        !( c.de === eu.nome || c.de === outro.nome ||
+           (eu.ts && c.deTs === eu.ts) || (outro.ts && c.deTs === outro.ts) ));
+    }
+  });
+  eu.compConvites = []; outro.compConvites = [];
+  saveGrupos();
+  showCompanionToast('🤝 Vocês agora são companheiros de jornada!');
+  renderCompanionScreen();
+}
+
+async function declineCompanion(deNome, deTs) {
+  loadGrupos();
+  try { if (typeof syncFromFirebase === 'function') await syncFromFirebase(); } catch {}
+  const eu = cpMyParticipant();
+  if (eu) {
+    eu.compConvites = (eu.compConvites || []).filter(c => !((deTs && c.deTs === deTs) || c.de === deNome));
+    saveGrupos();
+  }
+  showCompanionToast('Convite recusado.');
+  renderCompanionScreen();
+}
+
+async function removeCompanion() {
+  if (!confirm('Deseja encerrar a parceria de companheiros de jornada?')) return;
+  loadGrupos();
+  try { if (typeof syncFromFirebase === 'function') await syncFromFirebase(); } catch {}
+  const g = cpMyGroup(); const eu = cpMyParticipant();
+  if (eu && eu.compParceiro) {
+    const parc = cpFindParticipant(g, eu.compParceiro.nome, eu.compParceiro.ts);
+    if (parc) parc.compParceiro = null;
+    eu.compParceiro = null;
+    saveGrupos();
+  }
+  CP.prayedToday = false; CP.contactedThisWeek = null; saveCP();
+  showCompanionToast('Parceria encerrada. Você pode convidar outra pessoa.');
   renderCompanionScreen();
 }
 
 // ── Dashboard do companheiro ─────────────────────────────────────────────
 function renderCompanionDashboard(el) {
-  const p = getCompanionPool()[CP.companionIdx];
-  if (!p) { CP.companionIdx = null; saveCP(); renderCompanionSelector(el); return; }
+  const g  = cpMyGroup();
+  const eu = cpMyParticipant();
+  if (!eu || !eu.compParceiro) { renderCompanionSelector(el); return; }
+  const parcPart = cpFindParticipant(g, eu.compParceiro.nome, eu.compParceiro.ts);
+  if (!parcPart) { renderCompanionSelector(el); return; }
+  const p = cpDisplay(parcPart, 0);
 
   // Verificar reset semanal do contato
   const curWeek = getISOWeek();
@@ -5379,7 +5510,7 @@ function renderCompanionDashboard(el) {
 
     <!-- Trocar companheiro -->
     <div style="text-align:center;margin-top:1.25rem;padding:0 1rem">
-      <button onclick="changeCompanion()" style="background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.5rem 1.25rem;font-size:14px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">
+      <button onclick="removeCompanion()" style="background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.5rem 1.25rem;font-size:14px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">
         🔄 Trocar companheiro
       </button>
     </div>`;
@@ -5468,6 +5599,10 @@ function sendMyPrayer() {
   CP.myPrayerRequest = txt;
   CP.myPrayerDate    = new Date().toDateString();
   saveCP();
+  // Grava no meu participante para o companheiro ver (sincroniza na nuvem)
+  loadGrupos();
+  const eu = cpMyParticipant();
+  if (eu) { eu.pedidoOracao = txt; eu.pedidoOracaoData = new Date().toLocaleDateString('pt-BR'); saveGrupos(); }
   showCompanionToast('🙏 Pedido enviado ao seu companheiro!');
   renderCompanionScreen();
 }
@@ -5475,6 +5610,9 @@ function sendMyPrayer() {
 function clearMyPrayer() {
   CP.myPrayerRequest = '';
   saveCP();
+  loadGrupos();
+  const eu = cpMyParticipant();
+  if (eu) { eu.pedidoOracao = ''; saveGrupos(); }
   renderCompanionScreen();
 }
 
@@ -5509,16 +5647,23 @@ function renderCompanionHomeBtn() {
   div.id = 'home-companion-btn';
   div.style.cssText = 'margin:.75rem 1rem 0';
   loadCP();
-  const hasCp = CP.companionIdx !== null && getCompanionPool()[CP.companionIdx];
-  const p = hasCp ? getCompanionPool()[CP.companionIdx] : null;
-  div.innerHTML = hasCp
+  loadGrupos();
+  const eu = (typeof cpMyParticipant === 'function') ? cpMyParticipant() : null;
+  const g  = (typeof cpMyGroup === 'function') ? cpMyGroup() : null;
+  let p = null;
+  if (eu && eu.compParceiro) {
+    const parc = cpFindParticipant(g, eu.compParceiro.nome, eu.compParceiro.ts);
+    if (parc) p = cpDisplay(parc, 0);
+  }
+  const pendentes = (eu && eu.compConvites) ? eu.compConvites.length : 0;
+  div.innerHTML = p
     ? `<button onclick="openCompanion()" style="display:flex;align-items:center;gap:10px;width:100%;background:var(--card);border:0.5px solid rgba(92,61,143,.35);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">
         <span style="font-size:22px">${p.icon}</span>
         <div style="flex:1;text-align:left"><div style="font-weight:600;color:var(--purple)">${p.name.split(' ')[0]}</div><div style="font-size:13px;color:var(--text3)">🤝 Companheiro de Jornada · 🔥 ${p.streak} dias</div></div>
         <span style="color:var(--text3);font-size:18px">›</span>
       </button>`
     : `<button onclick="openCompanion()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--purple-light);border:0.5px solid rgba(92,61,143,.35);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;color:var(--purple);cursor:pointer;font-family:var(--ff-body);font-weight:500">
-        🤝 Escolher Companheiro de Jornada
+        ${pendentes ? `📨 ${pendentes} convite${pendentes>1?'s':''} de companheiro — toque para responder` : '🤝 Escolher Companheiro de Jornada'}
       </button>`;
   area.after(div);
 }
@@ -6779,6 +6924,7 @@ function startFbPoll() {
       const active = document.querySelector('.screen.active')?.id;
       if (active === 'screen-grupos') renderGrupoList();
       if (active === 'screen-comunidade') renderComunidade();
+      if (active === 'screen-companion') renderCompanionScreen();
     }
   }, 30000);
 }
@@ -7661,12 +7807,12 @@ function savePgProgress(grupoNum, data) {
 }
 
 // Garante que há um registro de progresso válido para a semana atual
+// Nunca persiste ao apenas inicializar — evita sobrescrever Firebase antes da sync
 function getOrInitPgProgress(grupoNum) {
   let data = loadPgProgress(grupoNum);
   const weekKey = getISOWeekPg();
   if (!data || data.weekKey !== weekKey) {
     data = { grupoNum, weekKey, estudos: 0, oracoes: 0, bondades: 0 };
-    savePgProgress(grupoNum, data);
   }
   return data;
 }
@@ -7676,7 +7822,6 @@ function bumpPgProgress(tipo, qty = 1) {
   const meuGrupo = loadMeuGrupo ? loadMeuGrupo() : null;
   if (!meuGrupo) return;
   const grupoNum = meuGrupo.grupoNum;
-  loadGrupos();
   const data = getOrInitPgProgress(grupoNum);
   if (data[tipo] !== undefined) {
     const metas = getPgWeekMetas();
@@ -7725,7 +7870,6 @@ function getPgGrupoLevel(grupoNum) {
 
 // Registra uma semana completa — chamado quando todos os 3 objetivos são atingidos
 function checkPgSemanaCompleta(grupoNum, weekKey) {
-  loadGrupos();
   const nivelData = loadPgNivel(grupoNum);
   if ((nivelData.semanasMarcadas || []).includes(weekKey)) return false;
   nivelData.semanasMarcadas = [...(nivelData.semanasMarcadas || []), weekKey];
