@@ -3264,7 +3264,7 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
     </div>
     <div class="panel-section">
       <div class="panel-title">Progresso semanal</div>
-      <div class="panel-stat"><span>📖 Estudos concluídos</span><strong>${progresso.estudos||0}/${metas.estudos.meta}</strong></div>
+      <div class="panel-stat"><span>📖 Estudo da semana</span><strong>${progresso.estudos||0}/${metas.estudos.meta}</strong></div>
       <div class="panel-stat"><span>🙏 Pedidos de oração</span><strong>${progresso.oracoes||0}/${metas.oracoes.meta}</strong></div>
       <div class="panel-stat"><span>❤️ Atos de bondade</span><strong>${progresso.bondades||0}/${metas.bondades.meta}</strong></div>
     </div>
@@ -7958,7 +7958,7 @@ function renderGrupoPreviewWelcome() {
 // Metas semanais — simples e alcançáveis para um grupo de 3–8 pessoas
 function getPgWeekMetas() {
   return {
-    estudos:   { meta: 3,  label: 'Estudos concluídos',          icon:'📖', color:'#1E5F8C' },
+    estudos:   { meta: 1,  label: 'Estudo da semana',            icon:'📖', color:'#1E5F8C' },
     oracoes:   { meta: 5,  label: 'Pedidos de oração registrados', icon:'🙏', color:'#5C3D8F' },
     bondades:  { meta: 3,  label: 'Atos de bondade registrados',  icon:'❤️', color:'#C0392B' },
   };
@@ -8307,7 +8307,20 @@ function renderPgProgressHome() {
   })();
 
   const goalKeys = Object.keys(metas);
-  const goalsHtml = goalKeys.map(key => {
+  // 📖 Estudos concluídos: barra da JORNADA (0/13) — acompanha os 13 estudos, não a semana
+  const estudosJornada = Math.min(13, (typeof ST !== 'undefined' && Array.isArray(ST.done)) ? ST.done.length : 0);
+  const estudosJornadaPct = Math.round(estudosJornada / 13 * 100);
+  const estudosBar = `
+      <div class="pg-goal-row">
+        <div class="pg-goal-lbl">
+          <span class="pg-goal-name">📖 Estudos concluídos</span>
+          <span class="pg-goal-val">${estudosJornada}/13</span>
+        </div>
+        <div class="pg-goal-bar-outer">
+          <div class="pg-goal-bar-inner" style="width:${estudosJornadaPct}%;background:#1E5F8C"></div>
+        </div>
+      </div>`;
+  const goalsHtml = estudosBar + goalKeys.filter(k => k !== 'estudos').map(key => {
     const m = metas[key];
     const val = data[key] || 0;
     const pct = Math.min(100, Math.round(val / m.meta * 100));
