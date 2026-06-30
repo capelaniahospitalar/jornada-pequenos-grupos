@@ -6912,6 +6912,87 @@ const FB_DEFAULT_CONFIG = {
 let   fbPollTimer = null;
 let   fbSyncing   = false;
 
+// ════════════════════════════════════════════════════════════════════════
+//  COMMIT 1 — Confiabilidade da sincronização (concorrência, retry, telemetria)
+// ════════════════════════════════════════════════════════════════════════
+
+// Interruptores de segurança (rollback de 1 linha; congelados p/ evitar mudança acidental)
+const FB_FLAGS = Object.freeze({
+  usePrecondition : true,   // trava otimista via updateTime
+  retryOnReconnect: true,   // re-tentar gravação ao voltar a internet / app visível
+  debounceMs      : 400,    // (Commit 3) 0 = grava na hora (comportamento antigo)
+  useTombstone    : true,   // (Commit 2) remoção transitória
+});
+
+// Versão lógica + data de build (registrada na telemetria/log p/ auditoria futura)
+const APP_VERSION = Object.freeze({ version: '1.0.0', build: '2026-06-30' });
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function uuid() {
+  return (window.crypto && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : ('id-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10));
+}
+
+// Identidade permanente do aparelho (auditoria de conflitos)
+const DEVICE_ID_KEY = 'jdpg_device_id';
+function getDeviceId() {
+  try {
+    let id = localStorage.getItem(DEVICE_ID_KEY);
+    if (!id) { id = uuid(); localStorage.setItem(DEVICE_ID_KEY, id); }
+    return id;
+  } catch { return 'dev-unknown'; }
+}
+
+// Log LOCAL de conflitos (nunca enviado ao Firestore) — últimos 50
+const SYNC_CONFLICT_LOG_KEY = 'jdpg_sync_conflict_log';
+function logSyncConflict(info) {
+  try {
+    const log = JSON.parse(localStorage.getItem(SYNC_CONFLICT_LOG_KEY) || '[]');
+    log.push({ quando: new Date().toISOString(), deviceId: getDeviceId(),
+               versao: APP_VERSION.version, build: APP_VERSION.build, ...info });
+    while (log.length > 50) log.shift();
+    localStorage.setItem(SYNC_CONFLICT_LOG_KEY, JSON.stringify(log));
+  } catch (e) { console.warn('logSyncConflict:', e); }
+}
+
+// Telemetria LOCAL de sincronização (taxa de sucesso, retries, tempo médio)
+const SYNC_TELEMETRY_KEY = 'jdpg_sync_telemetry';
+function loadSyncTelemetry() {
+  const zero = { total:0, sucesso:0, retries:0, falhas:0, adiados:0, ultimaSync:null, ultimoRetry:null, tempoMedioMs:0 };
+  try { return Object.assign(zero, JSON.parse(localStorage.getItem(SYNC_TELEMETRY_KEY) || 'null') || {}); }
+  catch { return zero; }
+}
+function recordSync(ev) {  // ev: { resultado:'ok'|'falha'|'adiado', tentativas, durationMs }
+  try {
+    const t = loadSyncTelemetry();
+    t.total += 1;
+    if (ev.resultado === 'ok')          { t.sucesso += 1; t.ultimaSync = new Date().toISOString(); }
+    else if (ev.resultado === 'falha')  { t.falhas  += 1; }
+    else if (ev.resultado === 'adiado') { t.adiados += 1; }
+    if (ev.tentativas > 1) { t.retries += 1; t.ultimoRetry = new Date().toISOString(); }
+    if (ev.resultado === 'ok' && ev.durationMs != null) {
+      const n = Math.max(1, t.sucesso);
+      t.tempoMedioMs = Math.round((t.tempoMedioMs * (n - 1) + ev.durationMs) / n);
+    }
+    localStorage.setItem(SYNC_TELEMETRY_KEY, JSON.stringify(t));
+  } catch (e) { console.warn('recordSync:', e); }
+}
+
+// Estado: há alteração local ainda não confirmada na nuvem (ex.: caiu a rede)?
+let fbPendingSync = false;
+
+// Re-tentativa ao reconectar / app voltar a ficar visível
+async function fbRetryOnReconnect() {
+  if (!FB_FLAGS.retryOnReconnect || !fbPendingSync) return;
+  if (navigator.onLine === false) return;
+  await saveGruposToFirebase();
+}
+window.addEventListener('online', fbRetryOnReconnect);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') fbRetryOnReconnect();
+});
+
 function loadFbConfig() {
   try {
     const stored = JSON.parse(localStorage.getItem(FB_CONFIG_KEY) || 'null');
@@ -6945,6 +7026,7 @@ async function fbReadDoc(cfg) {
     dados: s ? JSON.parse(s) : null,
     tutores: tutoresStr ? JSON.parse(tutoresStr) : null,
     ts: t ? String(t) : null,
+    updateTime: doc.updateTime || null,   // COMMIT 1: carimbo nativo do servidor (trava otimista)
   };
 }
 
@@ -6964,14 +7046,14 @@ function fbWarnTooLarge() {
   } catch(e) { console.warn('fbWarnTooLarge:', e); }
 }
 
-async function fbWriteGrupos(cfg, data, tutoresData) {
+async function fbWriteGrupos(cfg, data, tutoresData, baseUpdateTime) {
   const dadosStr = JSON.stringify(data);
   // Guarda de tamanho: a regra do Firestore rejeita "dados" >= 500 KB. Aborta antes de
   // um write fadado a falhar e avisa o usuário, evitando perda silenciosa.
   if (dadosStr.length > 480000) {
     console.error('Firestore: dados muito grandes (' + dadosStr.length + ' bytes) — gravação cancelada.');
     fbWarnTooLarge();
-    return null;
+    return { ok: false, sizeExceeded: true };
   }
   const fields = {
     dados: { stringValue: dadosStr },
@@ -6979,14 +7061,29 @@ async function fbWriteGrupos(cfg, data, tutoresData) {
   };
   if (tutoresData) fields.tutores = { stringValue: JSON.stringify(tutoresData) };
   const body = { fields };
-  const r = await fetch(fbDocUrl(cfg), {
+  // COMMIT 1: pré-condição de concorrência — só grava se o documento não mudou desde a leitura
+  let url = fbDocUrl(cfg);
+  if (FB_FLAGS.usePrecondition && baseUpdateTime) {
+    url += '&currentDocument.updateTime=' + encodeURIComponent(baseUpdateTime);
+  }
+  const r = await fetch(url, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
+  // Confirmado em teste: conflito = HTTP 400 / FAILED_PRECONDITION
+  if (r.status === 400) {
+    const t = await r.text();
+    if (t.indexOf('FAILED_PRECONDITION') >= 0) return { ok: false, preconditionFailed: true };
+    throw new Error('HTTP 400: ' + t.slice(0,120));
+  }
   if (!r.ok) { const t = await r.text(); throw new Error('HTTP ' + r.status + ': ' + t.slice(0,120)); }
   const saved = await r.json();
-  return saved.fields?.ts?.integerValue ? String(saved.fields.ts.integerValue) : null;
+  return {
+    ok: true,
+    ts: saved.fields?.ts?.integerValue ? String(saved.fields.ts.integerValue) : null,
+    updateTime: saved.updateTime || null,
+  };
 }
 
 function applyGruposData(salvo) {
@@ -7070,46 +7167,82 @@ async function syncFromFirebase() {
   return false;
 }
 
-async function saveGruposToFirebase() {
-  const cfg = loadFbConfig();
-  if (!cfg) return;
-  const dadosSalvar = PEQUENOS_GRUPOS.map(g => ({
+// Lê a nuvem e prepara o estado local: proteção anti-apagamento + merge.
+// Retorna { remote, abort }. Se abort=true, a gravação deve ser cancelada.
+async function prepareSaveGrupos(cfg) {
+  const remote = await fbReadDoc(cfg);
+
+  // Proteção contra apagamento: nunca gravar lista vazia por cima de uma nuvem que tem dados
+  const localTemDados  = PEQUENOS_GRUPOS.some(g => g.nome || (g.participantes && g.participantes.length));
+  const remoteTemDados = remote && Array.isArray(remote.dados) && remote.dados.some(g => g.nome || (g.participantes && g.participantes.length));
+  if (!localTemDados && remoteTemDados) {
+    console.warn('Proteção: gravação cancelada (local vazio, nuvem com dados). Recuperando dados da nuvem.');
+    applyGruposData(remote.dados);
+    fbLastKnownTs = remote.ts;
+    return { remote, abort: true };
+  }
+
+  // Se a nuvem mudou desde a última sync, faz merge antes de gravar (lógica preservada)
+  if (remote && remote.ts && remote.ts !== fbLastKnownTs) {
+    console.warn('Firebase: nuvem mais nova — fazendo merge antes de gravar');
+    applyGruposData(mergeGruposData(remote.dados, PEQUENOS_GRUPOS));
+  }
+  return { remote, abort: false };
+}
+
+// Grava UMA vez, com pré-condição (trava otimista). Não decide nem re-tenta.
+async function trySaveGrupos(cfg, baseUpdateTime) {
+  const payload = PEQUENOS_GRUPOS.map(g => ({
     num: g.num, nome: g.nome, tutor: g.tutor,
     coordenador: g.coordenador, diaReuniao: g.diaReuniao,
     horaReuniao: g.horaReuniao, participantes: g.participantes,
     gratidoes: g.gratidoes || [],
   }));
-  try {
-    // A2: detecta conflito — se o Firestore foi modificado por outro dispositivo, faz merge
-    const remote = await fbReadDoc(cfg);
-    // Proteção contra apagamento: nunca gravar lista vazia por cima de uma nuvem que tem dados
-    const localTemDados  = PEQUENOS_GRUPOS.some(g => g.nome || (g.participantes && g.participantes.length));
-    const remoteTemDados = remote && Array.isArray(remote.dados) && remote.dados.some(g => g.nome || (g.participantes && g.participantes.length));
-    if (!localTemDados && remoteTemDados) {
-      console.warn('Proteção: gravação cancelada (local vazio, nuvem com dados). Recuperando dados da nuvem.');
-      applyGruposData(remote.dados);
-      fbLastKnownTs = remote.ts;
+  return fbWriteGrupos(cfg, payload, TUTORS.length ? TUTORS : undefined, baseUpdateTime);
+}
+
+// Orquestra: prepara → grava → em conflito, backoff aleatório e tenta de novo (até 3x).
+async function saveGruposToFirebase() {
+  const cfg = loadFbConfig();
+  if (!cfg) return;
+  const syncId = uuid().slice(0, 8);
+  const inicio = Date.now();
+  let ultimoUpdateTime = null;
+
+  for (let tentativa = 1; tentativa <= 3; tentativa++) {
+    try {
+      const prep = await prepareSaveGrupos(cfg);
+      if (prep.abort) { fbPendingSync = false; return; }
+      ultimoUpdateTime = prep.remote ? prep.remote.updateTime : null;
+
+      const res = await trySaveGrupos(cfg, prep.remote ? prep.remote.updateTime : null);
+
+      if (res && res.ok) {
+        fbLastKnownTs = res.ts;
+        fbPendingSync = false;
+        recordSync({ resultado: 'ok', tentativas: tentativa, durationMs: Date.now() - inicio });
+        return;
+      }
+      if (res && res.sizeExceeded) { recordSync({ resultado: 'falha', tentativas: tentativa }); return; }
+      if (res && res.preconditionFailed) {
+        console.warn('Firebase: conflito (FAILED_PRECONDITION) — sync ' + syncId + ' tentativa ' + tentativa + '/3');
+        if (tentativa < 3) await sleep(80 + Math.random() * 120);  // backoff aleatório (quebra lock-step)
+        continue;
+      }
+      return;
+    } catch (e) {
+      console.warn('Firebase save (sync ' + syncId + '):', e);
+      fbPendingSync = true;   // rede caiu: marca pendente p/ retry ao reconectar
+      recordSync({ resultado: 'adiado', tentativas: tentativa });
       return;
     }
-    if (remote && remote.ts && remote.ts !== fbLastKnownTs) {
-      console.warn('Firebase: conflito detectado — fazendo merge de participantes');
-      const merged = mergeGruposData(remote.dados, PEQUENOS_GRUPOS);
-      applyGruposData(merged);
-      // Recalcula dadosSalvar após merge — DEVE incluir os mesmos campos do caminho
-      // normal (em especial gratidoes), senão o mural é apagado da nuvem no conflito.
-      const dadosMerged = PEQUENOS_GRUPOS.map(g => ({
-        num: g.num, nome: g.nome, tutor: g.tutor,
-        coordenador: g.coordenador, diaReuniao: g.diaReuniao,
-        horaReuniao: g.horaReuniao, participantes: g.participantes,
-        gratidoes: g.gratidoes || [],
-      }));
-      const newTs = await fbWriteGrupos(cfg, dadosMerged, TUTORS.length ? TUTORS : undefined);
-      if (newTs) fbLastKnownTs = newTs;
-    } else {
-      const newTs = await fbWriteGrupos(cfg, dadosSalvar, TUTORS.length ? TUTORS : undefined);
-      if (newTs) fbLastKnownTs = newTs;
-    }
-  } catch(e) { console.warn('Firebase save:', e); }
+  }
+
+  // 3 tentativas esgotadas por conflito → telemetria + log local (não vai ao Firestore)
+  recordSync({ resultado: 'falha', tentativas: 3 });
+  logSyncConflict({ syncId, operacao: 'saveGruposToFirebase',
+                    motivo: 'FAILED_PRECONDITION apos 3 tentativas',
+                    tentativa: 3, updateTimeRecebido: ultimoUpdateTime });
 }
 
 function startFbPoll() {
