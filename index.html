@@ -8699,46 +8699,12 @@ setTimeout(initE8, 100);
 // estável), descomente o bloco abaixo e gere um service-worker.js atualizado.
 // ── Inicializar sync Firebase ao carregar ────────────────────────────────
 if (loadFbConfig()) {
-  syncFromFirebase().then(updated => {
-    // V3: se o Firestore não tem o campo tutores ainda, semeia com os dados de bootstrap
-    // (definidos temporariamente abaixo — remova após confirmação no Firebase Console)
-    if (updated && TUTORS.length === 0) seedTutorsToFirebase();
-  });
+  syncFromFirebase();
   startFbPoll();
 }
 
-// V3: tutores de bootstrap — apenas para semear o Firestore na primeira execução após deploy.
-// ATENÇÃO: atualize as Firestore Security Rules no Console para permitir o campo "tutores":
-//   allow write: if request.resource.data.keys().hasOnly(['dados','ts','tutores'])
-//     && request.resource.data.dados is string
-//     && request.resource.data.dados.size() < 500000
-//     && (!('tutores' in request.resource.data) || request.resource.data.tutores is string);
-// Após confirmar que o campo "tutores" existe no Firestore e TUTORS != [], remova este bloco.
-const _TUTORS_BOOTSTRAP = [
-  { name:'Capelão Wladimir', icon:'🙏', wa:'5521979389804' },
-  { name:'Capelão Renan',    icon:'✝️', wa:'5521993795269' },
-  { name:'Capelão Ualace',   icon:'📖', wa:'5521980465780' },
-  { name:'Capelão Felipe',   icon:'🌿', wa:'5521967793085' }
-];
-async function seedTutorsToFirebase() {
-  const cfg = loadFbConfig();
-  if (!cfg) return;
-  try {
-    const result = await fbReadDoc(cfg);
-    if (result && (!result.tutores || result.tutores.length === 0)) {
-      TUTORS = _TUTORS_BOOTSTRAP;
-      const newTs = await fbWriteGrupos(cfg,
-        result.dados || PEQUENOS_GRUPOS.map(g => ({
-          num:g.num,nome:g.nome,tutor:g.tutor,coordenador:g.coordenador,
-          diaReuniao:g.diaReuniao,horaReuniao:g.horaReuniao,participantes:g.participantes
-        })),
-        _TUTORS_BOOTSTRAP
-      );
-      if (newTs) fbLastKnownTs = newTs; // evita falso conflito na próxima gravação
-      console.log('V3: tutores semeados no Firestore com sucesso.');
-    }
-  } catch(e) { console.warn('seedTutors:', e); }
-}
+// V3: tutores carregados do Firestore (campo "tutores") em syncFromFirebase().
+// O bloco de bootstrap/seed foi removido em 2026-06-29 — o campo já está populado na nuvem.
 
 if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
   // Desregistra qualquer service worker antigo que possa estar em cache no navegador

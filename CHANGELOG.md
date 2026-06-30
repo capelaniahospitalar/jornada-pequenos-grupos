@@ -24,6 +24,23 @@ pontos:
 > Os argumentos dentro de `onclick="...(...)"` já estavam protegidos pela função
 > `escAttr()` (contexto de string JS), então não precisaram de `sanitize`.
 
+### Limpeza — remoção do `_TUTORS_BOOTSTRAP`
+
+Removidos o array `_TUTORS_BOOTSTRAP` (4 capelães com WhatsApp hardcoded), a função
+`seedTutorsToFirebase()` e seu chamador na inicialização. O campo `tutores` já está
+populado no Firestore (verificado no Console), então o seed virou código morto. O
+runtime carrega `TUTORS` do Firestore em `syncFromFirebase()`. Tira PII do código-fonte
+público; não afeta o funcionamento.
+
+> Ressalva honesta: não torna os telefones privados — eles permanecem legíveis via
+> Firestore (`read: if true`) e no campo `dados`. É limpeza de código + redução de
+> exposição no repositório, não correção de privacidade.
+
+### Verificações de Console (sem mudança de código)
+
+- **Firestore Rules:** confirmadas já endurecidas (não em modo teste). Resolvido.
+- **API Key:** confirmada restrita a `capelaniahospitalar.github.io/*` + `localhost/*`. Resolvido.
+
 ---
 
 ## Mudanças anteriores (commits `637d407`..`d8806e3`, via GitHub) — documentadas retroativamente
