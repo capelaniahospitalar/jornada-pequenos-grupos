@@ -1567,7 +1567,7 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
         <div class="welcome-step-title">Qual é o seu nome?</div>
       </div>
       <div class="welcome-step-body">
-        <input id="user-name-input" type="text" placeholder="Seu nome completo"
+        <input id="user-name-input" type="text" maxlength="80" placeholder="Seu nome completo"
           style="width:100%;border:0.5px solid rgba(255,255,255,0.15);border-radius:var(--radius-sm);padding:.7rem .85rem;font-size:17px;font-family:var(--ff-body);background:rgba(255,255,255,0.07);color:#fff;outline:none;box-sizing:border-box;transition:border .15s"
           oninput="ST.userName=this.value.trim();save(ST)">
         <p style="font-size:13px;color:rgba(255,255,255,0.45);margin-top:.4rem;font-family:var(--ff-body)">Usado para personalizar sua experiência no grupo.</p>
@@ -3054,7 +3054,7 @@ function renderTutorLogin(errorMsg) {
     </div>
     <div class="panel-section">
       <label style="display:block;font-size:14px;color:var(--text3);margin-bottom:4px">Seu nome completo</label>
-      <input id="tp-nome-input" type="text" style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box;margin-bottom:.6rem" placeholder="Nome completo">
+      <input id="tp-nome-input" type="text" maxlength="80" style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box;margin-bottom:.6rem" placeholder="Nome completo">
       ${errorMsg ? `<p style="color:#E05050;font-size:14px;margin:0 0 .6rem">${errorMsg}</p>` : ''}
       <button onclick="tutorIdentificar()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--navy);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17.5px;color:#fff;cursor:pointer;font-family:var(--ff-body)">
         Continuar →
@@ -5564,7 +5564,7 @@ function renderCompanionDashboard(el) {
         ${CP.myPrayerRequest
           ? `<div class="prayer-request-box" style="margin-bottom:.65rem">"${CP.myPrayerRequest}"</div>
              <button onclick="clearMyPrayer()" style="font-size:13px;color:var(--text3);background:none;border:none;cursor:pointer;font-family:var(--ff-body);padding:0">✕ Limpar pedido</button>`
-          : `<textarea class="prayer-textarea" id="my-prayer-input" rows="2"
+          : `<textarea class="prayer-textarea" id="my-prayer-input" rows="2" maxlength="300"
                placeholder="Escreva seu pedido de oração…"
                oninput="document.getElementById('my-prayer-send').disabled=!this.value.trim()">${CP.myPrayerRequest}</textarea>
              <div class="prayer-send-row">
@@ -6954,9 +6954,27 @@ async function fbReadGrupos(cfg) {
   return result ? result.dados : null;
 }
 
+let _fbSizeWarnedAt = 0;
+function fbWarnTooLarge() {
+  const now = Date.now();
+  if (now - _fbSizeWarnedAt < 60000) return; // não repetir o alerta em rajada
+  _fbSizeWarnedAt = now;
+  try {
+    alert('⚠️ Os dados do grupo atingiram o limite de armazenamento na nuvem. Sua última alteração foi salva apenas neste aparelho, mas não foi sincronizada. Reduza textos muito longos (mural, pedidos) ou avise o administrador.');
+  } catch(e) { console.warn('fbWarnTooLarge:', e); }
+}
+
 async function fbWriteGrupos(cfg, data, tutoresData) {
+  const dadosStr = JSON.stringify(data);
+  // Guarda de tamanho: a regra do Firestore rejeita "dados" >= 500 KB. Aborta antes de
+  // um write fadado a falhar e avisa o usuário, evitando perda silenciosa.
+  if (dadosStr.length > 480000) {
+    console.error('Firestore: dados muito grandes (' + dadosStr.length + ' bytes) — gravação cancelada.');
+    fbWarnTooLarge();
+    return null;
+  }
   const fields = {
-    dados: { stringValue: JSON.stringify(data) },
+    dados: { stringValue: dadosStr },
     ts:    { integerValue: String(Date.now()) },
   };
   if (tutoresData) fields.tutores = { stringValue: JSON.stringify(tutoresData) };
@@ -7505,7 +7523,7 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
         </p>
         <div class="insc-field" style="margin-bottom:.6rem">
           <label>Nome do Pequeno Grupo *</label>
-          <input class="insc-input" id="insc-grupo-nome-input" type="text" placeholder="Ex: Luz do Caminho, Fonte Viva, Raízes…" oninput="atualizarPreviewFlamula(this.value, ${g.num})">
+          <input class="insc-input" id="insc-grupo-nome-input" type="text" maxlength="40" placeholder="Ex: Luz do Caminho, Fonte Viva, Raízes…" oninput="atualizarPreviewFlamula(this.value, ${g.num})">
         </div>
         <div id="flamula-preview-wrap" style="display:none;margin:.5rem 0 .75rem;text-align:center">
           <div id="flamula-preview-svg" style="display:inline-block;width:90px"></div>
@@ -7538,7 +7556,7 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
       <div class="insc-block-body">
         <div class="insc-field">
           <label>Nome completo *</label>
-          <input class="insc-input" id="insc-nome" type="text" placeholder="Seu nome completo" autocomplete="name">
+          <input class="insc-input" id="insc-nome" type="text" maxlength="80" placeholder="Seu nome completo" autocomplete="name">
         </div>
         <div class="insc-field">
           <label>WhatsApp pessoal (com DDD) *</label>
@@ -7553,7 +7571,7 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
     <div id="dept-wrap" style="display:${ST.userProfile === 'colaborador' ? 'block' : 'none'};padding:0 1rem .5rem">
       <div class="insc-field">
         <label>Departamento onde trabalha</label>
-        <input class="insc-input" id="insc-dept" type="text" placeholder="Ex: Enfermagem, UTI, RH, Nutrição…">
+        <input class="insc-input" id="insc-dept" type="text" maxlength="40" placeholder="Ex: Enfermagem, UTI, RH, Nutrição…">
       </div>
     </div>
 
@@ -7707,7 +7725,7 @@ function iniciarTrocaPapel(grupoNum, papel) {
         </div>
         <div class="insc-field">
           <label>Novo nome do ${label.toLowerCase()} *</label>
-          <input class="insc-input" id="troca-papel-nome" type="text" placeholder="Nome completo">
+          <input class="insc-input" id="troca-papel-nome" type="text" maxlength="80" placeholder="Nome completo">
         </div>
         <div style="display:flex;gap:8px;margin-top:.6rem">
           <button class="insc-submit-btn" style="margin:0;flex:1" onclick="confirmarTrocaPapel(${grupoNum},'${papel}')">✓ Confirmar troca</button>
@@ -8514,7 +8532,7 @@ function renderComunidadeScreen() {
           <button class="grat-tipo-chip oracao ${tipoAtual==='oracao'?'active':''}" onclick="setPostTipo('oracao')">🙏 Pedido de oração</button>
         </div>
         <div class="grat-prefix">${prefixo}</div>
-        <textarea class="grat-textarea" id="grat-input" rows="3"
+        <textarea class="grat-textarea" id="grat-input" rows="3" maxlength="500"
           placeholder="${placeholder}"
           oninput="document.getElementById('grat-send-btn').disabled = !this.value.trim()"></textarea>
         <div class="grat-send-row">
@@ -8762,7 +8780,7 @@ function renderComunidade() {
           <button class="grat-tipo-chip oracao ${gratTipo==='oracao'?'active':''}" onclick="setGratTipo('oracao')">🙏 Pedido de Oração</button>
         </div>
         <div class="grat-prefix">${gratTipo==='gratidao'?'Hoje sou grato(a) por…':'Peço oração por…'}</div>
-        <textarea class="grat-textarea" id="grat-input" rows="3"
+        <textarea class="grat-textarea" id="grat-input" rows="3" maxlength="500"
           placeholder="${gratTipo==='gratidao'?'Escreva sua gratidão…':'Escreva seu pedido de oração…'}"
           oninput="document.getElementById('grat-enviar').disabled=!this.value.trim()"></textarea>
         <div class="grat-send-row">

@@ -1,5 +1,35 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-06-29] — Validação de tamanho de entradas (R-M04)
+
+### MÉDIO corrigido — guarda de tamanho + maxlength
+
+**Guarda no save (a parte importante).** Existe um único documento Firestore
+compartilhado por todos os grupos; a regra rejeita `dados` ≥ 500 KB. Antes, um write
+acima do limite falhava **silenciosamente para todos**. Agora `fbWriteGrupos()` mede o
+tamanho do `dados` (`JSON.stringify`) e, se passar de **480 KB**, cancela o write e
+avisa o usuário (`alert`, com throttle de 60 s para não repetir). Transforma perda
+silenciosa em aviso claro.
+
+**`maxlength` nos campos que sincronizam** (prevenção na origem):
+
+| Campo | Limite |
+|-------|--------|
+| Nome do grupo (`insc-grupo-nome-input`) | 40 |
+| Departamento (`insc-dept`) | 40 |
+| Nome do participante (`insc-nome`, `troca-papel-nome`) | 80 |
+| Nome do usuário (`user-name-input`, `tp-nome-input`) | 80 |
+| Pedido de oração ao companheiro (`my-prayer-input`) | 300 |
+| Post do mural (`grat-input`, 2 composers) | 500 |
+
+Invisível no uso normal; só limita ao atingir o teto. Não afeta diário pessoal nem
+campos não sincronizados.
+
+Verificado: app carrega sem erros; `fbWriteGrupos`/`fbWarnTooLarge` definidas;
+`maxlength` confirmado no DOM.
+
+---
+
 ## [2026-06-29] — Varredura XSS ampla (mural, grupos, bandeirola)
 
 ### ALTO corrigido — XSS em campos controlados por usuário (innerHTML)
