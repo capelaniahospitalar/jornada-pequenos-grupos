@@ -5277,7 +5277,7 @@ function renderCompanionSelector(el) {
         <div class="cp-card" style="border-color:var(--purple)">
           <div class="cp-avatar-sm">💌</div>
           <div class="cp-info">
-            <div class="cp-name">${c.de}</div>
+            <div class="cp-name">${sanitize(c.de)}</div>
             <div class="cp-lvl">convidou você para ser companheiro</div>
           </div>
           <div style="display:flex;gap:6px;flex-shrink:0">
@@ -5314,8 +5314,8 @@ function renderCompanionSelector(el) {
         <div class="cp-card" style="flex-wrap:wrap;cursor:default">
           <div class="cp-avatar-sm">${icon}</div>
           <div class="cp-info">
-            <div class="cp-name">${p.nome}</div>
-            <div class="cp-lvl">${p.departamento || 'Participante do grupo'}</div>
+            <div class="cp-name">${sanitize(p.nome)}</div>
+            <div class="cp-lvl">${sanitize(p.departamento || 'Participante do grupo')}</div>
           </div>
           <div style="flex-basis:100%">${acao}</div>
         </div>`;
@@ -5481,10 +5481,10 @@ function renderCompanionDashboard(el) {
   })();
 
   const prayBtnClass = CP.prayedToday ? 'praying-btn prayed' : 'praying-btn';
-  const prayBtnText  = CP.prayedToday ? '🙏 Você está orando por ' + p.name.split(' ')[0] + '!' : '🙏 Estou orando';
+  const prayBtnText  = CP.prayedToday ? '🙏 Você está orando por ' + sanitize(p.name.split(' ')[0]) + '!' : '🙏 Estou orando';
 
   const prayerSection = p.prayerRequest
-    ? `<div class="prayer-request-box">"${p.prayerRequest}"</div>`
+    ? `<div class="prayer-request-box">"${sanitize(p.prayerRequest)}"</div>`
     : `<p class="prayer-empty">Nenhum pedido de oração esta semana.</p>`;
 
   const missionTag = p.missionDone
@@ -5508,7 +5508,7 @@ function renderCompanionDashboard(el) {
       <div class="companion-card-hdr">
         <div class="companion-avatar">${p.icon}</div>
         <div style="flex:1;min-width:0">
-          <div class="companion-name">${p.name}</div>
+          <div class="companion-name">${sanitize(p.name)}</div>
           <div class="companion-level">🙏 ${FASE_LABELS_COMP[p.fase] || p.fase}</div>
         </div>
         <div class="companion-streak">
@@ -5559,7 +5559,7 @@ function renderCompanionDashboard(el) {
 
     <!-- Meu pedido de oração -->
     <div class="prayer-composer">
-      <div class="prayer-composer-hdr">✏️ Meu pedido de oração para ${p.name.split(' ')[0]}</div>
+      <div class="prayer-composer-hdr">✏️ Meu pedido de oração para ${sanitize(p.name.split(' ')[0])}</div>
       <div class="prayer-composer-body">
         ${CP.myPrayerRequest
           ? `<div class="prayer-request-box" style="margin-bottom:.65rem">"${CP.myPrayerRequest}"</div>
@@ -5737,7 +5737,7 @@ function renderCompanionHomeBtn() {
   div.innerHTML = p
     ? `<button onclick="openCompanion()" style="display:flex;align-items:center;gap:10px;width:100%;background:var(--card);border:0.5px solid rgba(92,61,143,.35);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">
         <span style="font-size:22px">${p.icon}</span>
-        <div style="flex:1;text-align:left"><div style="font-weight:600;color:var(--purple)">${p.name.split(' ')[0]}</div><div style="font-size:13px;color:var(--text3)">🤝 Companheiro de Jornada · 🔥 ${p.streak} dias</div></div>
+        <div style="flex:1;text-align:left"><div style="font-weight:600;color:var(--purple)">${sanitize(p.name.split(' ')[0])}</div><div style="font-size:13px;color:var(--text3)">🤝 Companheiro de Jornada · 🔥 ${p.streak} dias</div></div>
         <span style="color:var(--text3);font-size:18px">›</span>
       </button>`
     : `<button onclick="openCompanion()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--purple-light);border:0.5px solid rgba(92,61,143,.35);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;color:var(--purple);cursor:pointer;font-family:var(--ff-body);font-weight:500">
