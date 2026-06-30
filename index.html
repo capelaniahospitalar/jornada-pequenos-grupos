@@ -6959,7 +6959,7 @@ function logSyncConflict(info) {
 // Telemetria LOCAL de sincronização (taxa de sucesso, retries, tempo médio)
 const SYNC_TELEMETRY_KEY = 'jdpg_sync_telemetry';
 function loadSyncTelemetry() {
-  const zero = { total:0, sucesso:0, retries:0, falhas:0, adiados:0, ultimaSync:null, ultimoRetry:null, tempoMedioMs:0 };
+  const zero = { total:0, sucesso:0, retries:0, falhas:0, adiados:0, ultimaSync:null, ultimoRetry:null, tempoMedioMs:0, lastSuccessfulSyncVersion:null };
   try { return Object.assign(zero, JSON.parse(localStorage.getItem(SYNC_TELEMETRY_KEY) || 'null') || {}); }
   catch { return zero; }
 }
@@ -6967,7 +6967,7 @@ function recordSync(ev) {  // ev: { resultado:'ok'|'falha'|'adiado', tentativas,
   try {
     const t = loadSyncTelemetry();
     t.total += 1;
-    if (ev.resultado === 'ok')          { t.sucesso += 1; t.ultimaSync = new Date().toISOString(); }
+    if (ev.resultado === 'ok')          { t.sucesso += 1; t.ultimaSync = new Date().toISOString(); t.lastSuccessfulSyncVersion = APP_VERSION.version; }
     else if (ev.resultado === 'falha')  { t.falhas  += 1; }
     else if (ev.resultado === 'adiado') { t.adiados += 1; }
     if (ev.tentativas > 1) { t.retries += 1; t.ultimoRetry = new Date().toISOString(); }
