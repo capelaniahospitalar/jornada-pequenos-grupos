@@ -1,5 +1,25 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-06-29] — Corrige perda do mural em conflito Firebase (FB-C3, regressão)
+
+### ALTO corrigido — `gratidoes` (mural) apagado/perdido no merge
+
+A reescrita via GitHub reverteu a correção FB-C3. Dois problemas no caminho de
+conflito de `saveGruposToFirebase`:
+
+1. **Write descartava o mural.** `dadosMerged` não incluía `gratidoes`, então toda
+   gravação pós-conflito **apagava os posts do mural na nuvem**. Corrigido: `dadosMerged`
+   agora inclui `gratidoes` (igual ao caminho normal `dadosSalvar`).
+2. **Merge não unia o mural.** `mergeGruposData` só preservava as `gratidoes` do remoto
+   (via `...rg`), perdendo posts locais ainda não sincronizados. Corrigido: agora **une**
+   remoto + local com dedup por `id` (mesma lógica já usada para participantes).
+
+Conflito = dois aparelhos gravando entre syncs (tutor + participantes ao mesmo tempo) —
+cenário comum. Verificado em runtime: merge de remoto[id:1] + local[id:2,id:1] → `[1,2]`
+(une e deduplica).
+
+---
+
 ## [2026-06-29] — Validação de tamanho de entradas (R-M04)
 
 ### MÉDIO corrigido — guarda de tamanho + maxlength

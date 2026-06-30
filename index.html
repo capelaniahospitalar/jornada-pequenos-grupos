@@ -7028,7 +7028,16 @@ function mergeGruposData(remoteList, localGroups) {
         if (lu >= ru) merged[idx] = lp;
       }
     });
-    return { ...rg, participantes: merged,
+    // Une gratidoes (mural) dos dois lados, deduplicando por id — evita perder posts
+    // concorrentes que ainda não chegaram ao remoto (mesma lógica dos participantes).
+    const remoteGrat = rg.gratidoes || [];
+    const localGrat  = lg.gratidoes || [];
+    const gratKey = gr => (gr.id != null ? String(gr.id) : (gr.ts + '|' + (gr.texto || '')));
+    const gratMerged = [...remoteGrat];
+    localGrat.forEach(lgr => {
+      if (!gratMerged.find(rgr => gratKey(rgr) === gratKey(lgr))) gratMerged.push(lgr);
+    });
+    return { ...rg, participantes: merged, gratidoes: gratMerged,
       nome: lg.nome ?? rg.nome, tutor: lg.tutor ?? rg.tutor,
       coordenador: lg.coordenador ?? rg.coordenador,
       diaReuniao: lg.diaReuniao ?? rg.diaReuniao,
@@ -7086,11 +7095,13 @@ async function saveGruposToFirebase() {
       console.warn('Firebase: conflito detectado — fazendo merge de participantes');
       const merged = mergeGruposData(remote.dados, PEQUENOS_GRUPOS);
       applyGruposData(merged);
-      // Recalcula dadosSalvar após merge
+      // Recalcula dadosSalvar após merge — DEVE incluir os mesmos campos do caminho
+      // normal (em especial gratidoes), senão o mural é apagado da nuvem no conflito.
       const dadosMerged = PEQUENOS_GRUPOS.map(g => ({
         num: g.num, nome: g.nome, tutor: g.tutor,
         coordenador: g.coordenador, diaReuniao: g.diaReuniao,
         horaReuniao: g.horaReuniao, participantes: g.participantes,
+        gratidoes: g.gratidoes || [],
       }));
       const newTs = await fbWriteGrupos(cfg, dadosMerged, TUTORS.length ? TUTORS : undefined);
       if (newTs) fbLastKnownTs = newTs;
