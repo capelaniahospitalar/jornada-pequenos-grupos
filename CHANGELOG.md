@@ -1,5 +1,40 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-06-29] — Varredura XSS ampla (mural, grupos, bandeirola)
+
+### ALTO corrigido — XSS em campos controlados por usuário (innerHTML)
+
+Auditoria sistemática dos `innerHTML` que renderizam dados de usuário. A reescrita
+via GitHub havia reintroduzido pontos sem escape (a correção C01 da auditoria anterior
+se perdeu). Aplicado `sanitize()` nos vetores **cross-user** (onde um usuário injeta
+script que executa no navegador de outro):
+
+| Função | Campo |
+|--------|-------|
+| `renderComunidade` (mural sincronizado) | `item.autor`, `item.data`, `item.texto` |
+| `renderGratCard` (mural local) | `g.texto` (`g.nome` já estava ok) |
+| `renderGrupoDetalhe` (card de status) | `g.nome`, `g.tutor`, `g.coordenador` |
+| `renderGrupoSelecionadoPreview` | `meuGrupo.grupoNome`, `g.tutor`, `g.coordenador` |
+| lista de participantes inscritos | `p.nome` |
+| painel de envio ao tutor | `d.nome` (2 pontos) |
+| convite por link (welcome) | `g.nome` |
+| **`generatePennantSvg`** | nome do grupo dentro de `<text>` do SVG |
+
+> **Destaque:** a bandeirola (`generatePennantSvg`) inseria o nome do grupo direto no
+> markup SVG — um nome com `<` permitia injeção. Agora escapado. Verificado em runtime:
+> nome `<img onerror>` aparece escapado, não cru.
+
+**Deixados intencionalmente sem `sanitize`:**
+- Campos via `.textContent =` (ex.: `insc-grupo-tutor`) — já seguros; sanitizar
+  mostraria entidades literais (`&amp;`).
+- Nomes de nível/missão e `enc.texto` — conteúdo constante do código (currículo).
+- Diário pessoal (`saved[pi]`) — self-XSS, não sincroniza para outros.
+
+Verificação: app carrega sem erros; todas as funções editadas parseiam; teste de
+injeção na bandeirola confirmado neutralizado.
+
+---
+
 ## [2026-06-29] — Sanitização XSS na área do Companheiro de Jornada
 
 ### ALTO corrigido — XSS na nova tela de Companheiro

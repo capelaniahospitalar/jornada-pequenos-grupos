@@ -3446,10 +3446,10 @@ function openPanel() {
     ? destinatarios.map(d => d.wa ? `
       <button class="tutor-wa" onclick="window.open('https://wa.me/${d.wa}?text=${buildWaMsg(d.nome)}','_blank')" style="margin:0 0 .5rem">
         <svg viewBox="0 0 24 24" fill="white" width="18" height="18"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/></svg>
-        Enviar progresso para ${d.papel} (${d.nome})
+        Enviar progresso para ${d.papel} (${sanitize(d.nome)})
       </button>` : `
       <div style="font-size:14px;color:var(--text3);text-align:center;padding:.5rem;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);margin-bottom:.5rem">
-        ${d.papel} do grupo: <strong>${d.nome}</strong> — combine com ele(a) pela Comunidade do app.
+        ${d.papel} do grupo: <strong>${sanitize(d.nome)}</strong> — combine com ele(a) pela Comunidade do app.
       </div>`).join('')
     : `<div style="font-size:16px;color:var(--text3);text-align:center;padding:.5rem">Seu grupo ainda não tem Tutor ou Coordenador definidos.</div>`;
 
@@ -5013,7 +5013,7 @@ function initApp() {
       syncFromFirebase().then(() => {
         loadGrupos();
         const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
-        const nomeGrupo = g && g.nome ? `"${g.nome}"` : `Grupo ${grupoNum}`;
+        const nomeGrupo = g && g.nome ? `"${sanitize(g.nome)}"` : `Grupo ${grupoNum}`;
         // Guardar número do grupo convidado — a inscrição formal acontece na tela de inscrição
         window._conviteGrupoNum = grupoNum;
 
@@ -6785,7 +6785,7 @@ function generatePennantSvg(grupoNum, grupoNome, opts = {}) {
   const nameLines = splitPennantName(grupoNome || `Grupo ${grupoNum}`);
   const nameY = nameLines.length > 1 ? height * 0.48 : height * 0.52;
   const nameHtml = nameLines.map((line, i) =>
-    `<text x="${cx}" y="${nameY + i * 16}" text-anchor="middle" font-size="11.5" font-weight="700" fill="${pal.text}" font-family="Georgia,serif" letter-spacing="0.3">${line}</text>`
+    `<text x="${cx}" y="${nameY + i * 16}" text-anchor="middle" font-size="11.5" font-weight="700" fill="${pal.text}" font-family="Georgia,serif" letter-spacing="0.3">${sanitize(line)}</text>`
   ).join('');
 
   // Número do grupo pequeno no canto
@@ -7424,14 +7424,14 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
         <span class="grupo-info-ico">🌿</span>
         <div class="grupo-info-txt">
           <div class="grupo-info-lbl">Nome do grupo</div>
-          <div class="grupo-info-val">${g.nome || '— ainda não definido —'}</div>
+          <div class="grupo-info-val">${sanitize(g.nome || '— ainda não definido —')}</div>
         </div>
       </div>
       <div class="grupo-info-row">
         <span class="grupo-info-ico">👨‍🏫</span>
         <div class="grupo-info-txt">
           <div class="grupo-info-lbl">Tutor</div>
-          <div class="grupo-info-val">${g.tutor || '— ainda não definido —'}</div>
+          <div class="grupo-info-val">${sanitize(g.tutor || '— ainda não definido —')}</div>
         </div>
         ${podeGerenciar && g.tutor ? `<button class="grupo-troca-papel-btn" onclick="iniciarTrocaPapel(${g.num},'tutor')">Trocar</button>` : ''}
       </div>
@@ -7439,7 +7439,7 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
         <span class="grupo-info-ico">🤝</span>
         <div class="grupo-info-txt">
           <div class="grupo-info-lbl">Coordenador</div>
-          <div class="grupo-info-val">${g.coordenador || '— ainda não definido —'}</div>
+          <div class="grupo-info-val">${sanitize(g.coordenador || '— ainda não definido —')}</div>
         </div>
         ${podeGerenciar && g.coordenador ? `<button class="grupo-troca-papel-btn" onclick="iniciarTrocaPapel(${g.num},'coordenador')">Trocar</button>` : ''}
       </div>
@@ -7456,7 +7456,7 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
         <div class="grupo-info-txt">
           <div class="grupo-info-lbl">Participantes inscritos</div>
           <div class="grupo-info-val">${[...new Map(g.participantes.map(p => [p.nome.trim().toLowerCase(), p])).values()].length}</div>
-          ${g.participantes.length > 0 ? `<div style="margin-top:.4rem;display:flex;flex-direction:column;gap:.15rem">${[...new Map(g.participantes.map(p => [p.nome.trim().toLowerCase(), p])).values()].map(p => `<span style="font-size:13px;color:var(--text2);font-family:var(--ff-body)">• ${p.nome}</span>`).join('')}</div>` : ''}
+          ${g.participantes.length > 0 ? `<div style="margin-top:.4rem;display:flex;flex-direction:column;gap:.15rem">${[...new Map(g.participantes.map(p => [p.nome.trim().toLowerCase(), p])).values()].map(p => `<span style="font-size:13px;color:var(--text2);font-family:var(--ff-body)">• ${sanitize(p.nome)}</span>`).join('')}</div>` : ''}
         </div>
       </div>
     </div>`;
@@ -7939,9 +7939,9 @@ function renderGrupoPreviewWelcome() {
       <div class="grupo-preview-box">
         <div style="width:44px;height:60px;flex-shrink:0">${pennant}</div>
         <div class="grupo-preview-info">
-          <div class="grupo-preview-nome">${meuGrupo.grupoNome}</div>
-          <div class="grupo-preview-coord">👨‍🏫 Tutor: ${g ? g.tutor : ''}</div>
-          <div class="grupo-preview-coord">🤝 Coordenador: ${g ? g.coordenador : ''}</div>
+          <div class="grupo-preview-nome">${sanitize(meuGrupo.grupoNome)}</div>
+          <div class="grupo-preview-coord">👨‍🏫 Tutor: ${sanitize(g ? g.tutor : '')}</div>
+          <div class="grupo-preview-coord">🤝 Coordenador: ${sanitize(g ? g.coordenador : '')}</div>
           <div class="grupo-preview-meta">Inscrito em ${meuGrupo.dataInscricao||''} · ${meuGrupo.tipo==='colaborador'?'🏥 '+meuGrupo.departamento:meuGrupo.tipo==='amigo'?'🤝 Amigo dos Adventistas':meuGrupo.tipo==='membro'?'⛪ Membro IASD':'🌿 Participante'}</div>
         </div>
         <button class="grupo-troca-btn" onclick="openGrupos()">Trocar</button>
@@ -8575,7 +8575,7 @@ function renderGratCard(g) {
         </div>
         ${tagHtml}
       </div>
-      <div class="grat-text">${g.texto}</div>
+      <div class="grat-text">${sanitize(g.texto)}</div>
       <div class="grat-react-row">
         <button class="grat-react-btn ${minhasReacoes.coracao ? 'active' : ''}" onclick="reagirGratidao('${g.id}','coracao')">
           ❤️ ${reacoes.coracao || 0}
@@ -8744,12 +8744,12 @@ function renderComunidade() {
         <div class="grat-card-hdr">
           <div class="grat-avatar">${icone}</div>
           <div class="grat-meta">
-            <div class="grat-name">${item.autor}</div>
-            <div class="grat-time">${item.data}</div>
+            <div class="grat-name">${sanitize(item.autor)}</div>
+            <div class="grat-time">${sanitize(item.data)}</div>
           </div>
           <span class="${tagClass}">${tagLabel}</span>
         </div>
-        <div class="grat-text">${item.texto}</div>
+        <div class="grat-text">${sanitize(item.texto)}</div>
       </div>`;
   }).join('') : `<p class="mural-empty">Nenhuma publicação ainda. Seja o primeiro a compartilhar!</p>`;
 
