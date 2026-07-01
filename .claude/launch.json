@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "static",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8000"],
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "C:\\Temp\\claude\\C--Users-wladimir-souza-Documents-GitHub-jornada-pequenos-grupos\\63d89b58-c5b3-4b84-9cbf-7a1034aa5ac1\\scratchpad\\static-server.ps1"],
       "port": 8000
     }
   ]

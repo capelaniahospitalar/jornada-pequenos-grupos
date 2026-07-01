@@ -47,9 +47,12 @@
 
 5. **A identidade da pessoa deve ser permanente**, não amarrada a um único aparelho ou à
    grafia exata do nome digitado.
-   *Status: parcialmente implementado — existe `memberId` (Etapa 1), mas partes do app ainda
-   comparam por nome exato (`DB-02`), e não há caminho de recuperação de identidade num
-   segundo aparelho (`FLOW-01`).*
+   *Status: sincronização de progresso já usa `memberId` como fonte de verdade, com nome
+   normalizado como reserva (`DB-02`, resolvido 2026-07-01, função `findMeuParticipante`).
+   Recuperação de identidade em aparelho novo/reinstalação **implementada** (`IDENT-01`, resolvido
+   2026-07-01) — recuperação exige nome **e** WhatsApp (nunca só um dos dois), com confirmação
+   explícita; restaura apenas dados sincronizados (XP, streak, estudos, papel, companheiro); o
+   Diário Privado permanece só no aparelho anterior, comunicado claramente ao usuário.*
 
 6. **A jornada espiritual (estudos, XP, sequência de dias) acompanha o colaborador,
    independentemente do Pequeno Grupo em que estiver.**
@@ -69,7 +72,8 @@
 8. **Dados de acompanhamento ministerial (ex.: campanhas, presença) devem sobreviver à troca
    ou perda do aparelho** — diferente do diário (regra 7), esse tipo de dado é operacional, não
    confidencial, e precisa ser confiável entre dispositivos.
-   *Status: **não garantido hoje** para campanhas (`DB-04`, dado só local).*
+   *Status: **implementado** (`DB-04`, resolvido 2026-07-01) — campanhas agora sincronizam via
+   `g.campanhas`/Firebase, com migração automática dos dados que já existiam só localmente.*
 
 ## Companheiro de Jornada
 
@@ -93,11 +97,13 @@
 Para o detalhamento técnico de cada item (onde no código, evidência, gravidade), ver a tabela
 final de pendências no `ESTADO-E-ROADMAP.md`. Resumo de prioridade combinado nesta conversa:
 
-- **P1 — Segurança:** `PERM-01` (acesso ao painel por nome, sem verificação)
-- **P2 — Integridade de grupos:** `DB-01` (pertencimento múltiplo não bloqueado)
-- **P3 — Identidade:** `DB-02` (completar migração para `memberId`)
-- **Segunda onda:** `DB-03`, `DB-04`, `FLOW-01`
-- **Terceira onda (limpeza, não muda experiência do usuário):** `DB-05`, `FUNC-01`, `STR-01` a `STR-05`
+- ✅ **P1 — Segurança:** `PERM-01` — resolvido (autenticação do painel exige WhatsApp cadastrado).
+- ✅ **P2 — Integridade de grupos:** `DB-01` — resolvido (1 PG por colaborador/coordenador, com confirmação explícita).
+- ✅ **P3 — Identidade:** `DB-02` — resolvido (migração para `memberId` em `findMeuParticipante`).
+- ⏸️ **`DB-03`** — reavaliado após o DB-01; adiado deliberadamente (residual restrito a Tutores, sem impacto operacional).
+- ✅ **`DB-04`** — resolvido (Campanhas sincronizadas via `g.campanhas`/Firebase).
+- ✅ **`IDENT-01`** — resolvido (recuperação de identidade por nome+WhatsApp, sem duplicar participante).
+- **Próximo item:** limpeza de código morto (`DB-05`, `FUNC-01`, `STR-01` a `STR-05`) e homologação com grupos reais.
 - **Não são defeitos:** `ARCH-01` (Diário Privado), `PERM-02` (já era conhecido e aceito pela
   equipe antes desta auditoria — permanece como decisão a revisitar se o nível de segurança
   esperado pelo HAS mudar)

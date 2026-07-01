@@ -126,12 +126,61 @@ evidência de corrupção causada pela sincronização.** Os achados abaixo já 
   **Limpeza de dados de produção associada:** removidas entradas duplicadas de "Wladimir
   Goncalves"/"Wladimir Gonçalves de Souza" dos Grupos 2, 3, 5 e 6 (mantido só no Grupo 1, real),
   preparando a base para essa regra.
-- **DB-02** — Sincronização de progresso usa nome exato, não `memberId` (`bumpPgProgress`, `syncProgressoParaFirebase`, `_syncMissaoParaGrupo`)
-- **DB-03** — Progresso só é atribuído ao Grupo Aberto, não a todos os vínculos
-- **DB-04** — Campanhas (Embaixadores) só em `localStorage`, sem sincronização com a nuvem
+- **DB-02 — RESOLVIDO (2026-07-01).** `syncProgressoParaFirebase` e `bumpPgProgress` agora usam
+  a nova função utilitária `findMeuParticipante(g)` — `memberId` como fonte de verdade, nome
+  normalizado (trim+lowercase) como reserva para registros antigos sem `memberId`, mesmo padrão já
+  usado em `getMinhaFuncaoNoGrupo`. Testado ao vivo: sincroniza corretamente mesmo com nome local
+  divergente (via `memberId`); sincroniza via nome legado com variação de grafia/espaço; não
+  quebra nem sobrescreve nada quando não há correspondência. `_syncMissaoParaGrupo` foi
+  deliberadamente deixada de fora — opera só sobre cache local (`PG_MISSOES_KEY`), sem o problema
+  de reconciliação entre dispositivos que motivou o DB-02.
+- **DB-03 — REAVALIADO após o DB-01 (2026-07-01), não implementado por decisão consciente.**
+  Rastreei os 3 pontos que mudam "Grupo Aberto" (`setGrupoAberto`, ligados só a
+  `confirmarInscricao`/`aceitarConvite`) — confirmado: **resolvido por consequência do DB-01**
+  para colaborador/coordenador (só podem ter 1 vínculo ativo, não há mais "grupo errado" possível).
+  **Sobra um caso residual, restrito aos 4 Tutores (capelães)**: se um tutor supervisiona vários
+  grupos E também faz a própria jornada pessoal de estudos pelo app, o progresso dele só atualiza
+  o registro do "Grupo Aberto" (o último grupo em que entrou) — nos outros grupos que supervisiona,
+  seu próprio registro de tutor fica com progresso desatualizado no Painel do Tutor. **Efeito é só
+  visual/estatístico** (não altera o progresso real da pessoa, não afeta colaboradores). Correção
+  proposta (gravar em todos os grupos do tutor) foi **deliberadamente adiada** — mudaria a premissa
+  de "1 ação → 1 grupo atualizado" para "1 ação → N grupos", aumentando gravações/sincronizações/
+  superfície de bug para resolver algo que afeta só 4 pessoas, sem impacto na operação dos PGs.
+  Revisitar numa futura revisão do Painel do Tutor, não antes.
+- **DB-04 — RESOLVIDO (2026-07-01).** Campanha (Embaixadores) agora mora em `g.campanhas`, dentro
+  da própria estrutura do grupo — sincroniza pelo mesmo caminho já existente (`saveGrupos()` →
+  Firebase, com a trava de concorrência do Commit 1). `loadCampanhasProgress`/`saveCampanhasProgress`
+  reescritas; nenhuma mudança em `renderCampanhasTutor`/`salvarCampanhaPresenca`/`salvarCampanhaVisita`/
+  `desfazerVisita`. **Migração automática e única** dos dados antigos (`localStorage
+  'jdpg_campanhas_v1'`): na primeira leitura, se `g.campanhas` ainda não existe e há dado legado
+  daquele grupo, ele vira a base do grupo e a chave antiga daquele grupo é apagada do localStorage
+  — depois disso, o localStorage nunca mais é lido (só o grupo/Firebase é a fonte). Testado ao
+  vivo: migração seletiva por grupo (não afeta dados de outros grupos ainda não migrados); migração
+  não roda 2× (reinjeção de dado antigo no localStorage não altera o já migrado); leitura/escrita
+  seguintes operam só sobre `g.campanhas`.
 - **DB-05** — Sem histórico/tombstone ao trocar de PG (`cancelarInscricao`) — mesmo achado do
   "Achado de campo" documentado acima
-- **FLOW-01** — Sem caminho de recuperação de identidade num segundo aparelho
+- **IDENT-01 — RESOLVIDO (2026-07-01)** (renomeado de FLOW-01 — escopo real vai além de "segundo
+  aparelho": troca de celular, reinstalação, limpeza de cache, recuperação após perda). Novas
+  funções `buscarCadastroExistente(g, nome, wa)` (nome **e** WhatsApp normalizados — nunca só um
+  dos dois) e `recuperarIdentidade(g, p)` (só troca `memberId`; nunca cria um segundo participante
+  — papel e Companheiro de Jornada já estão no mesmo registro, preservados automaticamente).
+  Restaura localmente apenas o que é sincronizado: XP, streak, estudos concluídos (reconstruído,
+  jornada é sequencial). Diário/decisões (`ARCH-01`) e a lista exata de missões concluídas
+  **não são recuperáveis** — comunicado explicitamente na tela de sucesso.
+  - **`confirmarInscricao`:** bloqueio por nome duplicado agora primeiro tenta recuperar via
+    WhatsApp digitado no próprio formulário; só mantém o erro seco se não bater.
+  - **`aceitarConvite` — corrige um buraco real encontrado nesta etapa:** antes só verificava
+    duplicidade por `memberId`, então aceitar convite num aparelho novo **criava um segundo
+    participante com o mesmo nome**, silenciosamente. Agora verifica `buscarCadastroExistente`
+    antes de criar; se encontrar, recupera em vez de duplicar.
+  - **`renderTelaConvite`:** ganhou campo de WhatsApp (antes só pedia nome) — pré-preenchido com
+    o que o emissor do convite informou (opcional, só conveniência), mas a identidade é sempre
+    confirmada pelo valor que quem aceita digitou/corrigiu na própria tela.
+  - Testado ao vivo: WhatsApp errado bloqueia sem oferecer recuperação; WhatsApp certo recupera
+    (memberId trocado, XP/estudos/streak restaurados, sem duplicar) tanto via inscrição quanto
+    via convite; pessoa genuinamente nova (nome parecido, WA diferente) continua sendo cadastrada
+    normalmente, sem falso positivo.
 - **FUNC-01** — 4 funções duplicadas por reescritas anteriores não removerem a versão antiga:
   `openComunidade` (9166/9412), `enviarGratidao` (9286/9472), `sendMyPrayer` (5119/5638),
   `clearMyPrayer` (5141/5653) — só a segunda declaração de cada uma está ativa
@@ -159,13 +208,15 @@ evidência de corrupção causada pela sincronização.** Os achados abaixo já 
 
 ## Próximas decisões pendentes do usuário
 
-**Ordem de prioridade combinada:**
-1. **P1 — `PERM-01`** (segurança): corrigir autenticação do Painel Tutor/Coordenador antes de
-   uma implantação mais ampla.
-2. **P2 — `DB-01`** (integridade): garantir 1 PG por colaborador.
-3. **P3 — `DB-02`** (identidade): completar a migração para `memberId` na sincronização de progresso.
-4. **Segunda onda:** `DB-03`, `DB-04`, `FLOW-01`.
-5. **Terceira onda (limpeza, não muda a experiência do usuário):** `DB-05`, `FUNC-01`, `STR-01` a `STR-05`.
+**Ordem de prioridade combinada (atualizada 2026-07-01):**
+1. ✅ **`PERM-01`** — autenticação do Painel Tutor/Coordenador. Feito.
+2. ✅ **`DB-01`** — 1 PG por colaborador/coordenador, com confirmação explícita. Feito.
+3. ✅ **`DB-02`** — migração para `memberId` na sincronização de progresso. Feito.
+4. ⏸️ **`DB-03`** — reavaliado, adiado deliberadamente (ver nota acima; residual só em Tutores, sem impacto na operação).
+5. ✅ **`DB-04`** — Campanhas (Embaixadores) sincronizadas via `g.campanhas`. Feito.
+6. ✅ **`IDENT-01`** — Recuperação de Identidade do Colaborador. Feito.
+7. **Limpeza de código morto** (`FUNC-01`/duplicações, `STR-01` a `STR-05`). **Próximo item.**
+8. **Homologação com grupos reais.**
 
 **Decisões de contexto ainda em aberto:**
 6. Algum link antigo `?pg=N` já foi distribuído para pessoa real antes da Etapa 2 quebrar esse

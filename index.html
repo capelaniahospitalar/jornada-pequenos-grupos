@@ -3801,6 +3801,16 @@ function _syncMissaoParaGrupo(missionId) {
   syncProgressoParaFirebase();
 }
 
+// DB-02: localiza "eu" num grupo — memberId é a fonte de verdade; nome normalizado é reserva
+// para registros antigos sem memberId. Mesmo padrão já usado em getMinhaFuncaoNoGrupo.
+function findMeuParticipante(g) {
+  if (!g) return null;
+  const meuId = getMyMemberId();
+  const meuNome = (ST.userName || '').trim().toLowerCase();
+  return (g.participantes || []).find(p => p.memberId === meuId)
+      || (g.participantes || []).find(p => p.nome && p.nome.trim().toLowerCase() === meuNome);
+}
+
 function syncProgressoParaFirebase() {
   try {
     const meuGrupo = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
@@ -3808,7 +3818,7 @@ function syncProgressoParaFirebase() {
     loadGrupos();
     const g = PEQUENOS_GRUPOS.find(x => x.num === meuGrupo.grupoNum);
     if (!g) return;
-    const eu = g.participantes.find(p => p.nome === ST.userName);
+    const eu = findMeuParticipante(g);
     if (!eu) return;
     eu.progresso = {
       ...(eu.progresso || {}),
@@ -7266,12 +7276,25 @@ async function aceitarConvite(inviteId, dadosPessoa) {
     const wa = '55' + String((dadosPessoa && dadosPessoa.wa) || '').replace(/\D/g, '');
     if (!g.participantes) g.participantes = [];
     let p = g.participantes.find(x => x.memberId === memberId);
+    let recuperado = false;
     if (!p) {
-      p = { nome, wa, tipo: funcaoParaTipo(inv.funcao),
-            papel: (inv.funcao === 'tutor' || inv.funcao === 'coordenador') ? inv.funcao : null,
-            departamento: (dadosPessoa && dadosPessoa.departamento) || '',
-            dataInscricao: new Date().toLocaleDateString('pt-BR'), ts: agora, memberId };
-      g.participantes.push(p);
+      // IDENT-01: antes de criar um participante novo, verifica se já existe um cadastro com o
+      // mesmo nome + WhatsApp (aparelho novo aceitando convite de quem já é membro) — recupera
+      // em vez de duplicar.
+      p = buscarCadastroExistente(g, nome, wa);
+      if (p) {
+        recuperado = true;
+        p.memberId = memberId;
+        if (nome) p.nome = nome;
+        p.tipo = funcaoParaTipo(inv.funcao);
+        p.papel = (inv.funcao === 'tutor' || inv.funcao === 'coordenador') ? inv.funcao : p.papel;
+      } else {
+        p = { nome, wa, tipo: funcaoParaTipo(inv.funcao),
+              papel: (inv.funcao === 'tutor' || inv.funcao === 'coordenador') ? inv.funcao : null,
+              departamento: (dadosPessoa && dadosPessoa.departamento) || '',
+              dataInscricao: new Date().toLocaleDateString('pt-BR'), ts: agora, memberId };
+        g.participantes.push(p);
+      }
     } else {
       if (nome) p.nome = nome;
       p.tipo = funcaoParaTipo(inv.funcao);
@@ -7284,6 +7307,7 @@ async function aceitarConvite(inviteId, dadosPessoa) {
     const convitesNovos = podarConvites(mergeConvites(convites, [invUsado]));
     const vinculo = { grupoNum: g.num, grupoNome: g.nome, nome: p.nome, wa: p.wa, tipo: p.tipo,
       papel: p.papel, departamento: p.departamento || '', dataInscricao: p.dataInscricao, ts: p.ts, memberId };
+    const progressoRecuperado = recuperado ? (p.progresso || {}) : null;
 
     return {
       dados, convites: convitesNovos,
@@ -7292,9 +7316,17 @@ async function aceitarConvite(inviteId, dadosPessoa) {
         saveConvitesLocal(convitesNovos);
         upsertVinculo(vinculo);
         setGrupoAberto(g.num);
+        if (progressoRecuperado) {
+          // IDENT-01: restaura só o que é sincronizado (XP, streak, estudos concluídos
+          // reconstruído) — diário e lista exata de missões não são recuperáveis.
+          ST.xp = progressoRecuperado.xp || 0;
+          ST.streak = progressoRecuperado.streak || 0;
+          ST.done = Array.from({ length: progressoRecuperado.estudosConcluidos || 0 }, (_, i) => i);
+          save(ST);
+        }
         try { localStorage.setItem(GRUPOS_KEY, JSON.stringify(dados)); } catch(e) {}
       },
-      info: { invite: invUsado, grupoNum: g.num, funcao: inv.funcao },
+      info: { invite: invUsado, grupoNum: g.num, funcao: inv.funcao, recuperado },
     };
   });
 }
@@ -7397,7 +7429,14 @@ async function renderTelaConvite(inviteId) {
       </div>
     </div>
     <div class="welcome-step-card">
-      <div class="welcome-step-hdr"><div class="welcome-step-num">2</div><div class="welcome-step-title">Sua função</div></div>
+      <div class="welcome-step-hdr"><div class="welcome-step-num">2</div><div class="welcome-step-title">Seu WhatsApp</div></div>
+      <div class="welcome-step-body">
+        <input id="conv-wa" type="tel" maxlength="20" value="${sanitize((inv.paraWa || '').replace(/^55/, ''))}" placeholder="21 99999-0000"
+          style="width:100%;border:0.5px solid rgba(255,255,255,0.15);border-radius:var(--radius-sm);padding:.7rem .85rem;font-size:17px;font-family:var(--ff-body);background:rgba(255,255,255,0.07);color:#fff;outline:none;box-sizing:border-box">
+      </div>
+    </div>
+    <div class="welcome-step-card">
+      <div class="welcome-step-hdr"><div class="welcome-step-num">3</div><div class="welcome-step-title">Sua função</div></div>
       <div class="welcome-step-body">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(14,123,108,0.14);border:0.5px solid rgba(14,123,108,0.5);border-radius:var(--radius-sm);padding:.7rem .85rem">
           <span style="font-size:16px;color:#7FE0C4;font-weight:600;font-family:var(--ff-body)">${rotulo}</span>
@@ -7406,7 +7445,7 @@ async function renderTelaConvite(inviteId) {
       </div>
     </div>
     <div class="welcome-step-card">
-      <div class="welcome-step-hdr"><div class="welcome-step-num">3</div><div class="welcome-step-title">Você está entrando no Pequeno Grupo</div></div>
+      <div class="welcome-step-hdr"><div class="welcome-step-num">4</div><div class="welcome-step-title">Você está entrando no Pequeno Grupo</div></div>
       <div class="welcome-step-body">
         <div style="font-size:12px;letter-spacing:1px;color:rgba(255,255,255,0.5);text-transform:uppercase;font-family:var(--ff-body)">PG ${String(inv.grupoNum).padStart(3, '0')}</div>
         <div style="font-size:18px;color:#fff;font-weight:600;font-family:var(--ff-body)">${sanitize(inv.grupoNome || ('Grupo ' + inv.grupoNum))}</div>
@@ -7423,8 +7462,11 @@ async function renderTelaConvite(inviteId) {
 async function confirmarEntradaConvite(inviteId) {
   const nomeInput = document.getElementById('conv-nome');
   const nome = nomeInput ? nomeInput.value.trim() : '';
+  const waInput = document.getElementById('conv-wa');
+  const wa = waInput ? waInput.value.replace(/\D/g, '') : '';
   const erro = document.getElementById('conv-erro');
   if (!nome) { if (erro) erro.textContent = 'Por favor, informe seu nome.'; return; }
+  if (!wa || wa.length < 10) { if (erro) erro.textContent = 'Informe um WhatsApp válido com DDD.'; return; }
   if (erro) erro.textContent = '';
 
   ST.userName = nome; save(ST);
@@ -7445,11 +7487,19 @@ async function confirmarEntradaConvite(inviteId) {
   const btn = document.getElementById('conv-entrar-btn');
   if (btn) { btn.disabled = true; btn.style.opacity = '0.7'; btn.textContent = 'Entrando…'; }
 
-  const res = await aceitarConvite(inviteId, { nome, wa: inv && inv.paraWa });
+  // IDENT-01: o WhatsApp usado como prova de identidade é sempre o que a própria pessoa
+  // digitou aqui — nunca o "WhatsApp do convidado" (opcional, preenchido por quem convida).
+  const res = await aceitarConvite(inviteId, { nome, wa });
   if (res.ok) {
     window.history.replaceState({}, '', window.location.pathname);
     ST.welcomeDone = true; ST.grupoNum = res.grupoNum; save(ST);
-    showScreen('home'); renderHome(); renderCompanionFab(); setTimeout(initGrupos, 100);
+    if (res.recuperado) {
+      renderIdentidadeRecuperadaModal(() => {
+        showScreen('home'); renderHome(); renderCompanionFab(); setTimeout(initGrupos, 100);
+      });
+    } else {
+      showScreen('home'); renderHome(); renderCompanionFab(); setTimeout(initGrupos, 100);
+    }
   } else {
     document.getElementById('convite-body').innerHTML = telaConviteMensagem(res.motivo);
   }
@@ -8375,6 +8425,18 @@ function confirmarInscricao(grupoNum) {
   if (!wa || wa.length < 10) { mostrarErroInsc('Informe um WhatsApp pessoal válido com DDD.'); return; }
   if (tipoSelecionado === 'colaborador' && !dept) { mostrarErroInsc('Informe o departamento onde você trabalha.'); return; }
   if (g.participantes && g.participantes.some(p => p.nome.trim().toLowerCase() === nome.toLowerCase())) {
+    // IDENT-01: antes de bloquear, verifica se é a própria pessoa recuperando identidade
+    // num aparelho novo (nome + WhatsApp precisam bater — nunca só o nome).
+    const existente = buscarCadastroExistente(g, nome, wa);
+    if (existente) {
+      renderRecuperarIdentidadeModal(g.nome || ('Grupo ' + grupoNum), () => {
+        recuperarIdentidade(g, existente);
+        renderIdentidadeRecuperadaModal(() => {
+          showScreen('home'); renderHome(); renderCompanionFab(); setTimeout(initGrupos, 100);
+        });
+      });
+      return;
+    }
     mostrarErroInsc('Este nome já está inscrito neste grupo. Verifique se você já se cadastrou antes.'); return;
   }
 
@@ -8619,6 +8681,87 @@ function getMeuGrupoAtivo(nome) {
     }
   }
   return { existe: false };
+}
+
+// ── IDENT-01: recuperação de identidade em aparelho novo ──────────────────
+// Localiza um cadastro existente por Nome + WhatsApp — NUNCA só um dos dois.
+function buscarCadastroExistente(g, nome, waDigitado) {
+  if (!g || !nome || !waDigitado) return null;
+  const nomeNorm = nome.trim().toLowerCase();
+  const waNorm = String(waDigitado).replace(/\D/g, '');
+  if (!waNorm) return null;
+  return (g.participantes || []).find(p => {
+    const pNome = (p.nome || '').trim().toLowerCase();
+    const pWa = String(p.wa || '').replace(/\D/g, '');
+    if (pNome !== nomeNorm || !pWa) return false;
+    return pWa === waNorm || pWa.endsWith(waNorm) || waNorm.endsWith(pWa);
+  }) || null;
+}
+
+// Recupera identidade num aparelho novo: só troca o memberId, NUNCA cria um registro novo.
+// Papel e Companheiro de Jornada já estão no mesmo registro (preservados automaticamente).
+// Restaura localmente apenas o que é sincronizado: XP, streak, estudos concluídos (reconstruído,
+// já que a jornada é sequencial). Diário e a lista exata de missões concluídas NÃO são
+// recuperáveis (ARCH-01 / limitação do agregado de missões) — isso é comunicado na tela de sucesso.
+function recuperarIdentidade(g, p) {
+  p.memberId = getMyMemberId();
+  const prog = p.progresso || {};
+  ST.xp = prog.xp || 0;
+  ST.streak = prog.streak || 0;
+  ST.done = Array.from({ length: prog.estudosConcluidos || 0 }, (_, i) => i);
+  ST.userName = p.nome;
+  ST.grupoNum = g.num;
+  ST.grupoNome = g.nome;
+  ST.welcomeDone = true;
+  save(ST);
+  saveGrupos();
+  saveMeuGrupo({ grupoNum: g.num, grupoNome: g.nome, nome: p.nome, wa: p.wa, tipo: p.tipo, papel: p.papel, ts: p.ts });
+}
+
+function renderRecuperarIdentidadeModal(nomeGrupo, aoConfirmar) {
+  const existente = document.getElementById('recuperar-identidade-modal');
+  if (existente) existente.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'recuperar-identidade-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1.5rem';
+  overlay.innerHTML = `
+    <div style="background:#0D2137;border-radius:var(--radius);padding:1.5rem;max-width:360px;width:100%;text-align:center;font-family:var(--ff-body)">
+      <div style="font-size:16px;color:#fff;line-height:1.6;margin-bottom:.75rem">
+        Encontramos um cadastro com esse nome e WhatsApp no Pequeno Grupo <strong>${sanitize(nomeGrupo)}</strong>.<br>
+        Deseja recuperá-lo neste aparelho?
+      </div>
+      <div style="font-size:13px;color:rgba(255,255,255,.55);margin-bottom:1.25rem">
+        Seu Diário Privado permanece somente no aparelho anterior e não pode ser recuperado automaticamente.
+      </div>
+      <div style="display:flex;gap:.6rem">
+        <button id="recuperar-cancelar" style="flex:1;background:transparent;border:0.5px solid rgba(255,255,255,.3);color:#fff;border-radius:var(--radius-sm);padding:.7rem;cursor:pointer;font-family:var(--ff-body)">❌ Cancelar</button>
+        <button id="recuperar-confirmar" style="flex:1;background:var(--teal);border:none;color:#fff;border-radius:var(--radius-sm);padding:.7rem;cursor:pointer;font-family:var(--ff-body)">✔ Sim, recuperar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('recuperar-cancelar').onclick = () => overlay.remove();
+  document.getElementById('recuperar-confirmar').onclick = () => { overlay.remove(); aoConfirmar(); };
+}
+
+function renderIdentidadeRecuperadaModal(aoContinuar) {
+  const existente = document.getElementById('ident-recuperada-modal');
+  if (existente) existente.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'ident-recuperada-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1.5rem';
+  overlay.innerHTML = `
+    <div style="background:#0D2137;border-radius:var(--radius);padding:1.5rem;max-width:360px;width:100%;text-align:center;font-family:var(--ff-body)">
+      <div style="font-size:40px;margin-bottom:.5rem">✅</div>
+      <div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:.75rem">Cadastro recuperado com sucesso!</div>
+      <div style="font-size:15px;color:rgba(255,255,255,.8);line-height:1.6;margin-bottom:1.25rem">
+        Seu progresso foi restaurado neste aparelho.<br><br>
+        O <strong>Diário Privado</strong> e o histórico visual de missões, mantidos apenas no
+        aparelho anterior, não podem ser recuperados automaticamente.
+      </div>
+      <button id="ident-recuperada-continuar" style="width:100%;background:var(--teal);border:none;color:#fff;border-radius:var(--radius-sm);padding:.8rem;font-size:16px;font-weight:600;cursor:pointer;font-family:var(--ff-body)">Continuar</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('ident-recuperada-continuar').onclick = () => { overlay.remove(); aoContinuar(); };
 }
 
 // Modal de confirmação explícita — nunca migra sem o usuário confirmar.
@@ -8867,7 +9010,7 @@ function bumpPgProgress(tipo, qty = 1) {
   if (tipo === 'estudos' || tipo === 'oracoes' || tipo === 'bondades') {
     loadGrupos();
     const gMe = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
-    const eu = gMe && gMe.participantes ? gMe.participantes.find(p => p.nome === (meuGrupo.nome || (typeof ST !== 'undefined' && ST.userName))) : null;
+    const eu = gMe ? findMeuParticipante(gMe) : null;
     if (eu) {
       const wk = getISOWeekPg();
       const c = (eu.progresso && eu.progresso.contrib && eu.progresso.contrib.weekKey === wk)
@@ -9023,19 +9166,38 @@ const PG_CAMPANHAS = [
 
 const PG_CAMP_KEY = 'jdpg_campanhas_v1';
 
+// DB-04: campanha é dado do GRUPO, não do aparelho — mora em g.campanhas, sincronizado
+// pelo mesmo caminho de saveGrupos()/Firebase já usado pelo resto dos dados do grupo.
 function loadCampanhasProgress(grupoNum) {
-  try {
-    const all = JSON.parse(localStorage.getItem(PG_CAMP_KEY) || '{}');
-    return all[grupoNum] || {};
-  } catch { return {}; }
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return {};
+  if (!g.campanhas) {
+    // Migração única: se havia progresso salvo só localmente (versão anterior), vira a base
+    // do grupo agora. Depois disso, o localStorage nunca mais é lido — só o grupo é a fonte.
+    let legado = null;
+    try {
+      const all = JSON.parse(localStorage.getItem(PG_CAMP_KEY) || '{}');
+      legado = all[grupoNum] || null;
+    } catch { legado = null; }
+    g.campanhas = legado || {};
+    saveGrupos();
+    if (legado) {
+      try {
+        const all = JSON.parse(localStorage.getItem(PG_CAMP_KEY) || '{}');
+        delete all[grupoNum];
+        if (Object.keys(all).length) localStorage.setItem(PG_CAMP_KEY, JSON.stringify(all));
+        else localStorage.removeItem(PG_CAMP_KEY);
+      } catch(e) { console.warn('limpeza PG_CAMP_KEY:', e); }
+    }
+  }
+  return g.campanhas;
 }
 
 function saveCampanhasProgress(grupoNum, data) {
-  try {
-    const all = JSON.parse(localStorage.getItem(PG_CAMP_KEY) || '{}');
-    all[grupoNum] = data;
-    localStorage.setItem(PG_CAMP_KEY, JSON.stringify(all));
-  } catch(e) { console.warn('saveCampanhasProgress:', e); }
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return;
+  g.campanhas = data;
+  saveGrupos();
 }
 
 // Retorna apenas as campanhas cujo mês de início já chegou
