@@ -7111,90 +7111,178 @@ function estaNaAllowlistTutores({ nome, wa }) {
 
 function funcaoParaTipo(funcao) { return funcao === 'tutor' || funcao === 'coordenador' ? funcao : 'colaborador'; }
 
-// GERAR: confere a autoridade do usuário atual ANTES de criar o convite.
-//   funcao 'coordenador' → só Tutor do grupo pode convidar
-//   funcao 'colaborador' → só Coordenador do grupo pode convidar
-//   funcao 'tutor'       → só quem está na allowlist `tutores`
-function gerarConvite({ tipo, grupoNum, funcao, paraWa }) {
-  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
-  if (!g) return { ok: false, motivo: 'grupo_inexistente' };
-  const eu = loadMeuGrupo() || {};
+// ── ETAPA 2 (sub-commit 2.3): sincronização e concorrência ────────────────
 
-  if (funcao === 'coordenador') {
-    if (getMinhaFuncaoNoGrupo(grupoNum) !== 'tutor') return { ok: false, motivo: 'sem_autoridade' };
-    tipo = tipo || 'tutor->coord';
-  } else if (funcao === 'colaborador') {
-    if (getMinhaFuncaoNoGrupo(grupoNum) !== 'coordenador') return { ok: false, motivo: 'sem_autoridade' };
-    tipo = tipo || 'coord->colab';
-  } else if (funcao === 'tutor') {
-    if (!estaNaAllowlistTutores({ nome: eu.nome || ST.userName, wa: eu.wa })) return { ok: false, motivo: 'sem_autoridade' };
-    tipo = tipo || 'tutor';
-  } else {
-    return { ok: false, motivo: 'funcao_invalida' };
-  }
-
-  const inv = criarConviteObj({ tipo, funcao, grupoNum, grupoNome: g.nome,
-    deId: getMyMemberId(), deNome: eu.nome || ST.userName || '', paraWa });
-  const list = loadConvites(); list.push(inv); saveConvitesLocal(list);
-  return { ok: true, invite: inv, inviteId: inv.inviteId, link: APP_URL + '?conv=' + inv.inviteId };
+// Une convites remotos e locais por inviteId (mais recente vence, se transição válida).
+function mergeConvites(remoteList, localList) {
+  const map = {};
+  (remoteList || []).forEach(c => { if (c && c.inviteId) map[c.inviteId] = c; });
+  (localList || []).forEach(c => {
+    if (!c || !c.inviteId) return;
+    map[c.inviteId] = map[c.inviteId] ? resolverConvite(map[c.inviteId], c) : c;
+  });
+  return Object.values(map);
 }
 
-// ACEITAR: pipeline de validação (o convite informa, a base confirma).
-//   inviteId existe → versão → status pendente → não expirado →
-//   autoridade do emissor AINDA válida → aceita (marca utilizado).
-function aceitarConvite(inviteId, dadosPessoa) {
-  if (!inviteId) return { ok: false, motivo: 'inexistente' };
-  expirarConvitesVencidos();
-  const list = loadConvites();
-  const inv = list.find(c => c.inviteId === inviteId);
+// Poda: remove terminais (utilizado/cancelado/expirado) com mais de 30 dias.
+function podarConvites(list) {
+  const agora = Date.now();
+  return (list || []).filter(c => c.status === 'pendente' || !(c.updatedAt && agora - c.updatedAt > CONVITE_PODA_MS));
+}
+
+// Validação PURA para aceite (não muta nada). O convite informa, a base confirma.
+function validarConviteParaAceite(inv, g, dadosPessoa) {
   if (!inv) return { ok: false, motivo: 'inexistente' };
   if ((inv.versaoConvite || 1) !== VERSAO_CONVITE) return { ok: false, motivo: 'versao_incompativel' };
-  if (inv.status !== 'pendente') return { ok: false, motivo: inv.status };  // utilizado | cancelado | expirado
-
-  const g = PEQUENOS_GRUPOS.find(x => x.num === inv.grupoNum);
+  if (inv.status !== 'pendente') return { ok: false, motivo: inv.status };            // utilizado|cancelado|expirado
+  if (inv.expiraEm && Date.now() > inv.expiraEm) return { ok: false, motivo: 'expirado' };
   if (!g) return { ok: false, motivo: 'grupo_inexistente' };
-
-  // Autoridade do EMISSOR confirmada contra o estado atual da base
   if (inv.funcao === 'tutor') {
     const eu = loadMeuGrupo() || {};
-    if (!estaNaAllowlistTutores({ nome: (dadosPessoa && dadosPessoa.nome) || eu.nome || ST.userName, wa: (dadosPessoa && dadosPessoa.wa) || eu.wa }))
-      return { ok: false, motivo: 'nao_autorizado_tutor' };
+    const nome = (dadosPessoa && dadosPessoa.nome) || eu.nome || ST.userName;
+    const wa   = (dadosPessoa && dadosPessoa.wa)   || eu.wa;
+    if (!estaNaAllowlistTutores({ nome, wa })) return { ok: false, motivo: 'nao_autorizado_tutor' };
   } else {
     const emissor = (g.participantes || []).find(p => p.memberId === inv.deId);
     const papelEmissor = emissor ? (emissor.papel || emissor.tipo) : null;
     const exigido = inv.funcao === 'coordenador' ? 'tutor' : 'coordenador';
     if (papelEmissor !== exigido) return { ok: false, motivo: 'emissor_sem_papel' };
   }
+  return { ok: true };
+}
 
-  // ── ACEITA ────────────────────────────────────────────────────────────
-  const memberId = getMyMemberId();
-  const agora = Date.now();
-  const nome = (dadosPessoa && dadosPessoa.nome) ? String(dadosPessoa.nome).trim() : (loadMeuGrupo() || {}).nome || ST.userName || '';
-  const wa = '55' + String((dadosPessoa && dadosPessoa.wa) || '').replace(/\D/g, '');
-  let p = (g.participantes || []).find(x => x.memberId === memberId);
-  if (!p) {
-    p = { nome, wa, tipo: funcaoParaTipo(inv.funcao),
-          papel: (inv.funcao === 'tutor' || inv.funcao === 'coordenador') ? inv.funcao : null,
-          departamento: (dadosPessoa && dadosPessoa.departamento) || '',
-          dataInscricao: new Date().toLocaleDateString('pt-BR'), ts: agora, memberId };
-    if (!g.participantes) g.participantes = [];
-    g.participantes.push(p);
-  } else {
-    if (nome) p.nome = nome;
-    p.tipo = funcaoParaTipo(inv.funcao);
-    p.papel = (inv.funcao === 'tutor' || inv.funcao === 'coordenador') ? inv.funcao : p.papel;
+// Laço genérico de escrita de convites, seguro à concorrência. `construir(remote)`
+// roda EM MEMÓRIA (não muta estado global) e devolve:
+//   { rejeitar:{...} }                        → não grava; retorna a rejeição
+//   { dados, convites, aplicarLocal, info }   → grava com pré-condição; SÓ aplica no local se gravar
+// Ajustes do Capelão: (1) nada muda no estado local antes da confirmação;
+// (2) FAILED_PRECONDITION é resultado NORMAL da concorrência (silencioso, repete);
+// (3) cada volta relê o remoto imediatamente antes de gravar (snapshot sempre fresco).
+async function commitConviteChange(construir) {
+  const cfg = loadFbConfig();
+  if (!cfg) return { ok: false, motivo: 'sem_config' };
+  for (let tentativa = 1; tentativa <= 4; tentativa++) {
+    let remote;
+    try { remote = await fbReadDoc(cfg); }
+    catch { return { ok: false, motivo: 'sem_conexao' }; }
+    const built = construir(remote || {});
+    if (built.rejeitar) return built.rejeitar;
+    let w;
+    try {
+      w = await fbWriteGrupos(cfg, built.dados, TUTORS.length ? TUTORS : undefined,
+                              remote ? remote.updateTime : null, built.convites);
+    } catch { return { ok: false, motivo: 'sem_conexao' }; }
+    if (w.ok) {
+      fbLastKnownTs = w.ts;
+      built.aplicarLocal();                       // ajuste #1: só agora toca o estado local
+      return Object.assign({ ok: true }, built.info || {});
+    }
+    if (w.sizeExceeded) return { ok: false, motivo: 'tamanho' };
+    if (w.preconditionFailed) { await sleep(80 + Math.random() * 120); continue; }  // ajuste #2: esperado, silencioso
+    return { ok: false, motivo: 'erro' };
   }
-  if (inv.funcao === 'coordenador' && !g.coordenador) g.coordenador = p.nome;
-  if (inv.funcao === 'tutor' && !g.tutor) g.tutor = p.nome;
-  saveGruposLocal();  // escrita na nuvem (com trava C1) entra no 2.3
+  return { ok: false, motivo: 'conflito' };        // esgotou tentativas — quase sempre "já utilizado"
+}
 
-  upsertVinculo({ grupoNum: g.num, grupoNome: g.nome, nome: p.nome, wa: p.wa, tipo: p.tipo,
-    papel: p.papel, departamento: p.departamento || '', dataInscricao: p.dataInscricao, ts: p.ts, memberId });
-  setGrupoAberto(g.num);
+// GERAR: confere autoridade → grava o convite na base (via laço seguro).
+//   funcao 'coordenador' → só Tutor;  'colaborador' → só Coordenador;  'tutor' → allowlist.
+async function gerarConvite({ tipo, grupoNum, funcao, paraWa }) {
+  const gLocal = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!gLocal) return { ok: false, motivo: 'grupo_inexistente' };
+  const eu = loadMeuGrupo() || {};
 
-  inv.status = 'utilizado'; inv.usadoPor = memberId; inv.usadoEm = agora; inv.updatedAt = agora;
-  saveConvitesLocal(list);
-  return { ok: true, invite: inv, grupoNum: g.num, funcao: inv.funcao };
+  if (funcao === 'coordenador')      { if (getMinhaFuncaoNoGrupo(grupoNum) !== 'tutor')       return { ok: false, motivo: 'sem_autoridade' }; tipo = tipo || 'tutor->coord'; }
+  else if (funcao === 'colaborador') { if (getMinhaFuncaoNoGrupo(grupoNum) !== 'coordenador') return { ok: false, motivo: 'sem_autoridade' }; tipo = tipo || 'coord->colab'; }
+  else if (funcao === 'tutor')       { if (!estaNaAllowlistTutores({ nome: eu.nome || ST.userName, wa: eu.wa })) return { ok: false, motivo: 'sem_autoridade' }; tipo = tipo || 'tutor'; }
+  else return { ok: false, motivo: 'funcao_invalida' };
+
+  const inv = criarConviteObj({ tipo, funcao, grupoNum, grupoNome: gLocal.nome,
+    deId: getMyMemberId(), deNome: eu.nome || ST.userName || '', paraWa });
+
+  return await commitConviteChange((remote) => {
+    const convitesNovos = podarConvites(mergeConvites(mergeConvites(remote.convites, loadConvites()), [inv]));
+    return {
+      dados: remote.dados || PEQUENOS_GRUPOS,          // não altera grupos; devolve o remoto fresco
+      convites: convitesNovos,
+      aplicarLocal: () => saveConvitesLocal(convitesNovos),
+      info: { invite: inv, inviteId: inv.inviteId, link: APP_URL + '?conv=' + inv.inviteId },
+    };
+  });
+}
+
+// ACEITAR: seguro à corrida. Monta a alteração EM MEMÓRIA contra o remoto fresco,
+// grava com pré-condição e SÓ ENTÃO aplica no local (ajuste #1).
+async function aceitarConvite(inviteId, dadosPessoa) {
+  if (!inviteId) return { ok: false, motivo: 'inexistente' };
+  const memberId = getMyMemberId();
+
+  return await commitConviteChange((remote) => {
+    const convites = mergeConvites(remote.convites, loadConvites());
+    const inv = convites.find(c => c.inviteId === inviteId);
+    const gRem = (remote.dados || []).find(x => x.num === (inv && inv.grupoNum));
+
+    const val = validarConviteParaAceite(inv, gRem, dadosPessoa);
+    if (!val.ok) return { rejeitar: val };
+
+    // Alteração montada em cópia do remoto — nada do estado global é tocado aqui.
+    const dados = JSON.parse(JSON.stringify(remote.dados || []));
+    const g = dados.find(x => x.num === inv.grupoNum);
+    const agora = Date.now();
+    const nome = (dadosPessoa && dadosPessoa.nome) ? String(dadosPessoa.nome).trim() : (loadMeuGrupo() || {}).nome || ST.userName || '';
+    const wa = '55' + String((dadosPessoa && dadosPessoa.wa) || '').replace(/\D/g, '');
+    if (!g.participantes) g.participantes = [];
+    let p = g.participantes.find(x => x.memberId === memberId);
+    if (!p) {
+      p = { nome, wa, tipo: funcaoParaTipo(inv.funcao),
+            papel: (inv.funcao === 'tutor' || inv.funcao === 'coordenador') ? inv.funcao : null,
+            departamento: (dadosPessoa && dadosPessoa.departamento) || '',
+            dataInscricao: new Date().toLocaleDateString('pt-BR'), ts: agora, memberId };
+      g.participantes.push(p);
+    } else {
+      if (nome) p.nome = nome;
+      p.tipo = funcaoParaTipo(inv.funcao);
+      p.papel = (inv.funcao === 'tutor' || inv.funcao === 'coordenador') ? inv.funcao : p.papel;
+    }
+    if (inv.funcao === 'coordenador' && !g.coordenador) g.coordenador = p.nome;
+    if (inv.funcao === 'tutor' && !g.tutor) g.tutor = p.nome;
+
+    const invUsado = Object.assign({}, inv, { status: 'utilizado', usadoPor: memberId, usadoEm: agora, updatedAt: agora });
+    const convitesNovos = podarConvites(mergeConvites(convites, [invUsado]));
+    const vinculo = { grupoNum: g.num, grupoNome: g.nome, nome: p.nome, wa: p.wa, tipo: p.tipo,
+      papel: p.papel, departamento: p.departamento || '', dataInscricao: p.dataInscricao, ts: p.ts, memberId };
+
+    return {
+      dados, convites: convitesNovos,
+      aplicarLocal: () => {
+        applyGruposData(dados);
+        saveConvitesLocal(convitesNovos);
+        upsertVinculo(vinculo);
+        setGrupoAberto(g.num);
+        try { localStorage.setItem(GRUPOS_KEY, JSON.stringify(dados)); } catch(e) {}
+      },
+      info: { invite: invUsado, grupoNum: g.num, funcao: inv.funcao },
+    };
+  });
+}
+
+// REVOGAR: só o emissor cancela; convite pendente vira 'cancelado' na hora.
+async function revogarConvite(inviteId) {
+  const memberId = getMyMemberId();
+  return await commitConviteChange((remote) => {
+    const convites = mergeConvites(remote.convites, loadConvites());
+    const inv = convites.find(c => c.inviteId === inviteId);
+    if (!inv) return { rejeitar: { ok: false, motivo: 'inexistente' } };
+    if (inv.status !== 'pendente') return { rejeitar: { ok: false, motivo: inv.status } };
+    if (inv.deId && inv.deId !== memberId) return { rejeitar: { ok: false, motivo: 'sem_autoridade' } };
+    const invCanc = Object.assign({}, inv, { status: 'cancelado', updatedAt: Date.now() });
+    const convitesNovos = podarConvites(mergeConvites(convites, [invCanc]));
+    return {
+      dados: remote.dados || PEQUENOS_GRUPOS,
+      convites: convitesNovos,
+      aplicarLocal: () => saveConvitesLocal(convitesNovos),
+      info: { invite: invCanc },
+    };
+  });
 }
 
 // ── Firebase Firestore Sync ──────────────────────────────────────────────
