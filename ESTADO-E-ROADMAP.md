@@ -4,6 +4,55 @@
 > para o assistente ao recomeçar — a "memória" do assistente **não viaja entre máquinas**;
 > só este arquivo (via GitHub) viaja. **Nenhuma alteração de código sem aprovação do desenho.**
 
+## 🚨 Incidente de contaminação de produção (2026-07-01) — RESOLVIDO
+
+**O que aconteceu:** durante o checklist de regressão do IDENT-01, um `window.location.reload()`
+no meio de um teste ao vivo derrubou os bloqueios de rede (`fbReadDoc`/`syncFromFirebase`
+mockados só existem em memória da aba) — o app voltou a sincronizar de verdade com o Firebase de
+produção antes que os bloqueios fossem reaplicados, e escreveu dados de teste por cima do
+documento real (`jdpg/grupos`).
+
+**Escopo do dano (confirmado por leitura direta, byte a byte):**
+- Grupo 1 (CAPELANIA, real): nome/tutor/coordenador trocados por dados fictícios + 5
+  participantes fictícios adicionados. Participantes reais e mural (`gratidoes`) preservados o
+  tempo todo.
+- Grupo 2 (teste): nome/tutor trocados por dados fictícios.
+- Campo `tutores` (allowlist dos 4 capelães): **removido inteiramente** (write sem esse campo
+  substitui o documento por completo — comportamento do Firestore, não um bug novo).
+- Grupos 3-50: confirmados intactos (nenhuma alteração).
+
+**Restauração:** snapshot do estado contaminado salvo localmente antes de qualquer nova escrita;
+diff programático confirmou que só os Grupos 1 e 2 mudariam; gravação final protegida por
+`currentDocument.updateTime` (aborta se algo mudar entre a leitura e a escrita). Grupo 1 e 2
+restaurados ao estado exato de antes do incidente; `tutores` reconstruído com os dados fornecidos
+pelo usuário (não estava salvo em nenhum snapshot — perda real, mas recuperada por fonte humana).
+Confirmado por leitura: Grupo 1 = CAPELANIA com os 2 participantes reais + mural intacto; Grupo 2
+= vazio; `tutores` com os 4 capelães; Grupos 3-50 intactos.
+
+**Causa raiz:** ausência de isolamento entre ambiente de teste e produção — não é um bug de
+código, é uma lacuna de processo. **Decisão tomada:** nenhum teste funcional deve rodar contra o
+Firebase de produção daqui para frente; ver regra permanente e plano de ambiente de homologação
+mais abaixo.
+
+**Nota sobre dados sensíveis:** o snapshot bruto da restauração (com nomes/WhatsApp reais) foi
+salvo **só localmente** (`C:\Users\wladimir.souza\Documents\backups-firebase-jdpg\`), não neste
+repositório — este é público, e o snapshot contém PII (WhatsApp dos 4 capelães).
+
+## Regra permanente — isolamento de teste vs. produção
+
+**É terminantemente proibido executar qualquer teste que possa escrever no Firebase de produção.**
+Sempre que houver necessidade de validar fluxos que alterem dados (cadastro, convites, campanhas,
+progresso, mural, companheiro, recuperação de identidade etc.), usar exclusivamente ambiente de
+homologação ou mocks locais com a rede bloqueada (`fbReadDoc`/`syncFromFirebase`/
+`saveGruposToFirebase` sobrescritas). **Nunca recarregar a página (`location.reload()`) durante um
+teste com a rede bloqueada** — o reload apaga os bloqueios (são só JS em memória da aba) e a app
+volta a sincronizar de verdade antes que os bloqueios possam ser reaplicados. Se não for possível
+garantir isolamento absoluto, interromper o teste e pedir autorização antes de prosseguir.
+
+**Próximo passo estrutural (ainda não feito):** criar um ambiente de homologação separado (cópia
+do Firebase de produção, projeto/documento distinto) para que toda validação funcional futura
+aconteça lá, nunca em produção.
+
 ## Natureza do projeto
 App de discipulado (Capelania HAS) para ~50 Pequenos Grupos. **NÃO é Flutter** — é um
 **único `index.html`** (HTML/JS puro, PWA) usando **Firestore via REST** num **único documento
