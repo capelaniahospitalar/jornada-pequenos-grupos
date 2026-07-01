@@ -114,7 +114,18 @@ evidência de corrupção causada pela sincronização.** Os achados abaixo já 
   grupos). Revisitar se o nível de segurança esperado pelo HAS mudar.
 
 ### 🟠🟡 Dívidas técnicas
-- **DB-01** — Colaborador pode pertencer a múltiplos PGs (sem bloqueio em `confirmarInscricao`/`aceitarConvite`)
+- **DB-01 — RESOLVIDO (2026-07-01).** Colaborador/coordenador agora só pertence a 1 PG ativo por
+  vez (tutor continua isento — supervisiona vários grupos por natureza do papel). Nova função
+  `getMeuGrupoAtivo(nome)` detecta vínculo existente; ao tentar entrar em outro PG
+  (`confirmarInscricao`/`confirmarEntradaConvite`), abre `renderTrocaDeGrupoModal` — **nunca migra
+  automaticamente**, só após confirmação explícita ("Sim, trocar de grupo"). `cancelarInscricao`
+  foi refatorada: núcleo de remoção extraído para `removerDoGrupoAtual` (reaproveitado pelo fluxo
+  de troca, sem duplicar lógica). Testado ao vivo: colaborador dispara modal e migra corretamente
+  ao confirmar; nada muda ao cancelar; Tutor comprovadamente isento (multi-grupo); Coordenador
+  comprovadamente sujeito à regra (modal aparece); botão antigo "Cancelar inscrição" sem regressão.
+  **Limpeza de dados de produção associada:** removidas entradas duplicadas de "Wladimir
+  Goncalves"/"Wladimir Gonçalves de Souza" dos Grupos 2, 3, 5 e 6 (mantido só no Grupo 1, real),
+  preparando a base para essa regra.
 - **DB-02** — Sincronização de progresso usa nome exato, não `memberId` (`bumpPgProgress`, `syncProgressoParaFirebase`, `_syncMissaoParaGrupo`)
 - **DB-03** — Progresso só é atribuído ao Grupo Aberto, não a todos os vínculos
 - **DB-04** — Campanhas (Embaixadores) só em `localStorage`, sem sincronização com a nuvem

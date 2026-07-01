@@ -7429,6 +7429,19 @@ async function confirmarEntradaConvite(inviteId) {
 
   ST.userName = nome; save(ST);
   const inv = getConvite(inviteId);
+
+  // DB-01: colaborador/coordenador só pode estar em 1 PG ativo por vez (tutor é isento)
+  if (inv && inv.funcao !== 'tutor') {
+    const atual = getMeuGrupoAtivo(nome);
+    if (atual.existe && atual.grupoNum !== inv.grupoNum) {
+      renderTrocaDeGrupoModal(atual, inv.grupoNome || ('Grupo ' + inv.grupoNum), () => {
+        removerDoGrupoAtual(atual.grupoNum);
+        confirmarEntradaConvite(inviteId);
+      });
+      return;
+    }
+  }
+
   const btn = document.getElementById('conv-entrar-btn');
   if (btn) { btn.disabled = true; btn.style.opacity = '0.7'; btn.textContent = 'Entrando…'; }
 
@@ -8365,6 +8378,18 @@ function confirmarInscricao(grupoNum) {
     mostrarErroInsc('Este nome já está inscrito neste grupo. Verifique se você já se cadastrou antes.'); return;
   }
 
+  // DB-01: colaborador/coordenador só pode estar em 1 PG ativo por vez (tutor é isento)
+  if (tipoSelecionado !== 'tutor') {
+    const atual = getMeuGrupoAtivo(nome);
+    if (atual.existe && atual.grupoNum !== grupoNum) {
+      renderTrocaDeGrupoModal(atual, g.nome || ('Grupo ' + grupoNum), () => {
+        removerDoGrupoAtual(atual.grupoNum);
+        confirmarInscricao(grupoNum);
+      });
+      return;
+    }
+  }
+
   // Validações de criação do grupo (só se for o primeiro a entrar)
   let grupoNomeInput = null, grupoDiaInput = null, grupoHoraInput = null;
   if (precisaNome) {
@@ -8558,8 +8583,9 @@ function confirmarTrocaReuniao(grupoNum) {
   openInscricao(grupoNum);
 }
 
-function cancelarInscricao(grupoNum) {
-  if (!confirm('Deseja cancelar sua participação neste grupo?')) return;
+// Núcleo reutilizável: remove a pessoa do grupo atual (dados só — sem UI, sem confirm, sem navegação).
+// Usado tanto pelo botão "Cancelar inscrição" quanto pelo fluxo de troca de grupo (DB-01).
+function removerDoGrupoAtual(grupoNum) {
   const meuGrupo = loadMeuGrupo();
   localStorage.removeItem(MEU_GRUPO_KEY);
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
@@ -8570,7 +8596,52 @@ function cancelarInscricao(grupoNum) {
     if (meuGrupo.papel === 'coordenador') g.coordenador = null;
     saveGrupos();
   }
+}
+
+function cancelarInscricao(grupoNum) {
+  if (!confirm('Deseja cancelar sua participação neste grupo?')) return;
+  removerDoGrupoAtual(grupoNum);
   openInscricao(grupoNum);
+}
+
+// ── DB-01: um colaborador/coordenador só pertence a 1 PG ativo por vez ────
+// Tutor é o único papel isento (supervisiona vários grupos, não "participa" de vários).
+function getMeuGrupoAtivo(nome) {
+  if (!nome) return { existe: false };
+  const meuId = getMyMemberId();
+  const nomeNorm = nome.trim().toLowerCase();
+  for (const g of PEQUENOS_GRUPOS) {
+    const p = (g.participantes || []).find(x =>
+      (x.memberId && meuId && x.memberId === meuId) ||
+      (x.nome && x.nome.trim().toLowerCase() === nomeNorm));
+    if (p && p.tipo !== 'tutor') {
+      return { existe: true, grupoNum: g.num, nomeGrupo: g.nome || ('Grupo ' + g.num), papel: p.tipo };
+    }
+  }
+  return { existe: false };
+}
+
+// Modal de confirmação explícita — nunca migra sem o usuário confirmar.
+function renderTrocaDeGrupoModal(grupoAtual, nomeGrupoNovo, aoConfirmar) {
+  const existente = document.getElementById('troca-grupo-modal');
+  if (existente) existente.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'troca-grupo-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1.5rem';
+  overlay.innerHTML = `
+    <div style="background:#0D2137;border-radius:var(--radius);padding:1.5rem;max-width:360px;width:100%;text-align:center;font-family:var(--ff-body)">
+      <div style="font-size:16px;color:#fff;line-height:1.6;margin-bottom:1.25rem">
+        Você já participa do Pequeno Grupo <strong>${sanitize(grupoAtual.nomeGrupo)}</strong> como ${sanitize(grupoAtual.papel === 'coordenador' ? 'coordenador(a)' : 'colaborador(a)')}.<br>
+        Deseja sair dele e entrar no Pequeno Grupo <strong>${sanitize(nomeGrupoNovo)}</strong>?
+      </div>
+      <div style="display:flex;gap:.6rem">
+        <button id="troca-grupo-cancelar" style="flex:1;background:transparent;border:0.5px solid rgba(255,255,255,.3);color:#fff;border-radius:var(--radius-sm);padding:.7rem;cursor:pointer;font-family:var(--ff-body)">❌ Cancelar</button>
+        <button id="troca-grupo-confirmar" style="flex:1;background:var(--teal);border:none;color:#fff;border-radius:var(--radius-sm);padding:.7rem;cursor:pointer;font-family:var(--ff-body)">✔ Sim, trocar de grupo</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('troca-grupo-cancelar').onclick = () => overlay.remove();
+  document.getElementById('troca-grupo-confirmar').onclick = () => { overlay.remove(); aoConfirmar(); };
 }
 
 // ── Chip de grupo na home ──────────────────────────────────────────────

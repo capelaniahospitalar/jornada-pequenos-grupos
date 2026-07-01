@@ -25,8 +25,10 @@
 
 1. **Um colaborador participa de apenas um Pequeno Grupo por vez.**
    Pertencimento é exclusivo — não é possível estar inscrito em dois PGs simultaneamente como
-   colaborador comum.
-   *Status na implementação: **não garantido hoje** — ver `DB-01` no `ESTADO-E-ROADMAP.md`.*
+   colaborador comum. **Coordenador entra na mesma regra** (é um colaborador com atribuição
+   extra dentro de 1 grupo só, não um papel de supervisão multi-grupo).
+   *Status: **implementado** (`DB-01`, 2026-07-01). Troca de grupo exige confirmação explícita
+   do usuário — nunca migra automaticamente. Ver `ESTADO-E-ROADMAP.md` para detalhes técnicos.*
 
 2. **Um coordenador administra apenas o seu próprio PG.**
    Não tem visão de administração sobre outros grupos.
