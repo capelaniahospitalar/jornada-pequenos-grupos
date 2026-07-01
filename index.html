@@ -6868,7 +6868,8 @@ function loadGrupos() {
   } catch(e) { console.warn('loadGrupos:', e); }
 }
 
-function saveGrupos() {
+// Persiste os grupos apenas em localStorage (sem tocar na nuvem).
+function saveGruposLocal() {
   try {
     const dadosSalvar = PEQUENOS_GRUPOS.map(g => ({
       num: g.num,
@@ -6882,18 +6883,132 @@ function saveGrupos() {
     }));
     localStorage.setItem(GRUPOS_KEY, JSON.stringify(dadosSalvar));
   } catch(e) { console.warn('saveGrupos localStorage:', e); }
+}
+function saveGrupos() {
+  saveGruposLocal();
   saveGruposToFirebase();
 }
 
-function loadMeuGrupo() {
+// ── Identidade permanente da PESSOA (memberId = UUID) ─────────────────────
+// Representa a PESSOA, não o aparelho: gerado 1x por instalação, guardado
+// localmente e carimbado no registro do participante ao entrar/criar/aceitar.
+// getDeviceId() continua existindo apenas como apoio técnico.
+const MEMBER_ID_KEY = 'jdpg_member_id_v1';
+function getMyMemberId() {
   try {
-    const s = localStorage.getItem(MEU_GRUPO_KEY);
-    return s ? JSON.parse(s) : null;
-  } catch { return null; }
+    let id = localStorage.getItem(MEMBER_ID_KEY);
+    if (!id) { id = uuid(); localStorage.setItem(MEMBER_ID_KEY, id); }
+    return id;
+  } catch { return 'mem-unknown'; }
+}
+
+// ── Meus Vínculos: TODOS os grupos dos quais faço parte (modelo de dados) ──
+const VINCULOS_KEY = 'jdpg_meus_vinculos_v1';
+function loadMeusVinculos() {
+  try { const s = localStorage.getItem(VINCULOS_KEY); return s ? (JSON.parse(s) || []) : []; }
+  catch { return []; }
+}
+function saveMeusVinculos(list) {
+  try { localStorage.setItem(VINCULOS_KEY, JSON.stringify(list || [])); }
+  catch(e) { console.warn('saveMeusVinculos:', e); }
+}
+// Insere/atualiza um vínculo pela chave grupoNum (nunca duplica um grupo)
+function upsertVinculo(v) {
+  if (!v || v.grupoNum == null) return;
+  const list = loadMeusVinculos();
+  const i = list.findIndex(x => x.grupoNum === v.grupoNum);
+  if (i >= 0) list[i] = { ...list[i], ...v }; else list.push(v);
+  saveMeusVinculos(list);
+}
+
+// ── Grupo Aberto: APENAS o grupo em exibição agora (estado efêmero de UI) ──
+// NUNCA é "vínculo ativo" — não altera Meus Vínculos, só marca o que está à vista.
+function setGrupoAberto(num) { ST.grupoAberto = num; save(ST); }
+function getGrupoAberto() {
+  const list = loadMeusVinculos();
+  if (!list.length) return null;
+  const aberto = list.find(v => v.grupoNum === ST.grupoAberto);
+  if (aberto) return aberto;
+  // fallback: vínculo mais recente (maior ts) — preserva o "meu grupo" único de hoje
+  return list.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0))[0];
+}
+
+// ── Compatibilidade: loadMeuGrupo/saveMeuGrupo agora operam sobre Vínculos ──
+// Mantidos como wrapper para NÃO tocar nas ~20 chamadas existentes.
+function loadMeuGrupo() {
+  if (!FB_FLAGS.identidadeUuid) {
+    try { const s = localStorage.getItem(MEU_GRUPO_KEY); return s ? JSON.parse(s) : null; }
+    catch { return null; }
+  }
+  const v = getGrupoAberto();
+  if (v) return v;
+  // Compat: antes da migração popular os vínculos, ainda usa o formato antigo
+  try { const s = localStorage.getItem(MEU_GRUPO_KEY); return s ? JSON.parse(s) : null; }
+  catch { return null; }
 }
 function saveMeuGrupo(dados) {
+  // Espelho no formato antigo (rollback de 1 linha continua funcionando)
   try { localStorage.setItem(MEU_GRUPO_KEY, JSON.stringify(dados)); }
   catch(e) { console.warn('saveMeuGrupo:', e); }
+  if (!FB_FLAGS.identidadeUuid) return;
+  if (dados && dados.grupoNum != null) {
+    upsertVinculo(dados);
+    setGrupoAberto(dados.grupoNum);
+  }
+}
+
+// ── Migração determinística p/ Meus Vínculos + memberId (roda 1x) ─────────
+// Carimba SÓ o MEU registro (identificado pelo ts/nome do meuGrupo antigo).
+// NÃO inventa memberId para registros de terceiros. Persiste só em localStorage
+// (o memberId chega à nuvem na próxima ação — sem corrida de sync no boot).
+const MIGRACAO_UUID_KEY = 'jdpg_migracao_uuid_v1';
+function migrateToVinculos() {
+  if (!FB_FLAGS.identidadeUuid) return;
+  try {
+    if (localStorage.getItem(MIGRACAO_UUID_KEY)) return; // já migrado
+
+    let meuAntigo = null;
+    try { const s = localStorage.getItem(MEU_GRUPO_KEY); meuAntigo = s ? JSON.parse(s) : null; } catch {}
+
+    const myId = getMyMemberId();
+    let meuRegistroMigrado = false;
+
+    if (meuAntigo && meuAntigo.grupoNum != null) {
+      const g = PEQUENOS_GRUPOS.find(x => x.num === meuAntigo.grupoNum);
+      const p = g && (g.participantes || []).find(x =>
+        (meuAntigo.ts && x.ts === meuAntigo.ts) ||
+        (x.nome && meuAntigo.nome && x.nome.trim().toLowerCase() === String(meuAntigo.nome).trim().toLowerCase()));
+      if (g && p) {
+        if (!p.memberId) { p.memberId = myId; meuRegistroMigrado = true; }
+        else { try { localStorage.setItem(MEMBER_ID_KEY, p.memberId); } catch {} } // já tinha: reusa como minha identidade
+        upsertVinculo({
+          grupoNum: g.num, grupoNome: g.nome, nome: p.nome, wa: p.wa,
+          tipo: p.tipo, papel: p.papel, departamento: p.departamento || '',
+          dataInscricao: p.dataInscricao, ts: p.ts, memberId: p.memberId,
+        });
+        if (ST.grupoAberto == null) setGrupoAberto(g.num);
+        if (meuRegistroMigrado) saveGruposLocal(); // só localStorage — sem escrita na nuvem no boot
+      }
+    }
+
+    // ── Log de auditoria (homologação) ──────────────────────────────────
+    let encontrados = 0, comId = 0, semId = 0, duplicidades = 0;
+    const idsVistos = {};
+    PEQUENOS_GRUPOS.forEach(g => (g.participantes || []).forEach(p => {
+      encontrados++;
+      if (p.memberId) { comId++; if (idsVistos[p.memberId]) duplicidades++; else idsVistos[p.memberId] = true; }
+      else semId++;
+    }));
+    console.info('[Migração UUID] encontrados:', encontrados,
+      '· com memberId:', comId, '· sem memberId:', semId,
+      '· meu registro migrado:', meuRegistroMigrado ? 'sim' : (meuAntigo ? 'já tinha/ausente' : 'sem vínculo antigo'),
+      '· duplicidades detectadas:', duplicidades);
+    try {
+      localStorage.setItem(MIGRACAO_UUID_KEY, JSON.stringify({
+        quando: new Date().toISOString(), encontrados, comId, semId, duplicidades, meuRegistroMigrado
+      }));
+    } catch {}
+  } catch (e) { console.warn('migrateToVinculos:', e); }
 }
 
 // ── Firebase Firestore Sync ──────────────────────────────────────────────
@@ -6922,6 +7037,7 @@ const FB_FLAGS = Object.freeze({
   retryOnReconnect: true,   // re-tentar gravação ao voltar a internet / app visível
   debounceMs      : 400,    // (Commit 3) 0 = grava na hora (comportamento antigo)
   useTombstone    : true,   // (Commit 2) remoção transitória
+  identidadeUuid  : true,   // (Etapa 1) memberId UUID + Meus Vínculos / Grupo Aberto (false = volta ao meuGrupo antigo)
 });
 
 // Versão lógica + data de build (registrada na telemetria/log p/ auditoria futura)
@@ -7811,6 +7927,7 @@ function confirmarInscricao(grupoNum) {
     departamento: tipoSelecionado === 'colaborador' ? dept : '',
     dataInscricao: new Date().toLocaleDateString('pt-BR'),
     ts: Date.now(),
+    memberId: getMyMemberId(),
   };
 
   if (!g.participantes) g.participantes = [];
@@ -8017,6 +8134,7 @@ function renderGrupoBarWelcome() {
 // ── Integração no initApp e renderHome ────────────────────────────────
 function initGrupos() {
   loadGrupos();
+  migrateToVinculos();  // Etapa 1: migração determinística p/ Meus Vínculos + memberId (roda 1x)
   // Se app está na home, mostrar chip
   renderGrupoChipHome();
 
