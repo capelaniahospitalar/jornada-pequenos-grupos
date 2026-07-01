@@ -2938,52 +2938,47 @@ const APP_URL = window.location.href.split('?')[0];
 
 function openShare() {
   showScreen('share');
-  const myName  = ST.userName || 'Um amigo';
-  const meuGrupo = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
+  const body = document.getElementById('share-body');
+  const mg = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
 
-  // Gerar link com o número do grupo do convidante (se inscrito)
-  const inviteUrl = meuGrupo ? (APP_URL + '?pg=' + meuGrupo.grupoNum) : APP_URL;
-  const grupoNome = meuGrupo ? (meuGrupo.grupoNome || ('Grupo ' + meuGrupo.grupoNum)) : null;
+  if (!mg) {
+    body.innerHTML = `<div class="content-card"><div class="phase-tag tag-opening">Convite</div>
+      <p class="body-text">Você ainda não faz parte de um Pequeno Grupo.</p></div>
+      <button class="nav-btn" onclick="goHome()">Voltar ao início</button>`;
+    return;
+  }
 
-  const waMsg = encodeURIComponent(
-    `${myName} está te convidando para uma jornada espiritual! 🙏\n\n` +
-    `"Jornada Discipular em Pequenos Grupos — Aos Pés do Mestre Jesus" — 13 reflexões bíblicas interativas, em comunidade.\n\n` +
-    (grupoNome ? `Você entrará diretamente no grupo "${grupoNome}".\n\n` : '') +
-    `Acesse agora: ${inviteUrl}`
-  );
+  const funcao = (typeof getMinhaFuncaoNoGrupo === 'function') ? getMinhaFuncaoNoGrupo(mg.grupoNum) : null;
+  let alvo = null, rotulo = '';
+  if (funcao === 'tutor')            { alvo = 'coordenador'; rotulo = 'Convidar Coordenador'; }
+  else if (funcao === 'coordenador') { alvo = 'colaborador'; rotulo = 'Convidar Colaborador'; }
 
-  document.getElementById('share-body').innerHTML = `
+  // Colaborador (ou papel indefinido) NÃO pode convidar — sua regra.
+  if (!alvo) {
+    body.innerHTML = `<div class="content-card"><div class="phase-tag tag-opening">Convite</div>
+      <p class="body-text">Apenas o <strong>Coordenador</strong> do grupo pode convidar novos integrantes. Peça ao Coordenador do seu Pequeno Grupo que envie o seu convite.</p></div>
+      <button class="nav-btn" onclick="goHome()">Voltar ao início</button>`;
+    return;
+  }
+
+  const grupoNome = mg.grupoNome || ('Grupo ' + mg.grupoNum);
+  body.innerHTML = `
     <div class="content-card">
       <div class="phase-tag tag-opening">Convite</div>
-      <p class="body-text">Compartilhe a jornada com alguém que você ama. Quem receber este link entrará direto no seu Pequeno Grupo${grupoNome ? ` <strong>"${grupoNome}"</strong>` : ''}, sem precisar procurar.</p>
+      <p class="body-text">Gere um convite de <strong>uso único</strong> para o seu Pequeno Grupo <strong>"${sanitize(grupoNome)}"</strong>. Ele é enviado pelo WhatsApp e cada link serve para uma pessoa.</p>
     </div>
-    ${meuGrupo ? `
-    <div class="share-section" style="background:var(--teal-light);border:0.5px solid var(--teal);border-radius:var(--radius);padding:.85rem 1rem">
-      <div style="font-size:13px;font-weight:700;color:var(--teal);margin-bottom:4px;font-family:var(--ff-body)">🌿 Seu grupo no convite</div>
-      <div style="font-size:16px;font-weight:600;color:var(--text);font-family:var(--ff-body)">${grupoNome}</div>
-      <div style="font-size:13px;color:var(--text3);margin-top:2px;font-family:var(--ff-body)">O convidado entrará automaticamente neste grupo ao aceitar.</div>
-    </div>` : `
-    <div class="share-section" style="background:rgba(255,100,80,.07);border:0.5px solid rgba(255,100,80,.2);border-radius:var(--radius);padding:.85rem 1rem">
-      <div style="font-size:14px;color:#E05050;font-family:var(--ff-body)">⚠️ Inscreva-se em um Pequeno Grupo para que o convite direcione o amigo para o seu grupo.</div>
-    </div>`}
     <div class="share-section">
-      <div class="share-title">Compartilhar</div>
-      <button class="share-btn wa" onclick="window.open('https://wa.me/?text=${waMsg}','_blank')">
+      <div class="share-title">WhatsApp do convidado (opcional)</div>
+      <input id="conv-para-wa" type="tel" placeholder="21 99999-0000"
+        style="width:100%;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.65rem .85rem;font-size:17px;font-family:var(--ff-body);outline:none;background:var(--bg);color:var(--text)">
+      <button class="share-btn wa" style="margin-top:.6rem" onclick="gerarECompartilhar('${alvo}', ${mg.grupoNum})">
         <svg viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/></svg>
-        Compartilhar no WhatsApp
-      </button>
-      <button class="share-btn" onclick="copyLink('${inviteUrl}')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
-        Copiar link
+        ${rotulo} pelo WhatsApp
       </button>
     </div>
-    <div class="share-section">
-      <div class="share-title">Seu nome (para o convite)</div>
-      <input id="share-name" type="text" value="${ST.userName||''}" placeholder="Como você quer ser identificado?"
-        style="width:100%;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.65rem .85rem;font-size:17.5px;font-family:var(--ff-body);outline:none;background:var(--bg);color:var(--text)"
-        oninput="ST.userName=this.value;save(ST)">
-    </div>
+    <div id="meus-convites"></div>
     <button class="nav-btn" onclick="goHome()">Voltar ao início</button>`;
+  renderMeusConvitesEnviados(mg.grupoNum);
 }
 
 function copyLink(url) {
@@ -5008,56 +5003,21 @@ function initApp() {
     return;
   }
 
-  // ── Verificar se veio de um link de convite (?pg=N) ─────────────────
-  const pgConvite = params.get('pg');
-  if (pgConvite) {
-    const grupoNum = parseInt(pgConvite, 10);
-    if (!isNaN(grupoNum) && grupoNum >= 1 && grupoNum <= 50) {
-      window.history.replaceState({}, '', window.location.pathname);
-      // Sincronizar Firebase antes para ter dados atualizados do grupo
-      syncFromFirebase().then(() => {
-        loadGrupos();
-        const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
-        const nomeGrupo = g && g.nome ? `"${sanitize(g.nome)}"` : `Grupo ${grupoNum}`;
-        // Guardar número do grupo convidado — a inscrição formal acontece na tela de inscrição
-        window._conviteGrupoNum = grupoNum;
+  // ── Convite de uso único (?conv=<id>) — Etapa 2 ─────────────────────
+  const convId = params.get('conv');
+  if (FB_FLAGS.convitesV2 && convId) {
+    window.history.replaceState({}, '', window.location.pathname);
+    renderTelaConvite(convId);
+    return;
+  }
 
-        if (ST.welcomeDone) {
-          // Usuário já tem jornada — abrir tela de inscrição do grupo convidado
-          showScreen('home');
-          renderHome();
-          renderCompanionFab();
-          setTimeout(() => {
-            initGrupos();
-            openInscricao(grupoNum);
-          }, 150);
-        } else {
-          // Primeiro acesso — welcome, depois inscrição
-          showScreen('welcome');
-          setTimeout(() => {
-            renderGrupoBarWelcome();
-            renderGrupoPreviewWelcome();
-            renderWelcomeLevelBadge();
-            // Ocultar o passo de escolha de grupo (já definido pelo convite)
-            const grupoStep = document.getElementById('step-grupo-card');
-            if (grupoStep) grupoStep.style.display = 'none';
-            // Ocultar papéis já ocupados
-            if (g && g.tutor)       { const el = document.getElementById('popt-tutor');       if (el) el.style.display = 'none'; }
-            if (g && g.coordenador) { const el = document.getElementById('popt-coordenador'); if (el) el.style.display = 'none'; }
-            // Mostrar aviso de convite
-            const hdr = document.getElementById('welcome-level-badge');
-            if (hdr && !document.getElementById('welcome-convite-aviso')) {
-              const aviso = document.createElement('div');
-              aviso.id = 'welcome-convite-aviso';
-              aviso.style.cssText = 'background:rgba(14,123,108,0.12);border:0.5px solid rgba(14,123,108,0.4);border-radius:8px;padding:.75rem 1rem;font-size:15px;color:var(--teal);font-family:var(--ff-body);margin-bottom:.75rem;line-height:1.5';
-              aviso.innerHTML = `🎉 Você foi convidado! Entrará no <strong>${nomeGrupo}</strong>.<br>Preencha seu nome abaixo e clique em "Entrar na Jornada".`;
-              hdr.parentNode.insertBefore(aviso, hdr);
-            }
-          }, 80);
-        }
-      });
-      return;
-    }
+  // ── Link antigo (?pg=N): não é mais aceito — orienta a pedir um novo ─
+  if (params.get('pg')) {
+    window.history.replaceState({}, '', window.location.pathname);
+    showScreen('convite');
+    const cb = document.getElementById('convite-body');
+    if (cb) cb.innerHTML = telaConviteMensagem('versao_anterior');
+    return;
   }
 
   // ── Navegar diretamente para uma tela via ?tela=X (uso interno/dev) ──
@@ -7288,6 +7248,167 @@ async function revogarConvite(inviteId) {
       info: { invite: invCanc },
     };
   });
+}
+
+// ── ETAPA 2 (sub-commit 2.4): interface e experiência ─────────────────────
+
+function pgRotulo(inv) {
+  return 'PG ' + String(inv.grupoNum).padStart(3, '0') + (inv.grupoNome ? ' – ' + inv.grupoNome : '');
+}
+
+// Texto automático padronizado do convite (o Coordenador nunca edita a mensagem).
+function textoConviteWhatsApp(inv) {
+  const pg = pgRotulo(inv);
+  if (inv.funcao === 'coordenador')
+    return `Olá! Você foi convidado para ser o Coordenador do ${pg}.\n\nToque no link abaixo para aceitar o convite e entrar na Jornada.`;
+  return `Olá! Você foi convidado para participar do ${pg}.\n\nToque no link abaixo para entrar na Jornada.`;
+}
+
+// Mensagens amigáveis para as situações do convite (inclui a 5ª situação de UI).
+function mensagemConvite(motivo) {
+  switch (motivo) {
+    case 'utilizado':          return { titulo: 'Convite já utilizado', texto: 'Este convite já foi utilizado por outra pessoa.' };
+    case 'expirado':           return { titulo: 'Convite expirado', texto: 'Este convite expirou. Solicite um novo convite ao Coordenador do seu Pequeno Grupo.' };
+    case 'cancelado':          return { titulo: 'Convite cancelado', texto: 'Este convite foi cancelado por quem enviou.' };
+    case 'emissor_sem_papel':  return { titulo: 'Convite indisponível', texto: 'Quem enviou este convite não é mais responsável pelo grupo. Solicite um novo convite.' };
+    case 'nao_autorizado_tutor': return { titulo: 'Sem autorização', texto: 'Você não está autorizado a entrar como Tutor deste Pequeno Grupo.' };
+    case 'versao_anterior':    return { titulo: 'Convite de versão anterior', texto: 'Este convite pertence a uma versão anterior do aplicativo e não pode mais ser utilizado. Solicite um novo convite ao Coordenador do seu Pequeno Grupo.' };
+    case 'sem_conexao':        return { titulo: 'Sem conexão', texto: 'Não foi possível validar o convite. Verifique sua internet e abra o link novamente.' };
+    default:                   return { titulo: 'Convite indisponível', texto: 'Este convite não existe ou não está mais disponível. Solicite um novo convite ao Coordenador.' };
+  }
+}
+
+function telaConviteMensagem(motivo) {
+  const m = mensagemConvite(motivo);
+  return `<div style="background:#0D2137;min-height:100vh;padding:3rem 1.5rem;text-align:center">
+    <div style="font-size:44px;margin-bottom:1rem">🌿</div>
+    <div style="font-family:var(--ff-serif);font-size:22px;color:#fff;margin-bottom:.75rem">${sanitize(m.titulo)}</div>
+    <p style="font-size:16px;color:rgba(255,255,255,0.82);font-family:var(--ff-body);line-height:1.6;margin-bottom:2rem">${sanitize(m.texto)}</p>
+    <button onclick="irParaInicioLimpo()" style="background:var(--gold);border:none;border-radius:var(--radius-sm);padding:.85rem 1.6rem;font-size:16px;font-weight:700;color:#0D2137;cursor:pointer;font-family:var(--ff-body)">Ir para o início</button>
+  </div>`;
+}
+
+function irParaInicioLimpo() {
+  window.history.replaceState({}, '', window.location.pathname);
+  if (ST.welcomeDone) { showScreen('home'); renderHome(); renderCompanionFab(); setTimeout(initGrupos, 80); }
+  else { showScreen('welcome'); setTimeout(prefillWelcomeForm, 50); }
+}
+
+// Tela de entrada por convite — os 4 elementos (mockup aprovado).
+async function renderTelaConvite(inviteId) {
+  showScreen('convite');
+  const body = document.getElementById('convite-body');
+  if (!body) return;
+  body.innerHTML = `<div style="background:#0D2137;min-height:100vh;padding:3rem 1.5rem;text-align:center;color:rgba(255,255,255,0.7);font-family:var(--ff-body)">Carregando convite…</div>`;
+
+  await syncFromFirebase();
+  const inv = getConvite(inviteId);
+
+  // Validação de EXIBIÇÃO (existência/versão/estado/validade). Autoridade do emissor
+  // e allowlist são reconferidas no aceitarConvite (contra o remoto fresco).
+  let motivo = null;
+  if (!inv) motivo = 'inexistente';
+  else if ((inv.versaoConvite || 1) !== VERSAO_CONVITE) motivo = 'versao_incompativel';
+  else if (inv.status !== 'pendente') motivo = inv.status;
+  else if (inv.expiraEm && Date.now() > inv.expiraEm) motivo = 'expirado';
+  if (motivo) { body.innerHTML = telaConviteMensagem(motivo); return; }
+
+  const rotulo = inv.funcao === 'tutor' ? 'Tutor' : inv.funcao === 'coordenador' ? 'Coordenador' : 'Colaborador';
+  body.innerHTML = `
+  <div style="background:#0D2137;min-height:100vh;padding:1.5rem 1rem 4rem">
+    <div style="text-align:center;margin-bottom:1rem">
+      <div style="font-size:12px;letter-spacing:1.5px;color:rgba(255,255,255,0.5);text-transform:uppercase;font-family:var(--ff-body)">Convite</div>
+      <div style="font-family:var(--ff-serif);font-size:22px;color:#fff;margin-top:4px">Entrar na Jornada</div>
+    </div>
+    <div class="welcome-step-card">
+      <div class="welcome-step-hdr"><div class="welcome-step-num">1</div><div class="welcome-step-title">Qual é o seu nome?</div></div>
+      <div class="welcome-step-body">
+        <input id="conv-nome" type="text" maxlength="80" value="${sanitize(ST.userName || '')}" placeholder="Seu nome completo"
+          style="width:100%;border:0.5px solid rgba(255,255,255,0.15);border-radius:var(--radius-sm);padding:.7rem .85rem;font-size:17px;font-family:var(--ff-body);background:rgba(255,255,255,0.07);color:#fff;outline:none;box-sizing:border-box">
+      </div>
+    </div>
+    <div class="welcome-step-card">
+      <div class="welcome-step-hdr"><div class="welcome-step-num">2</div><div class="welcome-step-title">Sua função</div></div>
+      <div class="welcome-step-body">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(14,123,108,0.14);border:0.5px solid rgba(14,123,108,0.5);border-radius:var(--radius-sm);padding:.7rem .85rem">
+          <span style="font-size:16px;color:#7FE0C4;font-weight:600;font-family:var(--ff-body)">${rotulo}</span>
+          <span style="font-size:12.5px;color:rgba(255,255,255,0.5);font-family:var(--ff-body)">🔒 definida pelo convite</span>
+        </div>
+      </div>
+    </div>
+    <div class="welcome-step-card">
+      <div class="welcome-step-hdr"><div class="welcome-step-num">3</div><div class="welcome-step-title">Você está entrando no Pequeno Grupo</div></div>
+      <div class="welcome-step-body">
+        <div style="font-size:12px;letter-spacing:1px;color:rgba(255,255,255,0.5);text-transform:uppercase;font-family:var(--ff-body)">PG ${String(inv.grupoNum).padStart(3, '0')}</div>
+        <div style="font-size:18px;color:#fff;font-weight:600;font-family:var(--ff-body)">${sanitize(inv.grupoNome || ('Grupo ' + inv.grupoNum))}</div>
+      </div>
+    </div>
+    <div id="conv-erro" style="color:#FF9980;font-size:14px;font-family:var(--ff-body);margin:.25rem 0 .5rem;min-height:18px"></div>
+    <button id="conv-entrar-btn" onclick="confirmarEntradaConvite('${inv.inviteId}')"
+      style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:var(--gold);border:none;border-radius:var(--radius-sm);padding:1rem;font-size:18px;font-weight:700;color:#0D2137;cursor:pointer;font-family:var(--ff-body);box-shadow:0 4px 16px rgba(255,215,0,0.25)">
+      Entrar na Jornada →
+    </button>
+  </div>`;
+}
+
+async function confirmarEntradaConvite(inviteId) {
+  const nomeInput = document.getElementById('conv-nome');
+  const nome = nomeInput ? nomeInput.value.trim() : '';
+  const erro = document.getElementById('conv-erro');
+  if (!nome) { if (erro) erro.textContent = 'Por favor, informe seu nome.'; return; }
+  if (erro) erro.textContent = '';
+
+  ST.userName = nome; save(ST);
+  const inv = getConvite(inviteId);
+  const btn = document.getElementById('conv-entrar-btn');
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.7'; btn.textContent = 'Entrando…'; }
+
+  const res = await aceitarConvite(inviteId, { nome, wa: inv && inv.paraWa });
+  if (res.ok) {
+    window.history.replaceState({}, '', window.location.pathname);
+    ST.welcomeDone = true; ST.grupoNum = res.grupoNum; save(ST);
+    showScreen('home'); renderHome(); renderCompanionFab(); setTimeout(initGrupos, 100);
+  } else {
+    document.getElementById('convite-body').innerHTML = telaConviteMensagem(res.motivo);
+  }
+}
+
+// Gera o convite (pelo papel) e abre o WhatsApp com o texto automático + link.
+async function gerarECompartilhar(funcao, grupoNum) {
+  const waEl = document.getElementById('conv-para-wa');
+  const waDigits = waEl ? waEl.value.replace(/\D/g, '') : '';
+  const paraWa = waDigits.length >= 10 ? ('55' + waDigits) : null;
+  const res = await gerarConvite({ grupoNum, funcao, paraWa });
+  if (!res.ok) {
+    const map = { sem_autoridade: 'Você não tem permissão para gerar este convite.', sem_conexao: 'Sem conexão. Verifique sua internet e tente novamente.', conflito: 'Muitas alterações ao mesmo tempo. Tente novamente.' };
+    alert(map[res.motivo] || 'Não foi possível gerar o convite agora. Tente novamente.');
+    return;
+  }
+  const texto = textoConviteWhatsApp(res.invite) + '\n\n' + res.link;
+  const destino = res.invite.paraWa ? res.invite.paraWa : '';
+  window.open('https://wa.me/' + destino + '?text=' + encodeURIComponent(texto), '_blank');
+  renderMeusConvitesEnviados(grupoNum);
+}
+
+// Lista dos convites pendentes que EU enviei, com opção de revogar.
+function renderMeusConvitesEnviados(grupoNum) {
+  const el = document.getElementById('meus-convites');
+  if (!el) return;
+  const meuId = getMyMemberId();
+  const pend = loadConvites().filter(c => c.deId === meuId && c.status === 'pendente' && (!grupoNum || c.grupoNum === grupoNum));
+  if (!pend.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="share-section"><div class="share-title">Convites pendentes que você enviou</div>` +
+    pend.map(c => `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:.5rem 0;border-bottom:0.5px solid var(--border)">
+      <span style="font-size:14px;font-family:var(--ff-body);color:var(--text2)">${c.funcao === 'coordenador' ? '🤝 Coordenador' : '👔 Colaborador'}${c.paraWa ? ' · ' + sanitize(c.paraWa) : ''}</span>
+      <button onclick="revogarEConfirmar('${c.inviteId}', ${grupoNum})" style="background:none;border:0.5px solid #E05050;color:#E05050;border-radius:14px;padding:2px 12px;font-size:13px;cursor:pointer;font-family:var(--ff-body)">Revogar</button>
+    </div>`).join('') + `</div>`;
+}
+
+async function revogarEConfirmar(inviteId, grupoNum) {
+  if (!confirm('Revogar este convite? Ele deixará de funcionar imediatamente.')) return;
+  const r = await revogarConvite(inviteId);
+  if (!r.ok) alert('Não foi possível revogar agora. Tente novamente.');
+  renderMeusConvitesEnviados(grupoNum);
 }
 
 // ── Firebase Firestore Sync ──────────────────────────────────────────────
