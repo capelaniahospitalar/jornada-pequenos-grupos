@@ -7011,6 +7011,62 @@ function migrateToVinculos() {
   } catch (e) { console.warn('migrateToVinculos:', e); }
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+//  ETAPA 2 — Convites de uso único (sub-commit 2.1: estrutura de dados)
+// ══════════════════════════════════════════════════════════════════════════
+// O convite mora na base compartilhada (campo `convites`), indexado por inviteId.
+// O LINK carrega SÓ o inviteId (?conv=<id>); toda a verdade vem da base.
+// Nada aqui é chamado ainda — geração/leitura/sync/UI vêm nos sub-commits 2.2–2.4.
+const VERSAO_CONVITE  = 2;
+const CONVITES_KEY    = 'jdpg_convites_v1';            // espelho local (cache); fonte da verdade = base
+const CONVITE_TTL_MS  = 7  * 24 * 60 * 60 * 1000;      // validade padrão: 7 dias
+const CONVITE_PODA_MS = 30 * 24 * 60 * 60 * 1000;      // poda terminais após 30 dias
+
+// 4 estados GRAVADOS. "inexistente" é só situação de UI (não é estado gravado).
+const CONVITE_ESTADOS = Object.freeze(['pendente', 'utilizado', 'cancelado', 'expirado']);
+
+// Máquina de estados: terminais são absorventes; nunca volta a 'pendente'.
+function transicaoConviteValida(de, para) {
+  if (de === para) return true;
+  return de === 'pendente' && (para === 'utilizado' || para === 'cancelado' || para === 'expirado');
+}
+
+// Resolução de conflito (usada pelo mergeConvites no sub-commit 2.3):
+// mais recente (maior updatedAt) vence, DESDE QUE a transição seja válida.
+function resolverConvite(a, b) {
+  if (!a) return b; if (!b) return a;
+  const maisNovo = (b.updatedAt || 0) >= (a.updatedAt || 0) ? b : a;
+  const maisVelho = maisNovo === b ? a : b;
+  return transicaoConviteValida(maisVelho.status, maisNovo.status) ? maisNovo : maisVelho;
+}
+
+// Fábrica PURA de um convite (não valida autoridade e não grava — isso é o 2.2).
+function criarConviteObj({ tipo, funcao, grupoNum, grupoNome, deId, deNome, paraWa }) {
+  const agora = Date.now();
+  return {
+    inviteId: uuid(),
+    versaoConvite: VERSAO_CONVITE,
+    tipo, funcao, grupoNum, grupoNome,
+    deId: deId || null, deNome: deNome || '',
+    paraWa: paraWa || null,
+    status: 'pendente',
+    criadoEm: agora,
+    expiraEm: agora + CONVITE_TTL_MS,
+    updatedAt: agora,
+    usadoPor: null, usadoEm: null,
+  };
+}
+
+// Espelho local (cache). A fonte da verdade é a base sincronizada (sub-commit 2.3).
+function loadConvites() {
+  try { const s = localStorage.getItem(CONVITES_KEY); return s ? (JSON.parse(s) || []) : []; }
+  catch { return []; }
+}
+function saveConvitesLocal(list) {
+  try { localStorage.setItem(CONVITES_KEY, JSON.stringify(list || [])); }
+  catch(e) { console.warn('saveConvitesLocal:', e); }
+}
+
 // ── Firebase Firestore Sync ──────────────────────────────────────────────
 // V1 SEGURANÇA: a apiKey abaixo é pública (inevitável em apps estáticos sem backend).
 // MITIGAÇÃO OBRIGATÓRIA: restrinja esta chave no Firebase Console →
@@ -7038,6 +7094,7 @@ const FB_FLAGS = Object.freeze({
   debounceMs      : 400,    // (Commit 3) 0 = grava na hora (comportamento antigo)
   useTombstone    : true,   // (Commit 2) remoção transitória
   identidadeUuid  : true,   // (Etapa 1) memberId UUID + Meus Vínculos / Grupo Aberto (false = volta ao meuGrupo antigo)
+  convitesV2      : true,   // (Etapa 2) convites de uso único (false = só ?pg= antigo)
 });
 
 // Versão lógica + data de build (registrada na telemetria/log p/ auditoria futura)
