@@ -7067,6 +7067,136 @@ function saveConvitesLocal(list) {
   catch(e) { console.warn('saveConvitesLocal:', e); }
 }
 
+// ── ETAPA 2 (sub-commit 2.2): geração, leitura e aceitação ────────────────
+// Opera sobre o cache local (loadConvites/saveConvitesLocal). Sincronização
+// com a base (trava C1, mergeConvites) é o 2.3; mensagens/WhatsApp/UI são o 2.4.
+
+function getConvite(inviteId) { return loadConvites().find(c => c.inviteId === inviteId) || null; }
+
+// Lê o inviteId do link (?conv=<id>). O link carrega SÓ o id; o resto vem da base.
+function parseConviteIdFromUrl() {
+  try { return new URLSearchParams(window.location.search).get('conv'); } catch { return null; }
+}
+
+// Marca como 'expirado' os pendentes vencidos (transição válida).
+function expirarConvitesVencidos() {
+  const list = loadConvites(); let mudou = false; const agora = Date.now();
+  list.forEach(c => { if (c.status === 'pendente' && c.expiraEm && agora > c.expiraEm) { c.status = 'expirado'; c.updatedAt = agora; mudou = true; } });
+  if (mudou) saveConvitesLocal(list);
+}
+
+// Papel do usuário atual num grupo (pela identidade estável; fallback por nome).
+function getMinhaFuncaoNoGrupo(grupoNum) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum); if (!g) return null;
+  const meuId = getMyMemberId();
+  const meuNome = (loadMeuGrupo() || {}).nome || ST.userName || '';
+  const p = (g.participantes || []).find(x => x.memberId === meuId)
+         || (g.participantes || []).find(x => (x.nome || '').trim().toLowerCase() === meuNome.trim().toLowerCase());
+  if (!p) return null;
+  if (p.papel === 'tutor' || p.tipo === 'tutor') return 'tutor';
+  if (p.papel === 'coordenador' || p.tipo === 'coordenador') return 'coordenador';
+  return 'colaborador';
+}
+
+// Raiz de confiança do Tutor: a allowlist `tutores` (capelães). O convite só INICIA.
+function estaNaAllowlistTutores({ nome, wa }) {
+  const digits = String(wa || '').replace(/\D/g, '');
+  const nomeL = String(nome || '').trim().toLowerCase();
+  return (TUTORS || []).some(t => {
+    const tw = String(t.wa || '').replace(/\D/g, '');
+    return (digits && tw && (tw === digits || tw.endsWith(digits) || digits.endsWith(tw)))
+        || (nomeL && String(t.name || '').trim().toLowerCase() === nomeL);
+  });
+}
+
+function funcaoParaTipo(funcao) { return funcao === 'tutor' || funcao === 'coordenador' ? funcao : 'colaborador'; }
+
+// GERAR: confere a autoridade do usuário atual ANTES de criar o convite.
+//   funcao 'coordenador' → só Tutor do grupo pode convidar
+//   funcao 'colaborador' → só Coordenador do grupo pode convidar
+//   funcao 'tutor'       → só quem está na allowlist `tutores`
+function gerarConvite({ tipo, grupoNum, funcao, paraWa }) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return { ok: false, motivo: 'grupo_inexistente' };
+  const eu = loadMeuGrupo() || {};
+
+  if (funcao === 'coordenador') {
+    if (getMinhaFuncaoNoGrupo(grupoNum) !== 'tutor') return { ok: false, motivo: 'sem_autoridade' };
+    tipo = tipo || 'tutor->coord';
+  } else if (funcao === 'colaborador') {
+    if (getMinhaFuncaoNoGrupo(grupoNum) !== 'coordenador') return { ok: false, motivo: 'sem_autoridade' };
+    tipo = tipo || 'coord->colab';
+  } else if (funcao === 'tutor') {
+    if (!estaNaAllowlistTutores({ nome: eu.nome || ST.userName, wa: eu.wa })) return { ok: false, motivo: 'sem_autoridade' };
+    tipo = tipo || 'tutor';
+  } else {
+    return { ok: false, motivo: 'funcao_invalida' };
+  }
+
+  const inv = criarConviteObj({ tipo, funcao, grupoNum, grupoNome: g.nome,
+    deId: getMyMemberId(), deNome: eu.nome || ST.userName || '', paraWa });
+  const list = loadConvites(); list.push(inv); saveConvitesLocal(list);
+  return { ok: true, invite: inv, inviteId: inv.inviteId, link: APP_URL + '?conv=' + inv.inviteId };
+}
+
+// ACEITAR: pipeline de validação (o convite informa, a base confirma).
+//   inviteId existe → versão → status pendente → não expirado →
+//   autoridade do emissor AINDA válida → aceita (marca utilizado).
+function aceitarConvite(inviteId, dadosPessoa) {
+  if (!inviteId) return { ok: false, motivo: 'inexistente' };
+  expirarConvitesVencidos();
+  const list = loadConvites();
+  const inv = list.find(c => c.inviteId === inviteId);
+  if (!inv) return { ok: false, motivo: 'inexistente' };
+  if ((inv.versaoConvite || 1) !== VERSAO_CONVITE) return { ok: false, motivo: 'versao_incompativel' };
+  if (inv.status !== 'pendente') return { ok: false, motivo: inv.status };  // utilizado | cancelado | expirado
+
+  const g = PEQUENOS_GRUPOS.find(x => x.num === inv.grupoNum);
+  if (!g) return { ok: false, motivo: 'grupo_inexistente' };
+
+  // Autoridade do EMISSOR confirmada contra o estado atual da base
+  if (inv.funcao === 'tutor') {
+    const eu = loadMeuGrupo() || {};
+    if (!estaNaAllowlistTutores({ nome: (dadosPessoa && dadosPessoa.nome) || eu.nome || ST.userName, wa: (dadosPessoa && dadosPessoa.wa) || eu.wa }))
+      return { ok: false, motivo: 'nao_autorizado_tutor' };
+  } else {
+    const emissor = (g.participantes || []).find(p => p.memberId === inv.deId);
+    const papelEmissor = emissor ? (emissor.papel || emissor.tipo) : null;
+    const exigido = inv.funcao === 'coordenador' ? 'tutor' : 'coordenador';
+    if (papelEmissor !== exigido) return { ok: false, motivo: 'emissor_sem_papel' };
+  }
+
+  // ── ACEITA ────────────────────────────────────────────────────────────
+  const memberId = getMyMemberId();
+  const agora = Date.now();
+  const nome = (dadosPessoa && dadosPessoa.nome) ? String(dadosPessoa.nome).trim() : (loadMeuGrupo() || {}).nome || ST.userName || '';
+  const wa = '55' + String((dadosPessoa && dadosPessoa.wa) || '').replace(/\D/g, '');
+  let p = (g.participantes || []).find(x => x.memberId === memberId);
+  if (!p) {
+    p = { nome, wa, tipo: funcaoParaTipo(inv.funcao),
+          papel: (inv.funcao === 'tutor' || inv.funcao === 'coordenador') ? inv.funcao : null,
+          departamento: (dadosPessoa && dadosPessoa.departamento) || '',
+          dataInscricao: new Date().toLocaleDateString('pt-BR'), ts: agora, memberId };
+    if (!g.participantes) g.participantes = [];
+    g.participantes.push(p);
+  } else {
+    if (nome) p.nome = nome;
+    p.tipo = funcaoParaTipo(inv.funcao);
+    p.papel = (inv.funcao === 'tutor' || inv.funcao === 'coordenador') ? inv.funcao : p.papel;
+  }
+  if (inv.funcao === 'coordenador' && !g.coordenador) g.coordenador = p.nome;
+  if (inv.funcao === 'tutor' && !g.tutor) g.tutor = p.nome;
+  saveGruposLocal();  // escrita na nuvem (com trava C1) entra no 2.3
+
+  upsertVinculo({ grupoNum: g.num, grupoNome: g.nome, nome: p.nome, wa: p.wa, tipo: p.tipo,
+    papel: p.papel, departamento: p.departamento || '', dataInscricao: p.dataInscricao, ts: p.ts, memberId });
+  setGrupoAberto(g.num);
+
+  inv.status = 'utilizado'; inv.usadoPor = memberId; inv.usadoEm = agora; inv.updatedAt = agora;
+  saveConvitesLocal(list);
+  return { ok: true, invite: inv, grupoNum: g.num, funcao: inv.funcao };
+}
+
 // ── Firebase Firestore Sync ──────────────────────────────────────────────
 // V1 SEGURANÇA: a apiKey abaixo é pública (inevitável em apps estáticos sem backend).
 // MITIGAÇÃO OBRIGATÓRIA: restrinja esta chave no Firebase Console →
