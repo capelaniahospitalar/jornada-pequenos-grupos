@@ -7325,9 +7325,13 @@ async function fbReadDoc(cfg) {
   const s = doc.fields?.dados?.stringValue;
   const t = doc.fields?.ts?.integerValue;
   const tutoresStr = doc.fields?.tutores?.stringValue;
+  const convitesStr = doc.fields?.convites?.stringValue;   // ETAPA 2: campo aditivo (como tutores)
+  let convites = null;
+  try { if (convitesStr) convites = JSON.parse(convitesStr); } catch { convites = null; }
   return {
     dados: s ? JSON.parse(s) : null,
     tutores: tutoresStr ? JSON.parse(tutoresStr) : null,
+    convites,
     ts: t ? String(t) : null,
     updateTime: doc.updateTime || null,   // COMMIT 1: carimbo nativo do servidor (trava otimista)
   };
@@ -7349,7 +7353,7 @@ function fbWarnTooLarge() {
   } catch(e) { console.warn('fbWarnTooLarge:', e); }
 }
 
-async function fbWriteGrupos(cfg, data, tutoresData, baseUpdateTime) {
+async function fbWriteGrupos(cfg, data, tutoresData, baseUpdateTime, convitesData) {
   const dadosStr = JSON.stringify(data);
   // Guarda de tamanho: a regra do Firestore rejeita "dados" >= 500 KB. Aborta antes de
   // um write fadado a falhar e avisa o usuário, evitando perda silenciosa.
@@ -7363,6 +7367,7 @@ async function fbWriteGrupos(cfg, data, tutoresData, baseUpdateTime) {
     ts:    { integerValue: String(Date.now()) },
   };
   if (tutoresData) fields.tutores = { stringValue: JSON.stringify(tutoresData) };
+  if (convitesData) fields.convites = { stringValue: JSON.stringify(convitesData) };  // ETAPA 2
   const body = { fields };
   // COMMIT 1: pré-condição de concorrência — só grava se o documento não mudou desde a leitura
   let url = fbDocUrl(cfg);
@@ -7457,6 +7462,10 @@ async function syncFromFirebase() {
       fbLastKnownTs = result.ts;
       // V3: carrega tutores do Firestore se disponível
       if (Array.isArray(result.tutores) && result.tutores.length > 0) TUTORS = result.tutores;
+      // ETAPA 2 (aditivo): mescla convites remotos no cache local (preserva pendentes locais)
+      if (typeof mergeConvites === 'function' && Array.isArray(result.convites)) {
+        saveConvitesLocal(mergeConvites(result.convites, loadConvites()));
+      }
       try { localStorage.setItem(GRUPOS_KEY, JSON.stringify(result.dados)); } catch(e) { console.warn('sync localStorage:', e); }
       fbLastSyncTime = Date.now();
       renderGrupoSyncBadge();
