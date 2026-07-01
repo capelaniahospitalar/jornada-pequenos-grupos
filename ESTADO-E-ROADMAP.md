@@ -34,6 +34,9 @@ Workaround sem código: usar um **grupo novo** e não usar "Cancelar".
 Cada commit é precedido de **Mapa de Impacto** (análise, sem código); tombstone também leva **ADR**.
 - **C1 — Concorrência:** FEITO (ver acima). Tag de restauração: `v0-pre-concurrency` (→ a167578).
   Marco pós-homologação a criar: `v1-concurrency-homologated`.
+- **Nota 2026-07-01:** tag de restauração `v2a-pre-identidade` criada (→ `c747675`, estado antes da
+  Etapa 1 — identidade `memberId`/Meus Vínculos — e da Etapa 2 — convites de uso único). Este
+  documento ainda não reflete o trabalho dessas duas etapas, feito após o handoff acima.
 - **C2 — Modelo "Meus Grupos" (multi-grupo):** trocar `meuGrupo` (single) por `meusGrupos` (lista);
   **pertencimento DERIVADO** = se o nome está na lista de participantes do grupo, é membro
   (sem reinscrição, sem botão "entrar de novo"); "já inscrita" vira **"Você já participa. Entrar
