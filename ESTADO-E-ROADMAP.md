@@ -181,6 +181,37 @@ Cada commit é precedido de **Mapa de Impacto** (análise, sem código); tombsto
   - **Decisão:** registrado, **não implementado agora**. Entra na fila de UX (junto do `UX-01`)
     para uma próxima RC ou a primeira versão estável, condicionado a não haver achados mais
     críticos nos testes de campo em andamento.
+- **ARCH-01 — Separar definitivamente o acesso administrativo (Tutor) da jornada do participante
+  (novo, 2026-07-02).** Achado ao questionar a necessidade da tela "Convite necessário"
+  (`mensagemConvite('sem_convite')`, criada no `BLOCKER-001`): hoje ela é um **beco sem saída** —
+  não tem caminho para o Painel do Tutor/Coordenador. Rastreado: `openTutorPanel()` só é chamado
+  pelo botão da tela antiga de boas-vindas (morta, `FUNC-02`) e pelo botão da Home (só existe
+  depois de `welcomeDone=true`, ou seja, depois de já estar num grupo). **Consequência real
+  hoje:** o Wladimir não é afetado (aparelho dele já tinha `welcomeDone=true` de antes do
+  `BLOCKER-001`), mas **os outros 3 capelães da allowlist `tutores` (Felipe Rodrigues, Ualace
+  Bruno, Renan Castro), que segundo os dados nunca acessaram o app, não têm hoje nenhum caminho
+  para o Painel do Tutor num aparelho novo.**
+  - **Diagnóstico do usuário:** isso expõe uma mudança de arquitetura que já aconteceu de fato —
+    o app deixou de ter um "fluxo de descoberta" (acessar → escolher grupo → escolher perfil) e
+    passou a ser 100% por convite (`Tutor → convida Coordenador → convida Colaborador`). Não há
+    mais caso de uso legítimo para abrir o link base do app como participante — o convite já traz
+    grupo, papel e autorização prontos.
+  - **Proposta de arquitetura (não implementada):**
+    - **Participantes:** nunca acessam o link base — sempre entram por convite (`?conv=<id>`).
+    - **Tutores:** ganham um **endereço administrativo próprio** (ex.: `?tutor`), independente da
+      jornada do participante — verifica a allowlist e abre o Painel, ou informa acesso restrito.
+    - **Coordenadores:** entram por convite do Tutor, depois usam a Home normalmente (já
+      funciona assim).
+    - A tela "Convite necessário" **deixaria de existir** — o link base passaria a mostrar algo
+      mínimo tipo "Este aplicativo é acessado apenas por convite" (ou nem isso), já que ninguém
+      deveria chegar ali por engano dentro do fluxo pretendido.
+  - **Classificação:** nem `BUG`, nem `UX`, nem `FEATURE` — item de **Arquitetura**. Elimina uma
+    ambiguidade que sobrou da evolução do projeto (a tela mistura "onde o participante cai sem
+    convite" com "onde o admin deveria entrar").
+  - **Decisão:** registrado, **não implementado agora**. A remoção da tela "Convite necessário"
+    fica para uma limpeza futura, possivelmente junto do `FUNC-02`. Enquanto isso não for feito,
+    **os 3 capelães ainda não terão como acessar o Painel do Tutor num aparelho novo** — só
+    relevante se algum deles precisar entrar antes do `ARCH-01` ser implementado.
 
 ## Rollback / segurança
 - Flags congeladas no topo do `<script>`: `FB_FLAGS = Object.freeze({ usePrecondition,
