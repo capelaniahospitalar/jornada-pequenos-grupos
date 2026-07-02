@@ -1,5 +1,31 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-02] — RC2: acesso administrativo do Tutor independente de grupo/dispositivo (ARCH-02)
+
+Início do desenvolvimento da RC2 (RC1 encerrada — ver `ESTADO-E-ROADMAP.md`). Primeira etapa:
+elimina a dependência circular que impedia um Tutor autorizado, mas sem nenhum Pequeno Grupo
+ainda, de acessar o Painel do Tutor pela primeira vez num aparelho novo.
+
+- Novo ponto de entrada `?tutor`, checado em `initApp()` antes do roteamento normal — funciona
+  independente de `welcomeDone` ou de já ter um grupo.
+- `estaNaAllowlistTutores()` agora retorna o registro encontrado (nome canônico) em vez de só
+  `true`/`false` — a allowlist `tutores` passa a ser a fonte de verdade para autenticar um Tutor,
+  não mais a existência prévia de um grupo. Mudança retrocompatível, não afeta o caller existente
+  (`gerarConvite`).
+- `tutorIdentificar()` não bloqueia mais quem ainda não tem grupo.
+- `tutorConfirmarCriarPass()` aceita a allowlist como prova de identidade alternativa quando não
+  há registro de participante para conferir o WhatsApp.
+- `renderTutorGruposList()`: quem está autorizado mas sem grupo vê "➕ Criar Primeiro Pequeno
+  Grupo" (placeholder — implementação completa é a próxima etapa, `ATIVACAO-01`) em vez de uma
+  mensagem de erro.
+- Sem duplicar a lógica de login: uma única variável (`tutorPanelOrigem`) decide só a exibição do
+  botão "voltar", reaproveitando as mesmas funções de identificação/senha/dashboard para as duas
+  origens (Home e `?tutor`).
+- Testado: fluxo existente (Home) sem regressão; `?tutor` com Tutor já-com-grupo; `?tutor` com
+  Tutor novo (zero grupos); `?tutor` com dado que não bate na allowlist ("Acesso restrito").
+
+---
+
 ## [2026-07-02] — Limpeza de código morto (FUNC-01, STR-01 a STR-05)
 
 Commit de manutenção, sem alteração de comportamento observável pelo usuário.
