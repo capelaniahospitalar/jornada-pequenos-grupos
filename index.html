@@ -1881,7 +1881,7 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
     <button class="back-btn" onclick="goHome()" aria-label="Voltar">&#8592;</button>
     <div class="sh-info">
       <div class="sh-step" style="color:rgba(255,255,255,0.55)">Acompanhamento</div>
-      <div class="sh-title">Painel do Tutor</div>
+      <div class="sh-title">Painel do Tutor/Coordenador</div>
     </div>
   </div>
   <div class="tutor-screen" id="tutorpanel-body"></div>
@@ -3099,7 +3099,7 @@ function renderTutorLogin(errorMsg) {
   if (!body) return;
   body.innerHTML = `
     <div class="content-card">
-      <div class="phase-tag tag-content">Painel do Tutor</div>
+      <div class="phase-tag tag-content">Painel do Tutor/Coordenador</div>
       <p class="body-text">Digite o nome que você usou ao se identificar como Tutor ou Coordenador de um Pequeno Grupo.</p>
     </div>
     <div class="panel-section">
@@ -8823,9 +8823,9 @@ function renderGruposBtnHome() {
           <span style="color:var(--text3);font-size:18px">›</span>
         </button>`;
       })()
-    : `<button onclick="openGrupos()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--teal-light);border:0.5px solid rgba(14,123,108,.35);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;color:var(--teal);cursor:pointer;font-family:var(--ff-body);font-weight:600">
-        🌿 Escolher meu Pequeno Grupo
-      </button>`;
+    : `<div style="width:100%;background:var(--teal-light);border:0.5px solid rgba(14,123,108,.35);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:14px;color:var(--teal);text-align:center;font-family:var(--ff-body)">
+        🌿 Você ainda não está em um Pequeno Grupo. Peça um convite ao Tutor ou Coordenador.
+      </div>`;
 
   // Botão Mural de Gratidão (só aparece se estiver em um grupo)
   const meuGrupoAtual = loadMeuGrupo();
