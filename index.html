@@ -3220,9 +3220,56 @@ function tutorLogout() {
   renderTutorLogin();
 }
 
-// Placeholder — implementação completa (criar o PG de fato) é a próxima etapa da RC2 (ATIVACAO-01).
-function abrirCriarPrimeiroPg(nome) {
-  alert('Em breve: criação de Pequeno Grupo pelo Tutor — próxima etapa da RC2 (ATIVACAO-01).');
+// ── ATIVACAO-01: criação de Pequeno Grupo pelo Tutor autenticado (allowlist) ────────
+// Uma função só, reaproveitada tanto para "criar o primeiro" quanto "criar mais um".
+function renderCriarPgForm(nomeTutor, errorMsg) {
+  const body = document.getElementById('tutorpanel-body');
+  body.innerHTML = `
+    <div class="content-card">
+      <div class="phase-tag tag-content">Novo Pequeno Grupo</div>
+      <p class="body-text">Você será registrado como Tutor responsável por este grupo.</p>
+    </div>
+    <div class="panel-section">
+      <label style="display:block;font-size:14px;color:var(--text3);margin-bottom:4px">Nome do Pequeno Grupo *</label>
+      <input id="cpg-nome" type="text" maxlength="40" placeholder="Ex: Luz do Caminho, Fonte Viva, Raízes…" style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box;margin-bottom:.6rem">
+      <label style="display:block;font-size:14px;color:var(--text3);margin-bottom:4px">Dia da semana</label>
+      <select id="cpg-dia" style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box;margin-bottom:.6rem">
+        <option value="">Selecione…</option>
+        <option value="Domingo">Domingo</option>
+        <option value="Segunda-feira">Segunda-feira</option>
+        <option value="Terça-feira">Terça-feira</option>
+        <option value="Quarta-feira">Quarta-feira</option>
+        <option value="Quinta-feira">Quinta-feira</option>
+        <option value="Sexta-feira">Sexta-feira</option>
+        <option value="Sábado">Sábado</option>
+      </select>
+      <label style="display:block;font-size:14px;color:var(--text3);margin-bottom:4px">Horário</label>
+      <input id="cpg-hora" type="time" style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box;margin-bottom:.6rem">
+      ${errorMsg ? `<p style="color:#E05050;font-size:14px;margin:0 0 .6rem">${errorMsg}</p>` : ''}
+      <button onclick="confirmarCriarPg('${nomeTutor.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17.5px;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">
+        ➕ Criar Pequeno Grupo
+      </button>
+      <button onclick="renderTutorGruposList('${nomeTutor.replace(/'/g,"\\'")}')" style="width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">← Voltar</button>
+    </div>`;
+}
+
+function confirmarCriarPg(nomeTutor) {
+  const nomeGrupo = document.getElementById('cpg-nome')?.value.trim();
+  const dia = document.getElementById('cpg-dia')?.value || '';
+  const hora = document.getElementById('cpg-hora')?.value || '';
+  if (!nomeGrupo) { renderCriarPgForm(nomeTutor, 'Dê um nome ao Pequeno Grupo.'); return; }
+
+  loadGrupos();
+  const g = getProximoGrupoVazio();
+  if (!g) { renderCriarPgForm(nomeTutor, 'Não há mais Pequenos Grupos disponíveis — fale com a administração.'); return; }
+
+  g.nome = nomeGrupo;
+  g.diaReuniao = dia || null;
+  g.horaReuniao = hora || null;
+  g.tutor = nomeTutor;
+  saveGrupos();
+
+  renderTutorGruposList(nomeTutor);
 }
 
 // ── Lista de Pequenos Grupos sob a tutela do responsável logado ────────
@@ -3231,19 +3278,23 @@ function renderTutorGruposList(nome) {
   const grupos = getGruposDoResponsavel(nome);
 
   if (!grupos.length) {
-    // ARCH-01: sem grupo é o estado normal de um Tutor recém-autorizado — a ação principal
-    // é criar o primeiro (ATIVACAO-01 implementa o botão a seguir; aqui só a interface).
+    // ARCH-02: sem grupo é o estado normal de um Tutor recém-autorizado pela allowlist —
+    // a ação principal é criar o primeiro PG (ATIVACAO-01).
     document.getElementById('tutorpanel-body').innerHTML = `
       <div class="content-card">
         <div class="phase-tag tag-content">${sanitize(nome)}</div>
         <p class="body-text">Você está autorizado como Tutor, mas ainda não tem nenhum Pequeno Grupo.</p>
       </div>
-      <button onclick="abrirCriarPrimeiroPg('${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">
+      <button onclick="renderCriarPgForm('${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">
         ➕ Criar Primeiro Pequeno Grupo
       </button>
       <button onclick="tutorLogout()" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Sair</button>`;
     return;
   }
+
+  // ATIVACAO-01: só quem é Tutor de pelo menos um desses grupos pode criar outro —
+  // Coordenador (mesmo autenticado neste mesmo painel) nunca cria Pequeno Grupo.
+  const souTutorDeAlgum = grupos.some(g => g.tutor && g.tutor.trim().toLowerCase() === nome.trim().toLowerCase());
 
   const cards = grupos.map(g => {
     const progresso = getOrInitPgProgress(g.num);
@@ -3277,6 +3328,7 @@ function renderTutorGruposList(nome) {
       <p class="body-text">${grupos.length} Pequeno${grupos.length===1?'':'s'} Grupo${grupos.length===1?'':'s'} sob seus cuidados.</p>
     </div>
     ${cards}
+    ${souTutorDeAlgum ? `<button onclick="renderCriarPgForm('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body)">➕ Criar outro Pequeno Grupo</button>` : ''}
     <button onclick="renderTutorResetPassScreen('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">🔑 Trocar minha senha</button>
     <button onclick="tutorLogout()" style="width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">🚪 Sair</button>`;
 }
