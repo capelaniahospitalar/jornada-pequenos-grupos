@@ -148,8 +148,17 @@ Cada commit é precedido de **Mapa de Impacto** (análise, sem código); tombsto
 - Flags congeladas no topo do `<script>`: `FB_FLAGS = Object.freeze({ usePrecondition,
   retryOnReconnect, debounceMs, useTombstone, identidadeUuid, convitesV2 })` → desligar cada
   camada por 1 linha. `debounceMs` e `useTombstone` são só reservas (ver Roadmap acima).
-- Tags: `v0-pre-concurrency` (pré-Commit-1, → `a167578`) e `v2a-pre-identidade` (pré-Etapa-1/2,
-  → `c747675`). Ambas publicadas no GitHub.
+- Tags: `v0-pre-concurrency` (pré-Commit-1, → `a167578`), `v2a-pre-identidade` (pré-Etapa-1/2,
+  → `c747675`) e `v3-rc1-baseline` (Baseline RC1, → `43f2d15`, criada localmente em 2026-07-02 —
+  **ainda não publicada no GitHub**, ver nota abaixo). As duas primeiras publicadas no GitHub.
+- **Baseline RC1 (2026-07-02):** snapshot do Firestore em
+  `C:\Users\wladimir.souza\Documents\backups-firebase-jdpg\BASELINE-RC1-2026-07-02.json` (50
+  grupos, Grupo 1 só com o Wladimir, sem mural) + tag `v3-rc1-baseline`. Ponto oficial de
+  restauração para a fase de homologação. **Pendente:** publicar a tag no GitHub — o push falhou
+  neste ambiente (credencial `Wladimperator` sem permissão de escrita no repositório
+  `capelaniahospitalar/jornada-pequenos-grupos`, HTTP 403); publicar pelo GitHub Desktop ou `git
+  push origin v3-rc1-baseline` com uma credencial autorizada.
+- Checklist de homologação e registro de defeitos: `HOMOLOGACAO-RC1.md` (novo, 2026-07-02).
 - Validação local (sem node/python): servidor estático PowerShell + preview do assistente.
 
 ## Estado dos dados na nuvem
