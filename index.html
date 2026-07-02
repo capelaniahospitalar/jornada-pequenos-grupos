@@ -3253,7 +3253,7 @@ function renderCriarPgForm(nomeTutor, errorMsg) {
     </div>`;
 }
 
-function confirmarCriarPg(nomeTutor) {
+async function confirmarCriarPg(nomeTutor) {
   const nomeGrupo = document.getElementById('cpg-nome')?.value.trim();
   const dia = document.getElementById('cpg-dia')?.value || '';
   const hora = document.getElementById('cpg-hora')?.value || '';
@@ -3269,7 +3269,72 @@ function confirmarCriarPg(nomeTutor) {
   g.tutor = nomeTutor;
   saveGrupos();
 
-  renderTutorGruposList(nomeTutor);
+  await gerarConvidarCoordenadorAutoEExibir(nomeTutor, g.num);
+}
+
+// ARCH-03: gera automaticamente o convite do Coordenador após criar o PG. Reaproveita
+// gerarConvite() (mesmo token único/uso único/validade já existentes — nenhum código novo de
+// segurança). Antes de criar, reaproveita um convite pendente já existente pra esse grupo/função,
+// em vez de duplicar.
+async function gerarConvidarCoordenadorAutoEExibir(nomeTutor, grupoNum) {
+  const body = document.getElementById('tutorpanel-body');
+  if (body) body.innerHTML = `<div class="content-card"><p class="body-text">Grupo criado. Gerando o convite do Coordenador…</p></div>`;
+
+  await syncFromFirebase().catch(() => {});
+  const existente = loadConvites().find(c =>
+    c.grupoNum === grupoNum && c.funcao === 'coordenador' && c.status === 'pendente' &&
+    (!c.expiraEm || Date.now() <= c.expiraEm));
+
+  const res = existente
+    ? { ok: true, invite: existente, inviteId: existente.inviteId, link: APP_URL + '?conv=' + existente.inviteId }
+    : await gerarConvite({ funcao: 'coordenador', grupoNum });
+
+  if (res.ok) renderPgCriadoComConvite(nomeTutor, grupoNum, res);
+  else renderPgCriadoSemConvite(nomeTutor, grupoNum, res.motivo);
+}
+
+function renderPgCriadoComConvite(nomeTutor, grupoNum, res) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  const texto = textoConviteWhatsApp(res.invite) + '\n\n' + res.link;
+  document.getElementById('tutorpanel-body').innerHTML = `
+    <div class="content-card">
+      <div class="phase-tag tag-content">✅ Pequeno Grupo criado</div>
+      <p class="body-text"><strong>${sanitize(g ? g.nome : '')}</strong> — agora falta só o Coordenador aceitar o convite abaixo.</p>
+    </div>
+    <div class="panel-section">
+      <label style="display:block;font-size:14px;color:var(--text3);margin-bottom:4px">WhatsApp do Coordenador (opcional)</label>
+      <input id="cpg-coord-wa" type="tel" style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box;margin-bottom:.6rem" placeholder="21 99999-0000">
+      <button onclick="abrirWhatsappConviteCoordenador('${res.invite.inviteId}')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:#25D366;border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">
+        📲 Enviar convite pelo WhatsApp
+      </button>
+      <button onclick="renderTutorGruposList('${nomeTutor.replace(/'/g,"\\'")}')" style="width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">Ir para meus grupos</button>
+    </div>`;
+}
+
+function abrirWhatsappConviteCoordenador(inviteId) {
+  const inv = getConvite(inviteId);
+  if (!inv) return;
+  const waEl = document.getElementById('cpg-coord-wa');
+  const waDigits = waEl ? waEl.value.replace(/\D/g, '') : '';
+  const destino = waDigits.length >= 10 ? ('55' + waDigits) : '';
+  const texto = textoConviteWhatsApp(inv) + '\n\n' + APP_URL + '?conv=' + inv.inviteId;
+  window.open('https://wa.me/' + destino + '?text=' + encodeURIComponent(texto), '_blank');
+}
+
+// Falha parcial (PG criado, convite não): nunca silenciosa — mensagem clara + tentar de novo.
+function renderPgCriadoSemConvite(nomeTutor, grupoNum, motivo) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  const msg = { sem_conexao: 'Sem conexão com a internet.', conflito: 'Muitas alterações ao mesmo tempo.', tamanho: 'Limite de tamanho da base atingido.' }[motivo]
+    || 'Não foi possível gerar o convite agora.';
+  document.getElementById('tutorpanel-body').innerHTML = `
+    <div class="content-card">
+      <div class="phase-tag tag-content">⚠️ Pequeno Grupo criado, mas o convite falhou</div>
+      <p class="body-text"><strong>${sanitize(g ? g.nome : '')}</strong> foi criado normalmente. ${msg} O convite do Coordenador não foi gerado — tente novamente.</p>
+    </div>
+    <button onclick="gerarConvidarCoordenadorAutoEExibir('${nomeTutor.replace(/'/g,"\\'")}', ${grupoNum})" style="width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">
+      🔁 Tentar gerar o convite novamente
+    </button>
+    <button onclick="renderTutorGruposList('${nomeTutor.replace(/'/g,"\\'")}')" style="width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">Ir para meus grupos</button>`;
 }
 
 // ── Lista de Pequenos Grupos sob a tutela do responsável logado ────────
@@ -7220,11 +7285,21 @@ function validarConviteParaAceite(inv, g, dadosPessoa) {
     const nome = (dadosPessoa && dadosPessoa.nome) || eu.nome || ST.userName;
     const wa   = (dadosPessoa && dadosPessoa.wa)   || eu.wa;
     if (!estaNaAllowlistTutores({ nome, wa })) return { ok: false, motivo: 'nao_autorizado_tutor' };
+  } else if (inv.funcao === 'coordenador') {
+    // ARCH-03: emissor autorizado por 2 vias — participante com papel 'tutor' (legado) OU
+    // Tutor administrativo do grupo (g.tutor, string, fresco) batendo com o nome gravado no
+    // convite no momento da emissão (inv.deNome). Comparação normalizada.
+    // Limitação conhecida (documentada, não bloqueante): usa nome canônico, não um ID estável —
+    // melhoria futura é migrar para um identificador da allowlist em vez de nome.
+    const emissorParticipante = (g.participantes || []).find(p => p.memberId === inv.deId);
+    const papelParticipante = emissorParticipante ? (emissorParticipante.papel || emissorParticipante.tipo) : null;
+    const emissorViaAdmin = g.tutor && inv.deNome &&
+      String(g.tutor).trim().toLowerCase() === String(inv.deNome).trim().toLowerCase();
+    if (papelParticipante !== 'tutor' && !emissorViaAdmin) return { ok: false, motivo: 'emissor_sem_papel' };
   } else {
     const emissor = (g.participantes || []).find(p => p.memberId === inv.deId);
     const papelEmissor = emissor ? (emissor.papel || emissor.tipo) : null;
-    const exigido = inv.funcao === 'coordenador' ? 'tutor' : 'coordenador';
-    if (papelEmissor !== exigido) return { ok: false, motivo: 'emissor_sem_papel' };
+    if (papelEmissor !== 'coordenador') return { ok: false, motivo: 'emissor_sem_papel' };
   }
   return { ok: true };
 }
@@ -7264,18 +7339,34 @@ async function commitConviteChange(construir) {
 
 // GERAR: confere autoridade → grava o convite na base (via laço seguro).
 //   funcao 'coordenador' → só Tutor;  'colaborador' → só Coordenador;  'tutor' → allowlist.
+// ARCH-03: o Tutor é autoridade administrativa externa ao grupo (g.tutor), não precisa virar
+// participante artificial. Autoridade de coordenador aceita 2 vias equivalentes: participante
+// com papel 'tutor' (fluxo legado, ex. Wladimir) OU o Tutor administrativo autenticado no Painel
+// (ST.tutorPanelAuth) cujo nome bate com g.tutor — comparação normalizada.
+function souTutorAdminDoGrupo(gLocal) {
+  return !!ST.tutorPanelAuth && !!gLocal.tutor &&
+    String(ST.tutorPanelAuth).trim().toLowerCase() === String(gLocal.tutor).trim().toLowerCase();
+}
+
 async function gerarConvite({ tipo, grupoNum, funcao, paraWa }) {
   const gLocal = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
   if (!gLocal) return { ok: false, motivo: 'grupo_inexistente' };
   const eu = loadMeuGrupo() || {};
+  let deNomeFinal = eu.nome || ST.userName || '';
 
-  if (funcao === 'coordenador')      { if (getMinhaFuncaoNoGrupo(grupoNum) !== 'tutor')       return { ok: false, motivo: 'sem_autoridade' }; tipo = tipo || 'tutor->coord'; }
+  if (funcao === 'coordenador') {
+    const viaParticipante = getMinhaFuncaoNoGrupo(grupoNum) === 'tutor';
+    const viaAdmin = souTutorAdminDoGrupo(gLocal);
+    if (!viaParticipante && !viaAdmin) return { ok: false, motivo: 'sem_autoridade' };
+    if (viaAdmin && !viaParticipante) deNomeFinal = ST.tutorPanelAuth; // nome canônico do Tutor admin
+    tipo = tipo || 'tutor->coord';
+  }
   else if (funcao === 'colaborador') { if (getMinhaFuncaoNoGrupo(grupoNum) !== 'coordenador') return { ok: false, motivo: 'sem_autoridade' }; tipo = tipo || 'coord->colab'; }
   else if (funcao === 'tutor')       { if (!estaNaAllowlistTutores({ nome: eu.nome || ST.userName, wa: eu.wa })) return { ok: false, motivo: 'sem_autoridade' }; tipo = tipo || 'tutor'; }
   else return { ok: false, motivo: 'funcao_invalida' };
 
   const inv = criarConviteObj({ tipo, funcao, grupoNum, grupoNome: gLocal.nome,
-    deId: getMyMemberId(), deNome: eu.nome || ST.userName || '', paraWa });
+    deId: getMyMemberId(), deNome: deNomeFinal, paraWa });
 
   return await commitConviteChange((remote) => {
     const convitesNovos = podarConvites(mergeConvites(mergeConvites(remote.convites, loadConvites()), [inv]));

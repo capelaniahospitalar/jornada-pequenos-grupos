@@ -1,5 +1,52 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-02] — RC2: convite automático do Coordenador ao criar o PG (ARCH-03)
+
+Etapa 3 da RC2. Resolve a identidade dupla de "quem é o Tutor" que impedia um Tutor puro-admin
+(sem registro de participante, criado na Etapa 2) de gerar o convite do Coordenador.
+
+- `gerarConvite()` (branch `coordenador`): aceita autoridade por 2 vias — participante papel
+  `'tutor'` (legado, intocado) ou nova `souTutorAdminDoGrupo()` (`ST.tutorPanelAuth` bate com
+  `g.tutor`). `deNome` do convite usa o nome canônico do Tutor quando só a via admin autoriza.
+- `validarConviteParaAceite()`: contrapartida obrigatória no lado do aceite, mesma lógica de 2
+  vias — sem ela, o convite seria gerado mas nunca poderia ser aceito. Fluxo de `colaborador`
+  (emitido por Coordenador) não foi tocado.
+- `getMinhaFuncaoNoGrupo()` **não foi alterada** — evita qualquer risco no fluxo comum
+  (`openShare()`, usado por Colaborador/Coordenador via Home).
+- Nenhum Tutor artificial criado em `participantes[]`.
+- Convite do Coordenador agora é gerado **automaticamente** logo após criar o PG
+  (`confirmarCriarPg` → `gerarConvidarCoordenadorAutoEExibir`) — verifica convite pendente
+  existente antes (não duplica), mostra link pronto + WhatsApp em caso de sucesso, e uma tela
+  própria com botão de tentar novamente em caso de falha (nunca silenciosa).
+- **Limitação documentada:** autoridade administrativa usa nome canônico, não ID estável —
+  melhoria futura é migrar para um identificador da allowlist.
+- Testado: geração via admin, aceite completo pelo Coordenador, reaproveitamento de convite
+  pendente, falha simulada + retry, fluxo legado (participante) sem regressão.
+
+---
+
+## [2026-07-02] — RC2: criação de Pequenos Grupos pelo Tutor (ATIVACAO-01)
+
+Etapa 2 da RC2. Um Tutor autenticado pela allowlist (Etapa 1, `ARCH-02`) já pode criar Pequenos
+Grupos de verdade, sem reativar nenhum autocadastro.
+
+- `renderCriarPgForm()` + `confirmarCriarPg()` — nome do grupo (obrigatório), dia/horário
+  (opcionais); usa `getProximoGrupoVazio()` (já existente, reaproveitada) para achar o próximo dos
+  50 slots fixos ainda livre; grava com `saveGrupos()`, herdando de graça a trava de concorrência
+  já testada (precondição + retry) — nenhum código novo de concorrência.
+- Estado sem grupos → "➕ Criar Primeiro Pequeno Grupo"; estado com 1+ grupos → lista normal +
+  "➕ Criar outro Pequeno Grupo", **só visível para quem é Tutor de pelo menos um deles** — um
+  Coordenador autenticado no mesmo painel nunca cria grupo.
+- Uma única função de criação para os dois estados — sem duplicar fluxo.
+- Placeholder da Etapa 1 (`abrirCriarPrimeiroPg`/`alert`) removido.
+- **Fora do escopo, registrado como pendência (`ARCH-03`):** convite automático do Coordenador ao
+  criar o grupo — depende de resolver antes uma inconsistência entre duas checagens de "quem é
+  Tutor" (`g.tutor` string vs. lista de `participantes`), usadas por partes diferentes do app.
+- Testado: criação com zero grupos, criação de um segundo grupo, bloqueio correto para
+  Coordenador, console limpo.
+
+---
+
 ## [2026-07-02] — RC2: acesso administrativo do Tutor independente de grupo/dispositivo (ARCH-02)
 
 Início do desenvolvimento da RC2 (RC1 encerrada — ver `ESTADO-E-ROADMAP.md`). Primeira etapa:

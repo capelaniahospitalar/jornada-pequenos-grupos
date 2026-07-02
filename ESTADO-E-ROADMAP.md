@@ -143,17 +143,61 @@ Cada commit é precedido de **Mapa de Impacto** (análise, sem código); tombsto
   para quando for feito: eliminar a duplicidade, unificar num único botão, remover o contador
   baseado em `localStorage` (ou trocar por um derivado do Firebase). Planejado para depois da RC e
   da homologação, como rodada de refinamento de UX — não antes.
-- **ATIVACAO-01 — Feature (não correção): criar fluxo administrativo para ativação de novos
-  Pequenos Grupos e designação inicial do Tutor (novo, 2026-07-02).** Achado durante a correção do
-  `BLOCKER-001` (ver `HOMOLOGACAO-RC1.md`): ao fechar o autocadastro, ficou sem solução o único
-  mecanismo que existia para ativar um PG novo (dos 44 ainda vazios) — `gerarConvite()` exige que
-  o Tutor já esteja cadastrado como participante `papel:'tutor'` naquele grupo especificamente, e
-  isso só acontecia hoje pela tela antiga de autocadastro. **Não resolvido de propósito** — o
-  Grupo 1 (já ativo) é suficiente para a homologação atual; não expor esse poder ao usuário comum.
-  Esboço de solução sugerido pelo usuário: fluxo administrativo separado (`Administrador → Ativar
-  Grupo N → Definir Tutor → Tutor gera convite do Coordenador`), ou alternativa mais simples:
-  permitir que um Tutor já validado pela allowlist `tutores` ative apenas grupos a ele atribuídos.
-  Pertence claramente à próxima versão — não cabe no congelamento da RC1.
+- **`ATIVACAO-01` — Criação de Pequenos Grupos pelo Tutor — Etapa 2 da RC2 CONCLUÍDA
+  (2026-07-02).** Um Tutor autenticado pela allowlist (Etapa 1, `ARCH-02`) agora pode criar PGs de
+  verdade, sem reativar nenhum autocadastro.
+  - **Implementado:** `renderCriarPgForm(nomeTutor, errorMsg)` (nome do grupo obrigatório, dia/
+    horário opcionais) + `confirmarCriarPg(nomeTutor)` — usa `getProximoGrupoVazio()` (já existia,
+    reaproveitada) pra achar o próximo slot livre dos 50 fixos, preenche `nome`/`diaReuniao`/
+    `horaReuniao`/`tutor` e grava com `saveGrupos()` — herda de graça a trava de concorrência já
+    testada (`saveGruposToFirebase`: precondição + 3 tentativas + backoff), **sem nenhum código
+    novo de concorrência**.
+  - **Estado sem grupos:** botão "➕ Criar Primeiro Pequeno Grupo". **Estado com 1+ grupos:** lista
+    normal + botão "➕ Criar outro Pequeno Grupo" — **só visível para quem é `g.tutor` de pelo
+    menos um desses grupos** (`souTutorDeAlgum`); um Coordenador autenticado no mesmo painel nunca
+    vê esse botão — não pode criar grupo.
+  - **Sem duplicar fluxo:** uma única função de criação serve os dois estados (zero e 1+ grupos).
+  - **Placeholder da Etapa 1 removido:** `abrirCriarPrimeiroPg()`/`alert()` não existem mais no
+    código.
+  - **Testado (preview, dados fictícios):** zero grupos → cria o primeiro corretamente · Tutor com
+    grupo → botão "criar outro" aparece e funciona (2º grupo criado corretamente) · Coordenador
+    (não-tutor) → botão não aparece · console limpo, sem requisições falhas.
+  - **Fora do escopo (decisão explícita):** convite automático do Coordenador **não** entra nesta
+    etapa — ver `ARCH-03` abaixo.
+- **`ARCH-03` — Identidade dupla de "quem é o Tutor" — Etapa 3 da RC2 CONCLUÍDA (2026-07-02).**
+  Existiam duas checagens de autoridade de Tutor que não se falavam: `getGruposDoResponsavel()`
+  (Painel) via `g.tutor` string; `getMinhaFuncaoNoGrupo()` (usada por `gerarConvite()`) via lista
+  de `participantes`. Como o `ATIVACAO-01` deliberadamente não cria participante pro Tutor, ele não
+  conseguia gerar convite de Coordenador. **Resolvido sem alterar `getMinhaFuncaoNoGrupo()`**
+  (evita risco no fluxo comum `openShare()`) e **sem criar Tutor artificial em `participantes[]`**:
+  - `gerarConvite()` (branch `coordenador`): autoridade por 2 vias — participante papel `'tutor'`
+    (legado, intocado) OU nova função `souTutorAdminDoGrupo(gLocal)` (`ST.tutorPanelAuth` bate com
+    `g.tutor`, comparação normalizada). Quando só a via admin autoriza, `deNome` do convite usa o
+    nome canônico (`ST.tutorPanelAuth`), não a identidade de participante (que pode nem existir).
+  - **Contrapartida obrigatória em `validarConviteParaAceite()`** (achado durante o desenho, sem a
+    qual o convite gerado nunca poderia ser aceito): mesma lógica de 2 vias no lado do aceite —
+    participante papel `'tutor'` OU `g.tutor` (fresco) batendo com `inv.deNome` (gravado na
+    emissão). Fluxo de `colaborador` (emitido por Coordenador) **intocado**.
+  - **Limitação conhecida, documentada (não bloqueante):** a via admin usa **nome canônico**, não
+    um identificador estável — `inv.deNome` é comparado como string. Melhoria futura: migrar para
+    um ID estável da allowlist em vez de nome.
+  - **Testado:** convite gerado via admin (zero participante) ✅ · aceite desse convite pelo
+    Coordenador ✅ (papel + participante criados corretamente) · fluxo legado via participante
+    (Wladimir-style) sem regressão ✅.
+  - **Orquestração (convite automático ao criar o PG):** `confirmarCriarPg()` chama
+    `gerarConvidarCoordenadorAutoEExibir()` logo após `saveGrupos()` — sem ação extra do Tutor.
+    Antes de gerar, verifica se já existe convite `pendente` (não expirado) pra aquele grupo/função
+    e **reaproveita** em vez de duplicar. Sucesso → tela com link pronto + campo opcional de
+    WhatsApp do Coordenador + botão que abre o WhatsApp já preenchido (reaproveita
+    `textoConviteWhatsApp()`, mesmo texto padrão de sempre). **Falha nunca fica silenciosa:** tela
+    própria explicando que o PG foi criado mas o convite não, com botão "🔁 Tentar gerar o convite
+    novamente" (chama a mesma função). Testado: geração com sucesso, reaproveitamento de convite
+    existente (não duplica), falha simulada de rede + retry funcionando.
+  - **Residual não resolvido (fora do escopo desta etapa, por instrução explícita do usuário):** se
+    o Tutor sair da tela de falha sem clicar em "tentar novamente", hoje não há outro ponto de
+    entrada no Painel pra gerar esse convite depois — `renderTutorGrupoDetalhe` não tem esse botão.
+    Construir esse caminho permanente é "adequação do fluxo do Coordenador" (item 4 da ordem da
+    RC2), fora do escopo da Etapa 3.
 - **FUNC-02 — Remover definitivamente o fluxo legado de autocadastro (novo, 2026-07-02).**
   O `BLOCKER-001` fechou o **acesso** ao autocadastro (via `openGrupos()` redefinida), mas
   deliberadamente não apagou o código: `confirmarInscricao()`, `selectProfile()`, `startJourney()`
@@ -446,9 +490,9 @@ de autocadastro e consolidar a arquitetura 100% baseada em convites hierárquico
 **Ordem definida pelo usuário:**
 1. ✅ `ARCH-02` — ponto de entrada exclusivo dos Tutores (`?tutor`, independente de dispositivo/
    `welcomeDone`, validado contra a allowlist `tutores`). **Feito em 2026-07-02.**
-2. `ATIVACAO-01` — fluxo de criação de Pequenos Grupos pelo Tutor. **Próximo item.**
-3. Convite automático do Coordenador ao criar o grupo.
-4. Adequar o fluxo do Coordenador.
+2. ✅ `ATIVACAO-01` — fluxo de criação de Pequenos Grupos pelo Tutor. **Feito em 2026-07-02.**
+3. ✅ `ARCH-03` + convite automático do Coordenador ao criar o grupo. **Feito em 2026-07-02.**
+4. Adequar o fluxo do Coordenador. **Próximo item.**
 5. Adequar o fluxo do Participante.
 6. `FUNC-02` — remover definitivamente o legado de autocadastro (código físico, não só acesso).
 7. `UX-01`/`UX-02` — permissões e interface por papel.
