@@ -96,9 +96,8 @@ com usuários reais, durante a revisão da tela de entrada da RC1.
   | 6 | Usuário já cadastrado (`welcomeDone=true`) | ✅ Entra direto na Home, tela de convite não fica ativa |
 
   Console sem erros e sem requisições falhas em todos os 6 cenários.
-- **Commit:** _(pendente — aguardando você revisar/commitar pelo GitHub Desktop)_
+- **Commit:** `188a56f` ("conserto da página")
 - **Retestado:** ✅ 2026-07-02 — 6/6 cenários da checklist de regressão aprovados (ver tabela acima).
-  Falta apenas o commit para fechar definitivamente.
 - **Observação de fechamento:** BLOCKER-001 resolvido **antes** do início da homologação
   operacional. Não integra a lista de `BUG-XXX` encontrados durante a homologação por ter sido
   identificado previamente ao início dos testes de campo — a homologação já começa com a

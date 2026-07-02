@@ -353,7 +353,11 @@ preparado para validação em campo.
 - ✅ Código morto eliminado
 - ✅ Nenhuma função duplicada
 - ✅ Nenhuma referência órfã conhecida
-- ⚠️ Homologação operacional pendente — ver pendência 7 acima
+- ✅ **`BLOCKER-001` resolvido (2026-07-02, commit `188a56f`)** — fluxo antigo de autocadastro
+  fechado antes do início da homologação (ver `HOMOLOGACAO-RC1.md`); 6/6 testes de regressão
+  aprovados. Não conta como bug de homologação — foi identificado e corrigido antes de abrir os
+  testes de campo.
+- ⚠️ Homologação operacional pendente — ver pendência 7 acima (esta é a atividade atual)
 - ✅ Pronta para homologação operacional
 
 **Regra de disciplina a partir da RC1:** novas alterações devem ocorrer **apenas** para correção de
