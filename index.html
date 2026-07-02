@@ -5116,12 +5116,11 @@ function initApp() {
     renderCompanionFab();
     setTimeout(initGrupos, 80);
   } else {
-    showScreen('welcome');
-    setTimeout(() => {
-      renderGrupoBarWelcome();
-      renderGrupoPreviewWelcome();
-      renderWelcomeLevelBadge();
-    }, 80);
+    // BLOCKER-001: sem convite válido, não existe mais autocadastro — só a
+    // mensagem orientando a pedir um convite. Ver HOMOLOGACAO-RC1.md.
+    showScreen('convite');
+    const body = document.getElementById('convite-body');
+    if (body) body.innerHTML = telaConviteMensagem('sem_convite');
   }
 }
 
@@ -7326,6 +7325,7 @@ function mensagemConvite(motivo) {
     case 'nao_autorizado_tutor': return { titulo: 'Sem autorização', texto: 'Você não está autorizado a entrar como Tutor deste Pequeno Grupo.' };
     case 'versao_anterior':    return { titulo: 'Convite de versão anterior', texto: 'Este convite pertence a uma versão anterior do aplicativo e não pode mais ser utilizado. Solicite um novo convite ao Coordenador do seu Pequeno Grupo.' };
     case 'sem_conexao':        return { titulo: 'Sem conexão', texto: 'Não foi possível validar o convite. Verifique sua internet e abra o link novamente.' };
+    case 'sem_convite':        return { titulo: 'Convite necessário', texto: 'Você precisa de um convite para participar de um Pequeno Grupo. Solicite ao Tutor ou ao Coordenador do seu grupo um convite de ingresso.' };
     default:                   return { titulo: 'Convite indisponível', texto: 'Este convite não existe ou não está mais disponível. Solicite um novo convite ao Coordenador.' };
   }
 }
@@ -7343,7 +7343,12 @@ function telaConviteMensagem(motivo) {
 function irParaInicioLimpo() {
   window.history.replaceState({}, '', window.location.pathname);
   if (ST.welcomeDone) { showScreen('home'); renderHome(); renderCompanionFab(); setTimeout(initGrupos, 80); }
-  else { showScreen('welcome'); setTimeout(prefillWelcomeForm, 50); }
+  else {
+    // BLOCKER-001: sem convite válido, não há para onde voltar além da mensagem.
+    showScreen('convite');
+    const body = document.getElementById('convite-body');
+    if (body) body.innerHTML = telaConviteMensagem('sem_convite');
+  }
 }
 
 // Tela de entrada por convite — os 4 elementos (mockup aprovado).
@@ -8016,15 +8021,12 @@ function isGrupoAcessivel(g) {
 }
 
 // ── Navegação ──────────────────────────────────────────────────────────
+// BLOCKER-001: a lista pública de grupos e o autocadastro foram desativados —
+// ingresso só é possível por convite (?conv=<id>). Ver HOMOLOGACAO-RC1.md.
 function openGrupos() {
-  loadGrupos();
-  showScreen('grupos');
-  renderGrupoSyncBadge();
-  renderGrupoList();
-  syncFromFirebase().then(updated => {
-    if (updated) renderGrupoList();
-  });
-  startFbPoll();
+  showScreen('convite');
+  const body = document.getElementById('convite-body');
+  if (body) body.innerHTML = telaConviteMensagem('sem_convite');
 }
 
 // ── Render: lista de grupos ────────────────────────────────────────────

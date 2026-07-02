@@ -143,6 +143,24 @@ Cada commit é precedido de **Mapa de Impacto** (análise, sem código); tombsto
   para quando for feito: eliminar a duplicidade, unificar num único botão, remover o contador
   baseado em `localStorage` (ou trocar por um derivado do Firebase). Planejado para depois da RC e
   da homologação, como rodada de refinamento de UX — não antes.
+- **ATIVACAO-01 — Feature (não correção): criar fluxo administrativo para ativação de novos
+  Pequenos Grupos e designação inicial do Tutor (novo, 2026-07-02).** Achado durante a correção do
+  `BLOCKER-001` (ver `HOMOLOGACAO-RC1.md`): ao fechar o autocadastro, ficou sem solução o único
+  mecanismo que existia para ativar um PG novo (dos 44 ainda vazios) — `gerarConvite()` exige que
+  o Tutor já esteja cadastrado como participante `papel:'tutor'` naquele grupo especificamente, e
+  isso só acontecia hoje pela tela antiga de autocadastro. **Não resolvido de propósito** — o
+  Grupo 1 (já ativo) é suficiente para a homologação atual; não expor esse poder ao usuário comum.
+  Esboço de solução sugerido pelo usuário: fluxo administrativo separado (`Administrador → Ativar
+  Grupo N → Definir Tutor → Tutor gera convite do Coordenador`), ou alternativa mais simples:
+  permitir que um Tutor já validado pela allowlist `tutores` ative apenas grupos a ele atribuídos.
+  Pertence claramente à próxima versão — não cabe no congelamento da RC1.
+- **FUNC-02 — Remover definitivamente o fluxo legado de autocadastro (novo, 2026-07-02).**
+  O `BLOCKER-001` fechou o **acesso** ao autocadastro (via `openGrupos()` redefinida), mas
+  deliberadamente não apagou o código: `confirmarInscricao()`, `selectProfile()`, `startJourney()`
+  e o HTML da tela antiga (`screen-welcome`, passos 2 e 3) continuam no arquivo, inertes (nenhum
+  caminho os alcança mais). Remoção física fica para uma limpeza futura, no mesmo espírito do
+  `FUNC-01`/`STR-01` a `STR-05` já feitos — não é urgente, não representa risco enquanto
+  inalcançável.
 
 ## Rollback / segurança
 - Flags congeladas no topo do `<script>`: `FB_FLAGS = Object.freeze({ usePrecondition,
