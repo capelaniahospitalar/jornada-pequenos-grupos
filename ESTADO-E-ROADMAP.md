@@ -1,4 +1,4 @@
-# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-07-01)
+# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-07-02)
 
 > Documento para retomar o trabalho em outra máquina/sessão. Cole o conteúdo de volta
 > para o assistente ao recomeçar — a "memória" do assistente **não viaja entre máquinas**;
@@ -163,6 +163,19 @@ e trava de concorrência (`currentDocument.updateTime`). Confirmado por leitura:
 Grupos 7–50 inalterados, 50 grupos no total. Campo `convites` não existe no documento (nenhum
 convite ativo até o momento).
 
+**Atualizado 2026-07-02 (2ª operação, mesma sessão):** confirmado que links antigos `?pg=N` **já
+foram distribuídos para pessoas reais** (ver pendência 6 abaixo, agora resolvida) — o Grupo 1
+(CAPELANIA) foi **resetado sob autorização explícita do usuário** para recomeçar oficialmente pela
+cadeia de convites nova. Mudança: `participantes` do Grupo 1 passou de 2 para 1 (mantido só
+**Wladimir Gonçalves**, tutor real, com XP/progresso intactos — 110 XP, 1 estudo, 1 missão);
+**Tamires Santos removida** (precisa se recadastrar pelo convite do Coordenador/Tutor); `gratidoes`
+(mural) zerado (3 posts reais do Wladimir apagados, por decisão do usuário). Backup prévio:
+`snapshot-antes-reset-grupo1-2026-07-02.json`. Mesmo processo de segurança: leitura fresca →
+backup → trava de concorrência (`currentDocument.updateTime`) → gravação → confirmação por
+releitura. `tutores` (allowlist) e os outros 49 grupos não foram tocados. **Próximo passo humano:**
+Wladimir entra no app como Tutor e usa o Painel do Tutor para gerar o convite ao Coordenador,
+reiniciando a cadeia oficialmente.
+
 ## Auditoria Completa (2026-07-01) — Tabela Final de Pendências
 
 Auditoria de 5 fases (Estrutura, Banco de Dados, Fluxos, Permissões, Código) + verificações
@@ -286,10 +299,43 @@ evidência de corrupção causada pela sincronização.** Os achados abaixo já 
 6. ✅ **`IDENT-01`** — Recuperação de Identidade do Colaborador. Feito.
 7. ✅ **Limpeza de código morto** (`FUNC-01`, `STR-01` a `STR-05`). Feito em 2026-07-02.
 8. ✅ **Apagar grupos de teste 2–6** (preservando o 1). Feito em 2026-07-02.
-9. **Criar Release Candidate (RC1)** e iniciar homologação com grupos reais. **Próximo item.**
+9. ✅ **`RC1`** — Release Candidate declarada em 2026-07-02 (ver seção **Release Candidate RC1**
+   abaixo). Homologação operacional é a atividade atual.
 
 **Decisões de contexto ainda em aberto:**
-6. Algum link antigo `?pg=N` já foi distribuído para pessoa real antes da Etapa 2 quebrar esse
-   fluxo? (Especialmente relevante para o Grupo 1.)
-7. A homologação do Commit 1 (testes 2–7) foi concluída antes de avançar para a Etapa 1/2, ou
-   ficou pendente?
+6. ✅ **Respondida (2026-07-02):** sim, links antigos `?pg=N` foram distribuídos para pessoas reais
+   (Grupo 1). Ação tomada: Grupo 1 resetado (ver "Estado dos dados na nuvem" acima) — recomeço
+   oficial pela cadeia de convites nova, compatibilidade com `?pg=N` **encerrada** (não é mais
+   necessária, já que ninguém mais depende do link antigo).
+7. ✅ **Respondida (2026-07-02) — ⚠️ Homologação técnica realizada parcialmente.** Pelo histórico
+   acompanhado, houve diversos testes técnicos e validações pontuais do Commit 1 (concorrência),
+   mas **não uma homologação operacional formal** com usuários representativos usando o fluxo
+   completo. A homologação operacional permanece pendente e será executada utilizando a RC1 (ver
+   "Próxima atividade" abaixo).
+
+## Release Candidate RC1 (declarada 2026-07-02)
+
+A arquitetura está estabilizada. Correções estruturais concluídas, base de dados limpa, código
+morto removido, fluxo antigo de ingresso (`?pg=N`) descontinuado e novo fluxo de convites
+preparado para validação em campo.
+
+- ✅ Correções estruturais concluídas (`PERM-01`, `DB-01`, `DB-02`, `DB-04`, `IDENT-01`)
+- ✅ Banco consistente (grupos de teste limpos, Grupo 1 resetado, allowlist `tutores` intacta)
+- ✅ `IDENT-01` concluído
+- ✅ Dados de teste removidos
+- ✅ Código morto eliminado
+- ✅ Nenhuma função duplicada
+- ✅ Nenhuma referência órfã conhecida
+- ⚠️ Homologação operacional pendente — ver pendência 7 acima
+- ✅ Pronta para homologação operacional
+
+**Regra de disciplina a partir da RC1:** novas alterações devem ocorrer **apenas** para correção de
+defeitos encontrados durante a homologação ou ajustes mínimos de usabilidade previamente
+documentados (como o `UX-01`). Sem novas funcionalidades antes da homologação.
+
+**Próxima atividade (exclusivamente operacional):**
+1. Wladimir entra no app como Tutor.
+2. Gera o convite do Coordenador.
+3. Valida toda a cadeia: Tutor → Coordenador → Coordenador → Colaboradores → ingresso no grupo →
+   mural de gratidão → pedidos de oração → progresso → sincronização entre dispositivos.
+4. Qualquer defeito encontrado é registrado antes de se pensar em novas funcionalidades.
