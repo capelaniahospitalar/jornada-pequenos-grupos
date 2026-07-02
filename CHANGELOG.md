@@ -1,5 +1,30 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-02] — Limpeza de código morto (FUNC-01, STR-01 a STR-05)
+
+Commit de manutenção, sem alteração de comportamento observável pelo usuário.
+
+- **FUNC-01:** removidas as 4 funções duplicadas (`sendMyPrayer`, `clearMyPrayer`,
+  `openComunidade`, `enviarGratidao`) — em cada par, só a segunda declaração era
+  executada; a primeira nunca rodava (JS sobrescreve funções de mesmo nome).
+- Removida, junto, toda a cadeia de funções que só era chamada pela 1ª versão de
+  `openComunidade`/`enviarGratidao` e por isso também nunca executava:
+  `renderComunidadeScreen`, `renderGratCard`, `timeAgoGrat`, `setMuralFiltro`,
+  `setPostTipo`, `getMinhasReacoes`, `reagirGratidao` e as variáveis `muralFiltro`,
+  `postTipoSelecionado`, `GRAT_REACOES_KEY`.
+- **STR-05:** removido o `if (window._conviteGrupoNum)` em `startJourney()` — a
+  variável nunca era definida em lugar nenhum do código (resíduo do fluxo `?pg=N`
+  removido na Etapa 2), condição sempre falsa.
+- **STR-01/STR-03:** excluído `revisao.html` (arquivo órfão, não referenciado por
+  nada, continha o link duplicado do STR-03).
+- **STR-02:** removido `.claude/launch.json` (apontava para um caminho de sessão
+  antigo que não existe mais).
+- **STR-04:** removida a constante `TUTOR_PANEL_URL`, declarada e nunca usada.
+- Verificado: nenhuma função duplicada remanescente (busca global); app carrega sem
+  erros no console e sem requisições falhas.
+
+---
+
 ## [2026-06-29] — Corrige perda do mural em conflito Firebase (FB-C3, regressão)
 
 ### ALTO corrigido — `gratidoes` (mural) apagado/perdido no merge

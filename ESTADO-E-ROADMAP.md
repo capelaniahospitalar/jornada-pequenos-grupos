@@ -123,10 +123,26 @@ Cada commit é precedido de **Mapa de Impacto** (análise, sem código); tombsto
   função lê esse flag ainda; é só um marcador reservado do plano original.
 - **C4 — Debounce ~400ms** (`FB_FLAGS.debounceMs`) com dirty-check de payload. Mesma situação:
   flag existe (`400`) mas **não está implementada/lida em nenhum lugar do código**.
-- **C5 — Limpeza:** remover código morto (`sendMyPrayer`/`clearMyPrayer` duplicadas em 5154/5176,
-  sobrescritas por 5673/5688) + atualizar `CHANGELOG.md`. Também dead code novo a considerar:
-  `window._conviteGrupoNum` (linhas ~4975/4986) — nada mais define essa variável desde que o fluxo
-  `?pg=N` foi removido na Etapa 2.
+- **C5 — Limpeza: FEITO (2026-07-02).** `FUNC-01` (4 duplicatas: `sendMyPrayer`, `clearMyPrayer`,
+  `openComunidade`, `enviarGratidao`) + a cadeia inteira que só a 1ª versão de `openComunidade`/
+  `enviarGratidao` chamava (`renderComunidadeScreen`, `renderGratCard`, `timeAgoGrat`,
+  `setMuralFiltro`, `setPostTipo`, `getMinhasReacoes`, `reagirGratidao` + variáveis) + `STR-01`
+  (`revisao.html`) + `STR-02` (`.claude/launch.json`) + `STR-03` (resolvido junto com STR-01) +
+  `STR-04` (`TUTOR_PANEL_URL`) + `STR-05` (`window._conviteGrupoNum`, nunca definido em lugar
+  nenhum). 253 linhas removidas de `index.html`, zero mudança de comportamento observável — só
+  o que já era comprovadamente inalcançável foi tirado. `CHANGELOG.md` atualizado. Verificado:
+  busca global sem duplicatas remanescentes; app carrega sem erros de console nem requisições
+  falhas.
+- **UX-01 — Revisar acesso à Comunidade/Mural de Gratidão na Home (novo, 2026-07-02).**
+  Achado durante o C5: a Home tem hoje **dois botões** que levam para a mesma tela — "Mural de
+  Gratidão" (dentro de `renderGruposBtnHome`, só aparece se já estiver num grupo) e "Comunidade"
+  (`renderComunidadeBtnHome`, sempre aparece, com contador "X compartilhada(s) por você"). Esse
+  contador lê de um `localStorage` (`loadGratidoes`/`GRAT_KEY`) que **não é mais escrito por
+  ninguém** desde que o mural virou por grupo/Firebase — fica travado permanentemente. Deliberadamente
+  **não mexido no C5** (removê-lo muda a tela inicial, deixa de ser limpeza pura). Escopo proposto
+  para quando for feito: eliminar a duplicidade, unificar num único botão, remover o contador
+  baseado em `localStorage` (ou trocar por um derivado do Firebase). Planejado para depois da RC e
+  da homologação, como rodada de refinamento de UX — não antes.
 
 ## Rollback / segurança
 - Flags congeladas no topo do `<script>`: `FB_FLAGS = Object.freeze({ usePrecondition,
@@ -268,9 +284,9 @@ evidência de corrupção causada pela sincronização.** Os achados abaixo já 
 4. ⏸️ **`DB-03`** — reavaliado, adiado deliberadamente (ver nota acima; residual só em Tutores, sem impacto na operação).
 5. ✅ **`DB-04`** — Campanhas (Embaixadores) sincronizadas via `g.campanhas`. Feito.
 6. ✅ **`IDENT-01`** — Recuperação de Identidade do Colaborador. Feito.
-7. **Limpeza de código morto** (`FUNC-01`/duplicações, `STR-01` a `STR-05`). **Em andamento.**
+7. ✅ **Limpeza de código morto** (`FUNC-01`, `STR-01` a `STR-05`). Feito em 2026-07-02.
 8. ✅ **Apagar grupos de teste 2–6** (preservando o 1). Feito em 2026-07-02.
-9. **Homologação com grupos reais.**
+9. **Criar Release Candidate (RC1)** e iniciar homologação com grupos reais. **Próximo item.**
 
 **Decisões de contexto ainda em aberto:**
 6. Algum link antigo `?pg=N` já foi distribuído para pessoa real antes da Etapa 2 quebrar esse

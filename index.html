@@ -3027,7 +3027,6 @@ function copyLink(url) {
 // ══════════════════════════════════════
 //  PAINEL DO TUTOR (acompanhamento de discípulos)
 // ══════════════════════════════════════
-const TUTOR_PANEL_URL = 'https://script.google.com/macros/s/AKfycbz1eoMpd6OwunBWtBRwCUbcg40wZvk89cIu2KA2PwuGb1HbZ4hpO91tOo-IRmjnNoy1/exec';
 
 function openTutorPanel() {
   showScreen('tutorpanel');
@@ -5050,19 +5049,13 @@ function startJourney() {
   if (!meuGrupo) {
     const el = document.getElementById('welcome-group-required');
     if (el) { el.style.display = 'block'; setTimeout(()=>el.style.display='none', 4000); }
-    // Se veio de convite, abrir direto o grupo convidado
-    if (window._conviteGrupoNum) {
-      openInscricao(window._conviteGrupoNum);
-    } else {
-      openGrupos();
-    }
+    openGrupos();
     return;
   }
   ST.welcomeDone = true;
   ST.grupoNum  = meuGrupo.grupoNum;
   ST.grupoNome = meuGrupo.grupoNome;
   if (!ST.userName && meuGrupo.nome) ST.userName = meuGrupo.nome;
-  window._conviteGrupoNum = null;
   save(ST);
   showScreen('home');
   renderHome();
@@ -5193,48 +5186,6 @@ function loadCP() {
 function saveCP() {
   try { localStorage.setItem(COMPANION_KEY, JSON.stringify(CP)); }
   catch(e) { console.warn('saveCP:', e); }
-}
-
-function sendMyPrayer() {
-  const texto = document.getElementById('my-prayer-input')?.value.trim();
-  if (!texto) return;
-  const meuGrupo = loadMeuGrupo();
-  if (meuGrupo) {
-    loadGrupos();
-    const g = PEQUENOS_GRUPOS.find(x => x.num === meuGrupo.grupoNum);
-    if (g) {
-      const eu = g.participantes.find(p => p.nome === meuGrupo.nome);
-      if (eu) {
-        eu.pedidoOracao = texto;
-        eu.pedidoOracaoData = new Date().toLocaleDateString('pt-BR');
-        saveGrupos();
-      }
-    }
-  }
-  CP.myPrayerRequest = texto;
-  CP.myPrayerDate = new Date().toLocaleDateString('pt-BR');
-  saveCP();
-  renderCompanionScreen();
-}
-
-function clearMyPrayer() {
-  const meuGrupo = loadMeuGrupo();
-  if (meuGrupo) {
-    loadGrupos();
-    const g = PEQUENOS_GRUPOS.find(x => x.num === meuGrupo.grupoNum);
-    if (g) {
-      const eu = g.participantes.find(p => p.nome === meuGrupo.nome);
-      if (eu) {
-        eu.pedidoOracao = '';
-        eu.pedidoOracaoData = null;
-        saveGrupos();
-      }
-    }
-  }
-  CP.myPrayerRequest = '';
-  CP.myPrayerDate = null;
-  saveCP();
-  renderCompanionScreen();
 }
 
 function getISOWeek() {
@@ -9451,209 +9402,6 @@ function loadGratidoes() {
 function saveGratidoes(list) {
   try { localStorage.setItem(GRAT_KEY, JSON.stringify(list)); }
   catch(e) { console.warn('saveGratidoes:', e); }
-}
-
-function timeAgoGrat(ts) {
-  const diff = Date.now() - ts;
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return 'agora';
-  if (min < 60) return min + ' min';
-  const h = Math.floor(min / 60);
-  if (h < 24) return h + ' h';
-  const d = Math.floor(h / 24);
-  return d + ' d';
-}
-
-// ── Navegação ──────────────────────────────────────────────────────
-function openComunidade() {
-  showScreen('comunidade');
-  renderComunidadeScreen();
-}
-
-let muralFiltro = 'todos';
-
-function renderComunidadeScreen() {
-  const body = document.getElementById('comunidade-body');
-  if (!body) return;
-
-  const minhasGrat = loadGratidoes();
-  const todasGrat  = [...minhasGrat, ...GRAT_EXAMPLES].sort((a,b) => b.ts - a.ts);
-
-  let visiveis;
-  if (muralFiltro === 'meus') {
-    visiveis = minhasGrat.sort((a,b) => b.ts - a.ts);
-  } else if (muralFiltro === 'gratidao') {
-    visiveis = todasGrat.filter(g => (g.tipo || 'gratidao') === 'gratidao');
-  } else if (muralFiltro === 'oracao') {
-    visiveis = todasGrat.filter(g => g.tipo === 'oracao');
-  } else {
-    visiveis = todasGrat;
-  }
-
-  const tipoAtual = postTipoSelecionado || 'gratidao';
-  const prefixo = tipoAtual === 'oracao' ? 'Peço oração por…' : 'Hoje sou grato(a) por…';
-  const placeholder = tipoAtual === 'oracao'
-    ? 'Compartilhe um pedido de oração com o seu grupo…'
-    : 'Compartilhe algo bom que Deus fez por você hoje…';
-  const corBtn = tipoAtual === 'oracao' ? 'var(--purple)' : 'var(--gold)';
-
-  const composerHtml = `
-    <div class="grat-composer">
-      <div class="grat-composer-hdr">❤️ Mural de Gratidão / Pedidos de Oração</div>
-      <div class="grat-composer-body">
-        <div class="grat-tipo-row">
-          <button class="grat-tipo-chip ${tipoAtual==='gratidao'?'active':''}" onclick="setPostTipo('gratidao')">🙌 Gratidão</button>
-          <button class="grat-tipo-chip oracao ${tipoAtual==='oracao'?'active':''}" onclick="setPostTipo('oracao')">🙏 Pedido de oração</button>
-        </div>
-        <div class="grat-prefix">${prefixo}</div>
-        <textarea class="grat-textarea" id="grat-input" rows="3" maxlength="500"
-          placeholder="${placeholder}"
-          oninput="document.getElementById('grat-send-btn').disabled = !this.value.trim()"></textarea>
-        <div class="grat-send-row">
-          <label class="grat-privacy-toggle">
-            <input type="checkbox" id="grat-privado" style="margin:0">
-            🔒 Privado (só eu vejo)
-          </label>
-          <button class="grat-send-btn" id="grat-send-btn" style="background:${corBtn}" onclick="enviarGratidao()" disabled>Compartilhar</button>
-        </div>
-      </div>
-    </div>`;
-
-  const filterHtml = `
-    <div class="mural-filter-row">
-      <div class="mural-filter-chip ${muralFiltro==='todos'?'active':''}" onclick="setMuralFiltro('todos')">🌍 Todo o mural</div>
-      <div class="mural-filter-chip ${muralFiltro==='gratidao'?'active':''}" onclick="setMuralFiltro('gratidao')">🙌 Gratidões</div>
-      <div class="mural-filter-chip ${muralFiltro==='oracao'?'active':''}" onclick="setMuralFiltro('oracao')">🙏 Pedidos de oração</div>
-      <div class="mural-filter-chip ${muralFiltro==='meus'?'active':''}" onclick="setMuralFiltro('meus')">📝 Meus posts</div>
-    </div>`;
-
-  const emptyMsg = muralFiltro === 'meus' ? 'Você ainda não compartilhou nada.'
-    : muralFiltro === 'oracao' ? 'Nenhum pedido de oração ainda — compartilhe o seu.'
-    : muralFiltro === 'gratidao' ? 'Nenhuma gratidão ainda — seja o primeiro a compartilhar!'
-    : 'Nenhuma publicação ainda — seja o primeiro a compartilhar!';
-
-  const listHtml = visiveis.length
-    ? visiveis.filter(g => !g.privado || muralFiltro === 'meus').map(g => renderGratCard(g)).join('')
-    : `<div class="mural-empty">${emptyMsg}</div>`;
-
-  body.innerHTML = `
-    ${composerHtml}
-    <div class="mural-section-title">🙌 Mural da Comunidade</div>
-    ${filterHtml}
-    ${listHtml}`;
-}
-
-let postTipoSelecionado = 'gratidao';
-function setPostTipo(tipo) {
-  postTipoSelecionado = tipo;
-  renderComunidadeScreen();
-  setTimeout(() => document.getElementById('grat-input')?.focus(), 50);
-}
-
-function renderGratCard(g) {
-  const reacoes = g.reacoes || { coracao: 0, oracao: 0 };
-  const minhasReacoes = getMinhasReacoes(g.id);
-  const isOracao = g.tipo === 'oracao';
-  const tagHtml = isOracao
-    ? '<span class="grat-tag oracao">🙏 Pedido de oração</span>'
-    : '<span class="grat-tag">🙌 Gratidão</span>';
-  return `
-    <div class="grat-card ${isOracao ? 'oracao' : ''}">
-      <div class="grat-card-hdr">
-        <div class="grat-avatar">${g.avatar || '🌿'}</div>
-        <div class="grat-meta">
-          <div class="grat-name">${sanitize(g.nome)}${g.privado ? ' 🔒' : ''}</div>
-          <div class="grat-time">${timeAgoGrat(g.ts)}</div>
-        </div>
-        ${tagHtml}
-      </div>
-      <div class="grat-text">${sanitize(g.texto)}</div>
-      <div class="grat-react-row">
-        <button class="grat-react-btn ${minhasReacoes.coracao ? 'active' : ''}" onclick="reagirGratidao('${g.id}','coracao')">
-          ❤️ ${reacoes.coracao || 0}
-        </button>
-        <button class="grat-react-btn ${minhasReacoes.oracao ? 'active' : ''}" onclick="reagirGratidao('${g.id}','oracao')">
-          🙏 ${reacoes.oracao || 0} ${isOracao ? 'orando' : ''}
-        </button>
-      </div>
-    </div>`;
-}
-
-function setMuralFiltro(f) {
-  muralFiltro = f;
-  renderComunidadeScreen();
-}
-
-// ── Enviar gratidão ou pedido de oração ──────────────────────────────
-function enviarGratidao() {
-  const input = document.getElementById('grat-input');
-  const texto = input?.value.trim();
-  if (!texto) return;
-  const privado = document.getElementById('grat-privado')?.checked || false;
-  const tipo = postTipoSelecionado || 'gratidao';
-
-  const list = loadGratidoes();
-  const novo = {
-    id: 'g_' + Date.now(),
-    nome: ST.userName || 'Você',
-    avatar: '🌿',
-    texto,
-    tipo,
-    ts: Date.now(),
-    reacoes: { coracao: 0, oracao: 0 },
-    privado,
-  };
-  list.unshift(novo);
-  saveGratidoes(list);
-
-  // XP por compartilhar (gratidão ou pedido de oração)
-  ST.xp = (ST.xp || 0) + 10;
-  save(ST);
-
-  // Contribui ao progresso do PG — gratidão como bondade, pedido como oração
-  if (typeof bumpPgProgress === 'function') {
-    bumpPgProgress(tipo === 'oracao' ? 'oracoes' : 'bondades', 1);
-  }
-
-  input.value = '';
-  document.getElementById('grat-privado').checked = false;
-  document.getElementById('grat-send-btn').disabled = true;
-
-  renderComunidadeScreen();
-
-}
-
-// ── Reações ────────────────────────────────────────────────────────
-const GRAT_REACOES_KEY = 'jdpg_grat_reacoes_v1';
-
-function getMinhasReacoes(postId) {
-  try {
-    const all = JSON.parse(localStorage.getItem(GRAT_REACOES_KEY) || '{}');
-    return all[postId] || {};
-  } catch { return {}; }
-}
-
-function reagirGratidao(postId, tipo) {
-  try {
-    const all = JSON.parse(localStorage.getItem(GRAT_REACOES_KEY) || '{}');
-    if (!all[postId]) all[postId] = {};
-    const jaReagiu = !!all[postId][tipo];
-    all[postId][tipo] = !jaReagiu;
-    localStorage.setItem(GRAT_REACOES_KEY, JSON.stringify(all));
-
-    // Atualizar contador no post (se for meu post salvo, atualiza ali; se for exemplo, simula)
-    const minhasGrat = loadGratidoes();
-    const idx = minhasGrat.findIndex(g => g.id === postId);
-    if (idx >= 0) {
-      if (!minhasGrat[idx].reacoes) minhasGrat[idx].reacoes = { coracao:0, oracao:0 };
-      minhasGrat[idx].reacoes[tipo] = Math.max(0, (minhasGrat[idx].reacoes[tipo] || 0) + (jaReagiu ? -1 : 1));
-      saveGratidoes(minhasGrat);
-    } else {
-      const ex = GRAT_EXAMPLES.find(g => g.id === postId);
-      if (ex) ex.reacoes[tipo] = Math.max(0, (ex.reacoes[tipo] || 0) + (jaReagiu ? -1 : 1));
-    }
-  } catch(e) { console.warn('reagirPost:', e); }
-  renderComunidadeScreen();
 }
 
 // ── Botão de acesso à Comunidade na Home ─────────────────────────────
