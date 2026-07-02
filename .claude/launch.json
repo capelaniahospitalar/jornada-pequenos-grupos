@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "static",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "C:\\Temp\\claude\\C--Users-wladimir-souza-Documents-GitHub-jornada-pequenos-grupos\\251971bf-1419-47d3-bcd1-697fa07ea72c\\scratchpad\\static-server.ps1"],
+      "port": 8000
+    }
+  ]
+}

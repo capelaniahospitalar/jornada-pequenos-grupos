@@ -161,6 +161,26 @@ Cada commit é precedido de **Mapa de Impacto** (análise, sem código); tombsto
   caminho os alcança mais). Remoção física fica para uma limpeza futura, no mesmo espírito do
   `FUNC-01`/`STR-01` a `STR-05` já feitos — não é urgente, não representa risco enquanto
   inalcançável.
+- **UX-02 — Ocultar "Convidar amigo" para colaboradores (novo, 2026-07-02).** Achado numa
+  demonstração da Home pós-`BLOCKER-001`: o botão "🔗 Convidar amigo" (`openShare()`, linha 2970)
+  aparece pra **todo mundo** na Home, mas só funciona pra Tutor/Coordenador — um Colaborador que
+  clica cai numa tela dizendo "Apenas o Coordenador do grupo pode convidar novos integrantes".
+  **Não é bug funcional nem falha de segurança** — a autorização já está correta nos dois níveis
+  (`openShare()` e `gerarConvite()` checam `getMinhaFuncaoNoGrupo` e bloqueiam corretamente); é só
+  a Home oferecendo uma ação que aquele papel não pode executar.
+  - **Severidade:** Baixa. **Tipo:** UX (não `BUG-XXX`).
+  - **Comportamento esperado:** Tutor → botão visível; Coordenador → botão visível; Colaborador →
+    botão **nem renderizado** (não travado/desabilitado — simplesmente não existe pra esse papel).
+  - **Renomear** "Convidar amigo" → **"Convidar participante"** (o texto antigo é de antes do
+    modelo por Pequenos Grupos).
+  - **Ideia maior anotada para o futuro (não decidida ainda):** revisar a Home inteira por
+    permissão de papel — Tutor vê Painel do Tutor + Convidar + Mural + Diário + Estudos +
+    Progresso; Coordenador vê tudo isso exceto o Painel; Colaborador vê só Mural + Diário +
+    Estudos + Progresso. Reduz ações impossíveis na tela, mas é um escopo bem maior que só
+    esconder um botão — avaliar separadamente, não faz parte do UX-02.
+  - **Decisão:** registrado, **não implementado agora**. Entra na fila de UX (junto do `UX-01`)
+    para uma próxima RC ou a primeira versão estável, condicionado a não haver achados mais
+    críticos nos testes de campo em andamento.
 
 ## Rollback / segurança
 - Flags congeladas no topo do `<script>`: `FB_FLAGS = Object.freeze({ usePrecondition,
