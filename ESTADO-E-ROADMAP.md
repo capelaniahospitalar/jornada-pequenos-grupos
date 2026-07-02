@@ -137,11 +137,15 @@ Cada commit é precedido de **Mapa de Impacto** (análise, sem código); tombsto
 - Validação local (sem node/python): servidor estático PowerShell + preview do assistente.
 
 ## Estado dos dados na nuvem
-Snapshot de 2026-06-30 (antes da Etapa 1/2): `dados` ~10,4 KB, 6 grupos preenchidos, 13
-participantes, sem duplicado/corrupção. **Desatualizado** — a Etapa 2 acrescentou o campo
-`convites` ao mesmo documento; tamanho e conteúdo atuais não foram reconferidos depois disso.
-**Grupo 1 = REAL** (preservar SEMPRE). **Grupos 2–6 = teste** (podem ser apagados quando o
-usuário autorizar — preservando o 1).
+**Atualizado 2026-07-02:** Grupos 2–6 (dados de teste) zerados sob autorização do usuário —
+voltaram ao mesmo estado em branco dos Grupos 7–50 (`nome`/`tutor`/`coordenador`/`diaReuniao`/
+`horaReuniao` = null, `participantes`/`gratidoes` = []). Gravação feita via REST direto (fora do
+app), com backup local prévio
+(`C:\Users\wladimir.souza\Documents\backups-firebase-jdpg\snapshot-antes-limpeza-grupos-teste-2026-07-02.json`)
+e trava de concorrência (`currentDocument.updateTime`). Confirmado por leitura: **Grupo 1
+(CAPELANIA) intacto** (2 participantes reais + mural), allowlist `tutores` intacta (4 capelães),
+Grupos 7–50 inalterados, 50 grupos no total. Campo `convites` não existe no documento (nenhum
+convite ativo até o momento).
 
 ## Auditoria Completa (2026-07-01) — Tabela Final de Pendências
 
@@ -264,12 +268,12 @@ evidência de corrupção causada pela sincronização.** Os achados abaixo já 
 4. ⏸️ **`DB-03`** — reavaliado, adiado deliberadamente (ver nota acima; residual só em Tutores, sem impacto na operação).
 5. ✅ **`DB-04`** — Campanhas (Embaixadores) sincronizadas via `g.campanhas`. Feito.
 6. ✅ **`IDENT-01`** — Recuperação de Identidade do Colaborador. Feito.
-7. **Limpeza de código morto** (`FUNC-01`/duplicações, `STR-01` a `STR-05`). **Próximo item.**
-8. **Homologação com grupos reais.**
+7. **Limpeza de código morto** (`FUNC-01`/duplicações, `STR-01` a `STR-05`). **Em andamento.**
+8. ✅ **Apagar grupos de teste 2–6** (preservando o 1). Feito em 2026-07-02.
+9. **Homologação com grupos reais.**
 
 **Decisões de contexto ainda em aberto:**
 6. Algum link antigo `?pg=N` já foi distribuído para pessoa real antes da Etapa 2 quebrar esse
    fluxo? (Especialmente relevante para o Grupo 1.)
 7. A homologação do Commit 1 (testes 2–7) foi concluída antes de avançar para a Etapa 1/2, ou
    ficou pendente?
-8. Apagar grupos de teste 2–6 (preservando o 1)? (confirmar lista antes)
