@@ -181,37 +181,46 @@ Cada commit é precedido de **Mapa de Impacto** (análise, sem código); tombsto
   - **Decisão:** registrado, **não implementado agora**. Entra na fila de UX (junto do `UX-01`)
     para uma próxima RC ou a primeira versão estável, condicionado a não haver achados mais
     críticos nos testes de campo em andamento.
-- **ARCH-01 — Separar definitivamente o acesso administrativo (Tutor) da jornada do participante
-  (novo, 2026-07-02).** Achado ao questionar a necessidade da tela "Convite necessário"
-  (`mensagemConvite('sem_convite')`, criada no `BLOCKER-001`): hoje ela é um **beco sem saída** —
-  não tem caminho para o Painel do Tutor/Coordenador. Rastreado: `openTutorPanel()` só é chamado
-  pelo botão da tela antiga de boas-vindas (morta, `FUNC-02`) e pelo botão da Home (só existe
-  depois de `welcomeDone=true`, ou seja, depois de já estar num grupo). **Consequência real
-  hoje:** o Wladimir não é afetado (aparelho dele já tinha `welcomeDone=true` de antes do
-  `BLOCKER-001`), mas **os outros 3 capelães da allowlist `tutores` (Felipe Rodrigues, Ualace
-  Bruno, Renan Castro), que segundo os dados nunca acessaram o app, não têm hoje nenhum caminho
-  para o Painel do Tutor num aparelho novo.**
-  - **Diagnóstico do usuário:** isso expõe uma mudança de arquitetura que já aconteceu de fato —
-    o app deixou de ter um "fluxo de descoberta" (acessar → escolher grupo → escolher perfil) e
-    passou a ser 100% por convite (`Tutor → convida Coordenador → convida Colaborador`). Não há
-    mais caso de uso legítimo para abrir o link base do app como participante — o convite já traz
-    grupo, papel e autorização prontos.
-  - **Proposta de arquitetura (não implementada):**
-    - **Participantes:** nunca acessam o link base — sempre entram por convite (`?conv=<id>`).
-    - **Tutores:** ganham um **endereço administrativo próprio** (ex.: `?tutor`), independente da
-      jornada do participante — verifica a allowlist e abre o Painel, ou informa acesso restrito.
-    - **Coordenadores:** entram por convite do Tutor, depois usam a Home normalmente (já
-      funciona assim).
-    - A tela "Convite necessário" **deixaria de existir** — o link base passaria a mostrar algo
-      mínimo tipo "Este aplicativo é acessado apenas por convite" (ou nem isso), já que ninguém
-      deveria chegar ali por engano dentro do fluxo pretendido.
-  - **Classificação:** nem `BUG`, nem `UX`, nem `FEATURE` — item de **Arquitetura**. Elimina uma
-    ambiguidade que sobrou da evolução do projeto (a tela mistura "onde o participante cai sem
-    convite" com "onde o admin deveria entrar").
-  - **Decisão:** registrado, **não implementado agora**. A remoção da tela "Convite necessário"
-    fica para uma limpeza futura, possivelmente junto do `FUNC-02`. Enquanto isso não for feito,
-    **os 3 capelães ainda não terão como acessar o Painel do Tutor num aparelho novo** — só
-    relevante se algum deles precisar entrar antes do `ARCH-01` ser implementado.
+- **`ARCH-02` — Separar o acesso administrativo (Tutor) da jornada do participante — Etapa 1
+  CONCLUÍDA (2026-07-02).** *(Nota de nomenclatura: já existia um `ARCH-01` no documento, sobre o
+  Diário Espiritual — item não relacionado, da auditoria de 2026-07-01. Este é numerado `ARCH-02`
+  para não colidir.)* Achado ao questionar a necessidade da tela "Convite necessário": ela era um
+  **beco sem saída** — sem caminho para o Painel do Tutor/Coordenador para quem nunca tinha um
+  grupo. Rastreado: `openTutorPanel()` só era chamado pelo botão da tela antiga de boas-vindas
+  (morta, `FUNC-02`) e pelo botão da Home (só existe depois de `welcomeDone=true`). Além disso,
+  mesmo com uma porta nova, `tutorIdentificar()` dependia de `getGruposDoResponsavel()` — que só
+  encontra quem **já** aparece como `g.tutor`/`g.coordenador` em algum grupo, deixando um Tutor
+  novo (sem grupo ainda) sem saída mesmo com link dedicado.
+  - **Decisão de arquitetura (usuário):** a allowlist `tutores` passa a ser a **única fonte de
+    verdade** para autenticar um Tutor — a existência de grupos é consequência da autenticação,
+    nunca o mecanismo dela. Identidade real = WhatsApp (não o nome, que é só exibição).
+  - **Implementado:**
+    - Novo ponto de entrada `?tutor` em `initApp()` — funciona independente de `welcomeDone`/
+      dispositivo, checado antes do roteamento normal.
+    - `estaNaAllowlistTutores()` passou a retornar o registro encontrado (nome canônico incluso)
+      em vez de só `true`/`false` — mudança retrocompatível (objeto é truthy, `null` é falsy),
+      sem alterar o caller existente (`gerarConvite`).
+    - `tutorIdentificar()` não bloqueia mais quem não tem grupo — segue pro mesmo fluxo de
+      primeiro acesso de sempre.
+    - `tutorConfirmarCriarPass()` ganhou um segundo caminho de prova de identidade: se não há
+      registro de participante (`verificarWhatsappDoPapel` falha por `sem_registro`), tenta a
+      allowlist `tutores` como prova alternativa válida — usa o nome canônico da allowlist daí
+      em diante.
+    - `renderTutorGruposList()`: o estado "sem grupo" deixou de ser um erro — agora mostra "Você
+      está autorizado como Tutor, mas ainda não tem nenhum Pequeno Grupo" + botão **"➕ Criar
+      Primeiro Pequeno Grupo"** (placeholder — a criação de fato é a próxima etapa, `ATIVACAO-01`).
+    - **Sem duplicar login:** em vez de uma função paralela pra cada origem, uma única variável de
+      controle (`tutorPanelOrigem`, `'home'`|`'tutor'`) decide só a exibição do botão "voltar" do
+      cabeçalho (oculto via `?tutor`, já que não há Home pra voltar) — todas as funções de
+      identificação/senha/dashboard continuam únicas, reaproveitadas por ambas as origens.
+  - **Testado (preview, dados fictícios, sem tocar produção):** fluxo antigo via Home com Tutor
+    já-com-grupo intacto · `?tutor` com o mesmo Tutor (mesmo caminho, dashboard normal) · `?tutor`
+    com Tutor novo na allowlist e zero grupos → CTA de criar primeiro PG · `?tutor` com dado que
+    não bate em nada → "Acesso restrito" · botão voltar oculto só na origem `?tutor` · console
+    limpo, sem requisições falhas.
+  - **Fora do escopo desta etapa (fica para as próximas, ordem já definida):** criação de fato do
+    PG (`ATIVACAO-01`), convite automático do Coordenador, remoção física da tela "Convite
+    necessário" e do legado de autocadastro (`FUNC-02`), Home por papel (`UX-01`/`UX-02`).
 
 ## Rollback / segurança
 - Flags congeladas no topo do `<script>`: `FB_FLAGS = Object.freeze({ usePrecondition,
@@ -426,7 +435,7 @@ documentados (como o `UX-01`). Sem novas funcionalidades antes da homologação.
 
 **A homologação da RC1 foi oficialmente encerrada pelo usuário.** Ela cumpriu seu objetivo: a
 revisão da tela de entrada revelou resquícios importantes da arquitetura antiga (a lacuna do
-`ARCH-01` — Tutores novos sem caminho de acesso). Esse achado mudou o entendimento do sistema e
+`ARCH-02` — Tutores novos sem caminho de acesso). Esse achado mudou o entendimento do sistema e
 justificou uma revisão estrutural antes da implantação definitiva. **RC1 passa a ser um marco
 histórico do projeto**, não mais o estado ativo.
 
@@ -435,9 +444,9 @@ de autocadastro e consolidar a arquitetura 100% baseada em convites hierárquico
 (`Tutor → cria PG → convida Coordenador → aceita → convida Participantes → aceitam`).
 
 **Ordem definida pelo usuário:**
-1. `ARCH-01` — ponto de entrada exclusivo dos Tutores (`?tutor`, independente de dispositivo/
-   `welcomeDone`, validado contra a allowlist `tutores`). **Próximo item, em desenho.**
-2. `ATIVACAO-01` — fluxo de criação de Pequenos Grupos pelo Tutor.
+1. ✅ `ARCH-02` — ponto de entrada exclusivo dos Tutores (`?tutor`, independente de dispositivo/
+   `welcomeDone`, validado contra a allowlist `tutores`). **Feito em 2026-07-02.**
+2. `ATIVACAO-01` — fluxo de criação de Pequenos Grupos pelo Tutor. **Próximo item.**
 3. Convite automático do Coordenador ao criar o grupo.
 4. Adequar o fluxo do Coordenador.
 5. Adequar o fluxo do Participante.
