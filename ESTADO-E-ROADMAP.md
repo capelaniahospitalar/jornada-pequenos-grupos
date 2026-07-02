@@ -421,3 +421,33 @@ documentados (como o `UX-01`). Sem novas funcionalidades antes da homologação.
 3. Valida toda a cadeia: Tutor → Coordenador → Coordenador → Colaboradores → ingresso no grupo →
    mural de gratidão → pedidos de oração → progresso → sincronização entre dispositivos.
 4. Qualquer defeito encontrado é registrado antes de se pensar em novas funcionalidades.
+
+## RC1 encerrada — RC2 iniciada (decisão de gestão, 2026-07-02)
+
+**A homologação da RC1 foi oficialmente encerrada pelo usuário.** Ela cumpriu seu objetivo: a
+revisão da tela de entrada revelou resquícios importantes da arquitetura antiga (a lacuna do
+`ARCH-01` — Tutores novos sem caminho de acesso). Esse achado mudou o entendimento do sistema e
+justificou uma revisão estrutural antes da implantação definitiva. **RC1 passa a ser um marco
+histórico do projeto**, não mais o estado ativo.
+
+**Desenvolvimento da RC2 iniciado formalmente.** Prioridade: eliminar definitivamente o paradigma
+de autocadastro e consolidar a arquitetura 100% baseada em convites hierárquicos
+(`Tutor → cria PG → convida Coordenador → aceita → convida Participantes → aceitam`).
+
+**Ordem definida pelo usuário:**
+1. `ARCH-01` — ponto de entrada exclusivo dos Tutores (`?tutor`, independente de dispositivo/
+   `welcomeDone`, validado contra a allowlist `tutores`). **Próximo item, em desenho.**
+2. `ATIVACAO-01` — fluxo de criação de Pequenos Grupos pelo Tutor.
+3. Convite automático do Coordenador ao criar o grupo.
+4. Adequar o fluxo do Coordenador.
+5. Adequar o fluxo do Participante.
+6. `FUNC-02` — remover definitivamente o legado de autocadastro (código físico, não só acesso).
+7. `UX-01`/`UX-02` — permissões e interface por papel.
+8. Auditoria completa da arquitetura antes de uma nova homologação (RC2).
+
+**Processo mantido (igual à RC1, reafirmado pelo usuário):** diagnóstico + mapa de impacto →
+proposta técnica detalhada (arquivos afetados) → aprovação explícita → implementação de **uma
+etapa por vez** → testes de regressão → commit isolado e documentado → atualização do roadmap →
+só então a próxima etapa. Nenhuma refatoração massiva sem pontos de controle. O assistente deve
+continuar questionando decisões inconsistentes e reportando riscos/dependências ocultas antes de
+implementar, mesmo com essa autorização mais ampla.
