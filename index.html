@@ -8823,9 +8823,10 @@ function renderGruposBtnHome() {
           <span style="color:var(--text3);font-size:18px">›</span>
         </button>`;
       })()
-    : `<div style="width:100%;background:var(--teal-light);border:0.5px solid rgba(14,123,108,.35);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:14px;color:var(--teal);text-align:center;font-family:var(--ff-body)">
-        🌿 Você ainda não está em um Pequeno Grupo. Peça um convite ao Tutor ou Coordenador.
-      </div>`;
+    // Hoje é impossível chegar na Home sem grupo: ST.welcomeDone só é marcado junto com o
+    // grupo (confirmarEntradaConvite/recuperarIdentidade), e sair de um grupo (cancelarInscricao)
+    // ficou inalcançável junto com a tela antiga de autocadastro (BLOCKER-001).
+    : '';
 
   // Botão Mural de Gratidão (só aparece se estiver em um grupo)
   const meuGrupoAtual = loadMeuGrupo();
