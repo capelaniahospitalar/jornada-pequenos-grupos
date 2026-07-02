@@ -3028,8 +3028,18 @@ function copyLink(url) {
 //  PAINEL DO TUTOR (acompanhamento de discípulos)
 // ══════════════════════════════════════
 
+// ARCH-01: de onde a pessoa chegou ao Painel (Home vs acesso administrativo direto ?tutor) —
+// controla só a exibição do botão "voltar" do cabeçalho (não há Home pra voltar via ?tutor).
+let tutorPanelOrigem = 'home';
+function ajustarCabecalhoPainelTutor() {
+  const btn = document.querySelector('#screen-tutorpanel .back-btn');
+  if (btn) btn.style.display = (tutorPanelOrigem === 'tutor') ? 'none' : '';
+}
+
 function openTutorPanel() {
+  tutorPanelOrigem = 'home';
   showScreen('tutorpanel');
+  ajustarCabecalhoPainelTutor();
   renderTutorLogin();
 }
 
@@ -3116,12 +3126,8 @@ function tutorIdentificar() {
   const nome = document.getElementById('tp-nome-input')?.value.trim();
   if (!nome) { renderTutorLogin('Informe seu nome.'); return; }
 
-  const grupos = getGruposDoResponsavel(nome);
-  if (!grupos.length) {
-    renderTutorLogin('Nenhum Pequeno Grupo encontrado com esse nome como Tutor ou Coordenador. Verifique se digitou exatamente como na inscrição.');
-    return;
-  }
-
+  // ARCH-01: já ter grupo não é mais pré-requisito pra seguir — a allowlist `tutores`
+  // (verificada no passo seguinte) é quem decide se a pessoa está autorizada.
   if (!tutorHasPass(nome)) {
     renderTutorCreatePass(nome);
   } else {
@@ -3157,21 +3163,29 @@ function tutorConfirmarCriarPass(nome) {
     renderTutorCreatePass(nome, 'Informe o WhatsApp cadastrado (com DDD) para este papel.');
     return;
   }
-  // PERM-01: bloqueia criação da credencial sem prova de posse do WhatsApp cadastrado
+  // PERM-01: bloqueia criação da credencial sem prova de posse do WhatsApp cadastrado.
+  // ARCH-01: se não há registro de participante (Tutor novo, sem grupo ainda), a allowlist
+  // `tutores` — fonte de verdade da identidade do Tutor — também é aceita como prova válida.
   const verificacao = verificarWhatsappDoPapel(nome, wa);
+  let nomeFinal = nome;
   if (!verificacao.ok) {
-    const msg = verificacao.motivo === 'sem_registro'
-      ? 'Não encontramos o WhatsApp cadastrado para este papel. Por segurança, a criação do acesso precisa ser validada por um capelão ou coordenador do sistema.'
-      : 'O WhatsApp informado não corresponde ao cadastrado para este papel.';
-    renderTutorCreatePass(nome, msg);
-    return;
+    const naAllowlist = verificacao.motivo === 'sem_registro' ? estaNaAllowlistTutores({ nome, wa }) : null;
+    if (naAllowlist) {
+      nomeFinal = naAllowlist.name || nome; // nome canônico da allowlist — o WhatsApp é a chave real
+    } else {
+      const msg = verificacao.motivo === 'sem_registro'
+        ? 'Acesso restrito — esse WhatsApp não foi encontrado nem como participante de um grupo, nem na lista de Tutores autorizados.'
+        : 'O WhatsApp informado não corresponde ao cadastrado para este papel.';
+      renderTutorCreatePass(nome, msg);
+      return;
+    }
   }
   if (!pass || pass.length < 4) { renderTutorCreatePass(nome, 'Crie uma senha com pelo menos 4 caracteres.'); return; }
 
-  setTutorPass(nome, pass);
-  ST.tutorPanelAuth = nome;
+  setTutorPass(nomeFinal, pass);
+  ST.tutorPanelAuth = nomeFinal;
   save(ST);
-  renderTutorGruposList(nome);
+  renderTutorGruposList(nomeFinal);
 }
 
 function renderTutorPassLogin(nome, errorMsg) {
@@ -3206,17 +3220,27 @@ function tutorLogout() {
   renderTutorLogin();
 }
 
+// Placeholder — implementação completa (criar o PG de fato) é a próxima etapa da RC2 (ATIVACAO-01).
+function abrirCriarPrimeiroPg(nome) {
+  alert('Em breve: criação de Pequeno Grupo pelo Tutor — próxima etapa da RC2 (ATIVACAO-01).');
+}
+
 // ── Lista de Pequenos Grupos sob a tutela do responsável logado ────────
 function renderTutorGruposList(nome) {
   loadGrupos();
   const grupos = getGruposDoResponsavel(nome);
 
   if (!grupos.length) {
+    // ARCH-01: sem grupo é o estado normal de um Tutor recém-autorizado — a ação principal
+    // é criar o primeiro (ATIVACAO-01 implementa o botão a seguir; aqui só a interface).
     document.getElementById('tutorpanel-body').innerHTML = `
       <div class="content-card">
         <div class="phase-tag tag-content">${sanitize(nome)}</div>
-        <p class="body-text">Nenhum Pequeno Grupo encontrado sob seus cuidados no momento.</p>
+        <p class="body-text">Você está autorizado como Tutor, mas ainda não tem nenhum Pequeno Grupo.</p>
       </div>
+      <button onclick="abrirCriarPrimeiroPg('${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">
+        ➕ Criar Primeiro Pequeno Grupo
+      </button>
       <button onclick="tutorLogout()" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Sair</button>`;
     return;
   }
@@ -5089,6 +5113,18 @@ function initApp() {
     showScreen('convite');
     const cb = document.getElementById('convite-body');
     if (cb) cb.innerHTML = telaConviteMensagem('versao_anterior');
+    return;
+  }
+
+  // ── Acesso administrativo exclusivo do Tutor (?tutor) — ARCH-01 ──────
+  // Independente de welcomeDone/dispositivo: a allowlist `tutores` é quem autoriza,
+  // não o estado local do participante.
+  if (params.get('tutor') !== null) {
+    window.history.replaceState({}, '', window.location.pathname);
+    tutorPanelOrigem = 'tutor';
+    showScreen('tutorpanel');
+    ajustarCabecalhoPainelTutor();
+    renderTutorLogin();
     return;
   }
 
@@ -7087,14 +7123,16 @@ function getMinhaFuncaoNoGrupo(grupoNum) {
 }
 
 // Raiz de confiança do Tutor: a allowlist `tutores` (capelães). O convite só INICIA.
+// ARCH-01: retorna o registro da allowlist (nome canônico incluso), não só true/false —
+// continua funcionando como booleano em todo caller existente (objeto é truthy, null é falsy).
 function estaNaAllowlistTutores({ nome, wa }) {
   const digits = String(wa || '').replace(/\D/g, '');
   const nomeL = String(nome || '').trim().toLowerCase();
-  return (TUTORS || []).some(t => {
+  return (TUTORS || []).find(t => {
     const tw = String(t.wa || '').replace(/\D/g, '');
     return (digits && tw && (tw === digits || tw.endsWith(digits) || digits.endsWith(tw)))
         || (nomeL && String(t.name || '').trim().toLowerCase() === nomeL);
-  });
+  }) || null;
 }
 
 function funcaoParaTipo(funcao) { return funcao === 'tutor' || funcao === 'coordenador' ? funcao : 'colaborador'; }
