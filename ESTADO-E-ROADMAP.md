@@ -548,7 +548,25 @@ de autocadastro e consolidar a arquitetura 100% baseada em convites hierárquico
      (cai no grupo certo, recebe papel de Coordenador, painel sem funções de Tutor, convida
      Colaborador corretamente, sem seletor de grupo/papel) — retomar após o commit do `BLOCKER-01`
      só para reconfirmar com o código corrigido.
-5. Adequar o fluxo do Participante.
+5. ✅ **Adequar o fluxo do Participante/Colaborador — CONCLUÍDO (2026-07-03).** Diagnóstico ao vivo
+   (cadeia completa Tutor→Coordenador→Colaborador por convite) confirmou que a arquitetura já
+   entregava tudo o que o checklist pedia, sem código novo necessário: entra automaticamente no
+   grupo/papel corretos, sem seletor de grupo/papel no fluxo válido, não convida ninguém, não vê
+   funções reais de Tutor/Coordenador (`openShare`/painel bloqueiam corretamente). Único achado real:
+   - **`UX-LEGACY-01` — tela legada enganosa de escolha de papel ainda alcançável — CORRIGIDO
+     (2026-07-03).** A tela antiga `screen-welcome` (Passo 2: "Serei o Tutor"/"Serei o
+     Coordenador"/"Colaborador", `selectProfile()`) continuava alcançável por 2 botões — "← Voltar"
+     no cabeçalho da Home e "Trocar" na tela do próprio grupo (ambos `showScreen('welcome')`).
+     **Não era um `BLOCKER`** (testado ao vivo: `selectProfile('tutor')` só seta `ST.userProfile`,
+     que não é mais lido por nenhum caminho ativo — `confirmarInscricao`, o único consumidor, já
+     estava bloqueado pelo `BLOCKER-01`) — mas contradizia a arquitetura da RC2 e confundia o
+     usuário oferecendo uma escolha que não fazia nada. **Correção:** os 2 botões foram removidos
+     ([index.html:1660](index.html:1660) header da Home; botão "Trocar" na tela do grupo). Nenhuma
+     função/tela removida fisicamente (`screen-welcome`, `selectProfile`, `prefillWelcomeForm`
+     continuam no código, agora sem nenhum caminho ativo até eles — fica para o `FUNC-02`).
+     **Testado:** Colaborador e Coordenador sem caminho para a tela antiga · Tutor mantém acesso ao
+     painel dedicado (`?tutor`) · cadeia completa por convite continua funcionando · Home utilizável
+     · console limpo · nenhuma escrita real ao Firebase.
 6. `FUNC-02` — remover definitivamente o legado de autocadastro (código físico, não só acesso).
 7. `UX-01`/`UX-02` — permissões e interface por papel.
 8. Auditoria completa da arquitetura antes de uma nova homologação (RC2).

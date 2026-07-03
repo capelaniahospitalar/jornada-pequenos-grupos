@@ -1,5 +1,23 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-03] — RC2: item 5 concluído + UX-LEGACY-01 (remove acesso à tela antiga de escolha de papel)
+
+Diagnóstico do item 5 da RC2 (fluxo do Participante/Colaborador): a arquitetura de convites já
+entregava tudo o que era esperado, sem código novo. Único achado: a tela legada `screen-welcome`
+(Passo 2 com "Serei o Tutor"/"Serei o Coordenador"/"Colaborador") continuava alcançável por 2
+botões — "← Voltar" no cabeçalho da Home e "Trocar" na tela do próprio grupo.
+
+- **Não era um `BLOCKER`** — confirmado ao vivo que escolher "Serei o Tutor" só seta
+  `ST.userProfile`, que não é lido por nenhum caminho ativo (o único consumidor,
+  `confirmarInscricao`, já foi bloqueado pelo `BLOCKER-01`). Mas contradizia a arquitetura da RC2 e
+  confundia o usuário oferecendo uma escolha que não fazia nada.
+- **Correção (`UX-LEGACY-01`):** removidos os 2 botões que levavam a `showScreen('welcome')` — o
+  da Home e o da tela do grupo. Nenhuma função/tela removida fisicamente (fica para o `FUNC-02`).
+- Testado: Colaborador e Coordenador sem caminho para a tela antiga · Tutor mantém acesso ao painel
+  dedicado (`?tutor`) · cadeia completa por convite continua funcionando · console limpo.
+
+---
+
 ## [2026-07-03] — BLOCKER-01: fecha caminhos legados de escalonamento de autoridade sem convite
 
 Achado durante a auditoria de campo do item 4B da RC2: a tela legada do autocadastro antigo
