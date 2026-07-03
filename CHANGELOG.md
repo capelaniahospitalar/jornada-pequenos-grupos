@@ -1,5 +1,23 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-03] — UX-02: oculta becos sem saída da Home para Colaborador
+
+Item 7 da RC2 (permissões e interface por papel). Diagnóstico ao vivo confirmou que Tutor
+administrativo puro e Coordenador já estavam corretos; o achado real foi na Home.
+
+- `renderShareArea()` mostrava "Convidar amigo" (`openShare()`) e "Painel do Tutor/Coordenador"
+  (`openTutorPanel()`) igual para Coordenador e Colaborador — para Colaborador os dois eram becos
+  sem saída ("apenas o Coordenador pode convidar" / "acesso restrito").
+- Os 2 botões agora só renderizam quando `getMinhaFuncaoNoGrupo() === 'tutor' || 'coordenador'`
+  (inclui o tutor legado-participante, mantido por compatibilidade nesta fase de fechamento da
+  RC2 — decisão explícita, não é bug). Para Colaborador/sem grupo, só "Meu progresso" aparece.
+- "Convidar amigo" renomeado para "Convidar Participante".
+- Nenhuma mudança de autorização ou de modelo de dados — só visibilidade condicional na Home.
+- Testado: Colaborador vê só "Meu progresso" · Coordenador vê os 2 botões normalmente · Tutor
+  legado-participante preservado · console limpo · nenhuma escrita real ao Firebase.
+
+---
+
 ## [2026-07-03] — FUNC-02d: remove o formulário de autocadastro em renderInscricaoBody (FUNC-02 concluído)
 
 Quarta e última sub-etapa do `FUNC-02` (remoção física do legado de autocadastro). Com esta etapa,

@@ -622,6 +622,31 @@ de autocadastro e consolidar a arquitetura 100% baseada em convites hierárquico
      novo** (mesmo nome+WhatsApp, ponta a ponta incluindo o modal) · console limpo · nenhuma
      escrita real ao Firebase.
 7. `UX-01`/`UX-02` — permissões e interface por papel.
+   Diagnóstico feito em 2026-07-03, testando as 3 identidades (Tutor administrativo puro,
+   Coordenador, Colaborador) ao vivo na Home e no Painel:
+   - **Tutor administrativo puro (`?tutor`):** já correto estruturalmente — nunca chega à Home,
+     não existe caminho de volta ao fluxo de Participante a partir do Painel.
+   - **Zona cinzenta discutida e resolvida (decisão do usuário):** o Tutor legado que também é
+     participante (`papel:'tutor'` em `participantes[]`) continua podendo usar a jornada pessoal
+     normalmente — **tolerado de propósito** nesta fase de fechamento da RC2, não é bug. Só se
+     torna incompatível quando o último registro legado desse tipo deixar de existir (não há prazo
+     definido).
+   - **Coordenador:** já correto (vê só o próprio grupo, convida Colaborador, não vê ações de
+     Tutor no Painel — validado no item 4B/`ATIVACAO-01`).
+   - ✅ **`UX-02` — ocultar becos sem saída da Home para Colaborador — CONCLUÍDO (2026-07-03).**
+     Achado: `renderShareArea()` mostrava "Convidar amigo" (`openShare()`) e "Painel do
+     Tutor/Coordenador" (`openTutorPanel()`) igual para Coordenador e Colaborador — para
+     Colaborador os dois eram becos sem saída ("apenas o Coordenador pode convidar" / "acesso
+     restrito"). **Correção:** os 2 botões só renderizam quando
+     `getMinhaFuncaoNoGrupo() === 'tutor' || 'coordenador'` (inclui o tutor legado-participante,
+     por compatibilidade); para Colaborador/sem grupo, só "Meu progresso" aparece (grid ajusta pra
+     1 coluna). "Convidar amigo" renomeado para "Convidar Participante". Nenhuma mudança de
+     autorização ou de modelo de dados — só visibilidade condicional. **Ideia antiga superada:** o
+     registro original do `UX-02` também cogitava esconder o Painel do Coordenador — descartado,
+     incompatível com a arquitetura atual (Coordenador depende do Painel pra gerenciar o próprio
+     grupo, já testado extensivamente). **Testado:** Colaborador vê só "Meu progresso" · Coordenador
+     vê os 2 botões normalmente · Tutor legado-participante preservado por compatibilidade ·
+     console limpo · nenhuma escrita real ao Firebase.
 8. Auditoria completa da arquitetura antes de uma nova homologação (RC2).
 
 **Processo mantido (igual à RC1, reafirmado pelo usuário):** diagnóstico + mapa de impacto →
