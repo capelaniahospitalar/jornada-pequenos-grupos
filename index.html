@@ -8101,7 +8101,6 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
   const body = document.getElementById('insc-body');
   if (!body) return;
 
-  const status = getGrupoStatus(g);
   const podeGerenciar = !!jaInscrito; // só quem já está no grupo pode trocar papéis
 
   // ── Painel de status do grupo (o que já foi definido) ───────────────
@@ -8174,232 +8173,16 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
       <button onclick="cancelarInscricao(${g.num})" style="background:none;border:none;color:var(--text3);font-size:14px;cursor:pointer;font-family:var(--ff-body);padding:.5rem;margin-top:.25rem;width:100%;text-align:center">
         Cancelar minha inscrição
       </button>`;
-    return;
-  }
-
-  // ── Formulário de criação/inscrição ───────────────────────────────────
-  // Se o grupo ainda não tem nome, esta pessoa será quem nomeia o grupo
-  const precisaNome = !g.nome;
-  const precisaWa    = !g.wa;
-
-  body.innerHTML = `
-    ${statusCard}
-
-    ${precisaNome ? `
-    <div class="papel-form-card">
-      <div class="papel-form-hdr participante">🌱 Você está criando este grupo!</div>
-      <div class="papel-form-body">
-        <p style="font-size:14.5px;color:var(--text2);font-family:var(--ff-body);line-height:1.5;margin-bottom:.7rem">
-          Escolham um nome criativo e especial para o Pequeno Grupo — pode ser algo inspirador, bíblico ou que represente a identidade do grupo. A flâmula será gerada automaticamente com esse nome!
-        </p>
-        <div class="insc-field" style="margin-bottom:.6rem">
-          <label>Nome do Pequeno Grupo *</label>
-          <input class="insc-input" id="insc-grupo-nome-input" type="text" maxlength="40" placeholder="Ex: Luz do Caminho, Fonte Viva, Raízes…" oninput="atualizarPreviewFlamula(this.value, ${g.num})">
-        </div>
-        <div id="flamula-preview-wrap" style="display:none;margin:.5rem 0 .75rem;text-align:center">
-          <div id="flamula-preview-svg" style="display:inline-block;width:90px"></div>
-          <div style="font-size:12px;color:var(--text3);margin-top:4px;font-family:var(--ff-body)">Prévia da flâmula do grupo</div>
-        </div>
-        <div class="insc-field-row">
-          <div class="insc-field">
-            <label>Dia da semana</label>
-            <select class="insc-input" id="insc-grupo-dia-input">
-              <option value="">Selecione…</option>
-              <option value="Domingo">Domingo</option>
-              <option value="Segunda-feira">Segunda-feira</option>
-              <option value="Terça-feira">Terça-feira</option>
-              <option value="Quarta-feira">Quarta-feira</option>
-              <option value="Quinta-feira">Quinta-feira</option>
-              <option value="Sexta-feira">Sexta-feira</option>
-              <option value="Sábado">Sábado</option>
-            </select>
-          </div>
-          <div class="insc-field">
-            <label>Horário</label>
-            <input class="insc-input" id="insc-grupo-hora-input" type="time">
-          </div>
-        </div>
-      </div>
-    </div>` : ''}
-
-    <div class="insc-block">
-      <div class="insc-block-hdr">📋 Seus dados</div>
-      <div class="insc-block-body">
-        <div class="insc-field">
-          <label>Nome completo *</label>
-          <input class="insc-input" id="insc-nome" type="text" maxlength="80" placeholder="Seu nome completo" autocomplete="name">
-        </div>
-        <div class="insc-field">
-          <label>WhatsApp pessoal (com DDD) *</label>
-          <div style="display:flex;align-items:center;gap:6px">
-            <span style="font-size:16px;color:var(--text3);white-space:nowrap;font-family:var(--ff-body)">+55</span>
-            <input class="insc-input" id="insc-wa" type="tel" placeholder="21 99999-0000" autocomplete="tel">
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div id="dept-wrap" style="display:${ST.userProfile === 'colaborador' ? 'block' : 'none'};padding:0 1rem .5rem">
-      <div class="insc-field">
-        <label>Departamento onde trabalha</label>
-        <input class="insc-input" id="insc-dept" type="text" maxlength="40" placeholder="Ex: Enfermagem, UTI, RH, Nutrição…">
-      </div>
-    </div>
-
-    <div id="insc-erro" style="color:#E05050;font-size:14px;font-family:var(--ff-body);display:none;padding:.4rem 0"></div>
-
-    <button class="insc-submit-btn" id="insc-submit-btn" onclick="confirmarInscricao(${g.num})">
-      🌿 Confirmar minha participação — Grupo ${g.num}
-    </button>`;
 }
 
-// ── Preview ao vivo da flâmula durante criação do grupo ──────────────
-function atualizarPreviewFlamula(nome, grupoNum) {
-  const wrap = document.getElementById('flamula-preview-wrap');
-  const svgEl = document.getElementById('flamula-preview-svg');
-  if (!wrap || !svgEl) return;
-  const n = nome.trim();
-  if (!n) { wrap.style.display = 'none'; return; }
-  wrap.style.display = 'block';
-  svgEl.innerHTML = generatePennantSvg(grupoNum, n, { width: 100, height: 140 });
-}
-
-// ── Seleção de papel/tipo ────────────────────────────────────────────
-function selecionarTipo(tipo) {
-  tipoSelecionado = tipo;
-  ['tutor','coordenador','colaborador','amigo','membro','outro'].forEach(t => {
-    const el = document.getElementById('tipo-opt-' + t);
-    if (el) el.classList.toggle('selected', t === tipo);
-  });
-  const deptWrap = document.getElementById('dept-wrap');
-  if (deptWrap) deptWrap.style.display = (tipo === 'colaborador') ? 'block' : 'none';
-}
-
-// ── Confirmar criação/inscrição ────────────────────────────────────────
-function confirmarInscricao(grupoNum) {
-  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
-  if (!g) return;
-
-  const precisaNome = !g.nome;
-
-  const nome = document.getElementById('insc-nome')?.value.trim();
-  const wa   = document.getElementById('insc-wa')?.value.replace(/\D/g,'');
-  const dept = document.getElementById('insc-dept')?.value.trim();
-
-  // Usar perfil escolhido na tela de boas-vindas
-  tipoSelecionado = ST.userProfile || 'participante';
-
-  // Validações dos dados pessoais
-  if (!nome) { mostrarErroInsc('Por favor, informe seu nome completo.'); return; }
-  if (!wa || wa.length < 10) { mostrarErroInsc('Informe um WhatsApp pessoal válido com DDD.'); return; }
-  if (tipoSelecionado === 'colaborador' && !dept) { mostrarErroInsc('Informe o departamento onde você trabalha.'); return; }
-  if (g.participantes && g.participantes.some(p => p.nome.trim().toLowerCase() === nome.toLowerCase())) {
-    // IDENT-01: antes de bloquear, verifica se é a própria pessoa recuperando identidade
-    // num aparelho novo (nome + WhatsApp precisam bater — nunca só o nome).
-    const existente = buscarCadastroExistente(g, nome, wa);
-    if (existente) {
-      renderRecuperarIdentidadeModal(g.nome || ('Grupo ' + grupoNum), () => {
-        recuperarIdentidade(g, existente);
-        renderIdentidadeRecuperadaModal(() => {
-          showScreen('home'); renderHome(); renderCompanionFab(); setTimeout(initGrupos, 100);
-        });
-      });
-      return;
-    }
-    mostrarErroInsc('Este nome já está inscrito neste grupo. Verifique se você já se cadastrou antes.'); return;
-  }
-
-  // DB-01: colaborador/coordenador só pode estar em 1 PG ativo por vez (tutor é isento)
-  if (tipoSelecionado !== 'tutor') {
-    const atual = getMeuGrupoAtivo(nome);
-    if (atual.existe && atual.grupoNum !== grupoNum) {
-      renderTrocaDeGrupoModal(atual, g.nome || ('Grupo ' + grupoNum), () => {
-        removerDoGrupoAtual(atual.grupoNum);
-        confirmarInscricao(grupoNum);
-      });
-      return;
-    }
-  }
-
-  // Validações de criação do grupo (só se for o primeiro a entrar)
-  let grupoNomeInput = null, grupoDiaInput = null, grupoHoraInput = null;
-  if (precisaNome) {
-    grupoNomeInput = document.getElementById('insc-grupo-nome-input')?.value.trim();
-    grupoDiaInput  = document.getElementById('insc-grupo-dia-input')?.value || '';
-    grupoHoraInput = document.getElementById('insc-grupo-hora-input')?.value || '';
-    if (!grupoNomeInput) { mostrarErroInsc('Por favor, dê um nome ao Pequeno Grupo.'); return; }
-  }
-
-  document.getElementById('insc-erro').style.display = 'none';
-
-  // ── Definir nome e horário do grupo, se for o criador ────────────────
-  if (precisaNome) {
-    g.nome = grupoNomeInput;
-    g.diaReuniao = grupoDiaInput || null;
-    g.horaReuniao = grupoHoraInput || null;
-  }
-
-  // ── Tutor do grupo: prioridade para escolha explícita "Sou o Tutor";
-  // se ninguém escolher isso, usa o tutor já selecionado na welcome screen ──
-  if (!g.tutor) {
-    if (tipoSelecionado === 'tutor') {
-      g.tutor = nome;
-    } else if (typeof getTutorNameForSync === 'function') {
-      const tutorDaWelcome = getTutorNameForSync();
-      if (tutorDaWelcome) g.tutor = tutorDaWelcome;
-    }
-  }
-
-  // ── Definir coordenador, se aplicável ────────────────────────────────
-  if (tipoSelecionado === 'coordenador' && !g.coordenador) g.coordenador = nome;
-
-  // ── Montar participante ───────────────────────────────────────────
-  const participante = {
-    nome,
-    wa: '55' + wa,
-    tipo: tipoSelecionado,
-    papel: (tipoSelecionado === 'tutor' || tipoSelecionado === 'coordenador') ? tipoSelecionado : null,
-    departamento: tipoSelecionado === 'colaborador' ? dept : '',
-    dataInscricao: new Date().toLocaleDateString('pt-BR'),
-    ts: Date.now(),
-    memberId: getMyMemberId(),
-  };
-
-  if (!g.participantes) g.participantes = [];
-  g.participantes.push(participante);
-  saveGrupos();
-
-  // ── Salvar meu grupo ──────────────────────────────────────────────
-  saveMeuGrupo({
-    grupoNum: g.num,
-    grupoNome: g.nome,
-    ...participante,
-  });
-
-  // ── Atualizar ST ──────────────────────────────────────────────────
-  ST.grupoNum  = g.num;
-  ST.grupoNome = g.nome;
-  ST.userName  = nome;
-  save(ST);
-
-  const nameInput = document.getElementById('user-name-input');
-  if (nameInput) nameInput.value = nome;
-
-  // ── Mostrar confirmação ──────────────────────────────────────────
-  const meuGrupo = { grupoNum: g.num, nome: g.nome, papel: participante.papel, tipo: tipoSelecionado, departamento: dept };
-  renderInscricaoBody(g, true, meuGrupo);
-
-  setTimeout(() => {
-    renderGrupoPreviewWelcome();
-    const sb = document.getElementById('start-btn');
-    if (sb && ST.tutor !== undefined) sb.disabled = false;
-  }, 600);
-}
-
-function mostrarErroInsc(msg) {
-  const el = document.getElementById('insc-erro');
-  if (el) { el.textContent = msg; el.style.display = 'block'; }
-}
+// FUNC-02d: o ramo de autocadastro (!jaInscrito) foi removido — openInscricao() já garante que
+// jaInscrito é sempre true antes de chamar renderInscricaoBody(). Junto foram removidas
+// confirmarInscricao()/mostrarErroInsc()/atualizarPreviewFlamula()/selecionarTipo() (só existiam
+// para esse formulário; tipoSelecionado/#tipo-opt-* ficaram sem nenhuma referência viva) e
+// recuperarIdentidade()/renderRecuperarIdentidadeModal() (só chamadas de dentro do
+// confirmarInscricao morto — a recuperação de identidade real, via aceite de convite, usa
+// buscarCadastroExistente()/renderIdentidadeRecuperadaModal(), mantidas). Tutor só por
+// allowlist+criação do PG; Coordenador/Colaborador só por convite.
 
 // BLOCKER-01: iniciarTrocaPapel/confirmarTrocaPapel (troca livre de Tutor/Coordenador por nome
 // digitado, sem allowlist/convite) foram removidas — só existiam os 2 botões "Trocar" que as
@@ -8521,50 +8304,10 @@ function buscarCadastroExistente(g, nome, waDigitado) {
   }) || null;
 }
 
-// Recupera identidade num aparelho novo: só troca o memberId, NUNCA cria um registro novo.
-// Papel e Companheiro de Jornada já estão no mesmo registro (preservados automaticamente).
-// Restaura localmente apenas o que é sincronizado: XP, streak, estudos concluídos (reconstruído,
-// já que a jornada é sequencial). Diário e a lista exata de missões concluídas NÃO são
-// recuperáveis (ARCH-01 / limitação do agregado de missões) — isso é comunicado na tela de sucesso.
-function recuperarIdentidade(g, p) {
-  p.memberId = getMyMemberId();
-  const prog = p.progresso || {};
-  ST.xp = prog.xp || 0;
-  ST.streak = prog.streak || 0;
-  ST.done = Array.from({ length: prog.estudosConcluidos || 0 }, (_, i) => i);
-  ST.userName = p.nome;
-  ST.grupoNum = g.num;
-  ST.grupoNome = g.nome;
-  ST.welcomeDone = true;
-  save(ST);
-  saveGrupos();
-  saveMeuGrupo({ grupoNum: g.num, grupoNome: g.nome, nome: p.nome, wa: p.wa, tipo: p.tipo, papel: p.papel, ts: p.ts });
-}
-
-function renderRecuperarIdentidadeModal(nomeGrupo, aoConfirmar) {
-  const existente = document.getElementById('recuperar-identidade-modal');
-  if (existente) existente.remove();
-  const overlay = document.createElement('div');
-  overlay.id = 'recuperar-identidade-modal';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1.5rem';
-  overlay.innerHTML = `
-    <div style="background:#0D2137;border-radius:var(--radius);padding:1.5rem;max-width:360px;width:100%;text-align:center;font-family:var(--ff-body)">
-      <div style="font-size:16px;color:#fff;line-height:1.6;margin-bottom:.75rem">
-        Encontramos um cadastro com esse nome e WhatsApp no Pequeno Grupo <strong>${sanitize(nomeGrupo)}</strong>.<br>
-        Deseja recuperá-lo neste aparelho?
-      </div>
-      <div style="font-size:13px;color:rgba(255,255,255,.55);margin-bottom:1.25rem">
-        Seu Diário Privado permanece somente no aparelho anterior e não pode ser recuperado automaticamente.
-      </div>
-      <div style="display:flex;gap:.6rem">
-        <button id="recuperar-cancelar" style="flex:1;background:transparent;border:0.5px solid rgba(255,255,255,.3);color:#fff;border-radius:var(--radius-sm);padding:.7rem;cursor:pointer;font-family:var(--ff-body)">❌ Cancelar</button>
-        <button id="recuperar-confirmar" style="flex:1;background:var(--teal);border:none;color:#fff;border-radius:var(--radius-sm);padding:.7rem;cursor:pointer;font-family:var(--ff-body)">✔ Sim, recuperar</button>
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
-  document.getElementById('recuperar-cancelar').onclick = () => overlay.remove();
-  document.getElementById('recuperar-confirmar').onclick = () => { overlay.remove(); aoConfirmar(); };
-}
+// FUNC-02d: recuperarIdentidade()/renderRecuperarIdentidadeModal() removidas — só eram chamadas
+// de dentro do confirmarInscricao() morto. A recuperação de identidade real (aceite de convite
+// num aparelho novo) usa buscarCadastroExistente() (acima) + renderIdentidadeRecuperadaModal()
+// (abaixo, mantida), já testada em aceitarConvite().
 
 function renderIdentidadeRecuperadaModal(aoContinuar) {
   const existente = document.getElementById('ident-recuperada-modal');
@@ -8701,41 +8444,9 @@ function renderGruposBtnHome() {
 
 
 
-// ── Preview do grupo na welcome screen ──────────────────────────────
-function renderGrupoPreviewWelcome() {
-  const meuGrupo = loadMeuGrupo();
-  const previewDiv = document.getElementById('grupo-selecionado-preview');
-  const btn        = document.getElementById('btn-escolher-grupo');
-  if (!previewDiv || !btn) return;
-
-  if (meuGrupo) {
-    const g = PEQUENOS_GRUPOS.find(x => x.num === meuGrupo.grupoNum);
-    previewDiv.style.display = 'block';
-    const pennant = generatePennantSvg(meuGrupo.grupoNum, meuGrupo.grupoNome, {width:64, height:88});
-    previewDiv.innerHTML = `
-      <div class="grupo-preview-box">
-        <div style="width:44px;height:60px;flex-shrink:0">${pennant}</div>
-        <div class="grupo-preview-info">
-          <div class="grupo-preview-nome">${sanitize(meuGrupo.grupoNome)}</div>
-          <div class="grupo-preview-coord">👨‍🏫 Tutor: ${sanitize(g ? g.tutor : '')}</div>
-          <div class="grupo-preview-coord">🤝 Coordenador: ${sanitize(g ? g.coordenador : '')}</div>
-          <div class="grupo-preview-meta">Inscrito em ${meuGrupo.dataInscricao||''} · ${meuGrupo.tipo==='colaborador'?'🏥 '+meuGrupo.departamento:meuGrupo.tipo==='amigo'?'🤝 Amigo dos Adventistas':meuGrupo.tipo==='membro'?'⛪ Membro IASD':'🌿 Participante'}</div>
-        </div>
-        <button class="grupo-troca-btn" onclick="openGrupos()">Trocar</button>
-      </div>`;
-    btn.textContent = '✅ Grupo confirmado — tocar para trocar';
-    btn.classList.add('inscrito');
-    // Habilitar botão de iniciar se tutor também escolhido
-    if (ST.tutor !== undefined) {
-      const sb = document.getElementById('start-btn');
-      if (sb) sb.disabled = false;
-    }
-  } else {
-    previewDiv.style.display = 'none';
-    btn.innerHTML = '🌿 Ver os Pequenos Grupos disponíveis';
-    btn.classList.remove('inscrito');
-  }
-}
+// FUNC-02d: renderGrupoPreviewWelcome() removida — dependia de elementos que só existiam na
+// screen-welcome (já removida no FUNC-02b); seus únicos chamadores eram confirmarInscricao() e
+// prefillWelcomeForm(), ambos já mortos/removidos.
 
 
 // ══════════════════════════════════════
