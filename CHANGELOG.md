@@ -1,5 +1,28 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-03] — FUNC-02d: remove o formulário de autocadastro em renderInscricaoBody (FUNC-02 concluído)
+
+Quarta e última sub-etapa do `FUNC-02` (remoção física do legado de autocadastro). Com esta etapa,
+o `FUNC-02` está inteiramente concluído.
+
+- Removido o ramo `!jaInscrito` de `renderInscricaoBody()` (o formulário completo de
+  autocadastro) + `confirmarInscricao()`/`mostrarErroInsc()`/`atualizarPreviewFlamula()`/
+  `renderGrupoPreviewWelcome()`/`renderRecuperarIdentidadeModal()`/`recuperarIdentidade()` +
+  variável órfã `status`.
+- **Achado adicional durante a limpeza:** `selecionarTipo()` — zero chamadores em todo o arquivo,
+  referenciava IDs inexistentes no HTML atual. Removida junto (mesmo cluster morto).
+- **Bug introduzido e corrigido no mesmo turno:** ao remover o ramo morto, faltou uma chave de
+  fechamento (fechava só o `if`, não a função) — pego pelo teste imediato no preview antes de
+  qualquer regressão, corrigido na hora.
+- Mantidas intocadas (compartilhadas com o aceite de convite real): `getMeuGrupoAtivo`,
+  `renderTrocaDeGrupoModal`, `buscarCadastroExistente`, `renderIdentidadeRecuperadaModal`,
+  `startJourney`, `getGrupoStatus`, `getProximoGrupoVazio`, `isGrupoAcessivel`.
+- Testado: cadeia completa por convite, tela do próprio grupo, bloqueio de grupo alheio/vazio,
+  **recuperação de identidade em aparelho novo** (ponta a ponta, incluindo o modal), console
+  limpo, nenhuma escrita real ao Firebase.
+
+---
+
 ## [2026-07-03] — FUNC-02c: remove screen-grupos (grade legada) e funções órfãs
 
 Terceira sub-etapa do `FUNC-02` (remoção física do legado de autocadastro).

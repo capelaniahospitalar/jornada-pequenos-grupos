@@ -604,13 +604,23 @@ de autocadastro e consolidar a arquitetura 100% baseada em convites hierárquico
      mantidas — usadas por fluxos legítimos ou já protegidas contra elemento ausente. **Testado:**
      cadeia completa por convite · bloqueio de grupo vazio/alheio via `openInscricao` · tela do
      próprio grupo intacta · console limpo · nenhuma escrita real ao Firebase.
-   - `FUNC-02d` — apagar o ramo morto de autocadastro em `renderInscricaoBody`
-     (`confirmarInscricao`/`mostrarErroInsc`/`atualizarPreviewFlamula`/`renderGrupoPreviewWelcome`/
-     `renderRecuperarIdentidadeModal`/`recuperarIdentidade` + variável órfã `status`). **Não tocar**
-     em `getMeuGrupoAtivo`/`renderTrocaDeGrupoModal`/`buscarCadastroExistente`/
-     `renderIdentidadeRecuperadaModal` (compartilhadas com o aceite de convite real) nem em
-     `startJourney`/`getGrupoStatus`/`getProximoGrupoVazio`/`isGrupoAcessivel` (usadas por fluxos
-     legítimos — `ATIVACAO-01` e a tela do próprio grupo).
+   - ✅ **`FUNC-02d` — apagar o ramo morto de autocadastro em `renderInscricaoBody` — CONCLUÍDO
+     (2026-07-03). `FUNC-02` inteiramente concluído (a, b, c, d).** Removidos: o ramo `!jaInscrito`
+     de `renderInscricaoBody` (o formulário completo de autocadastro), `confirmarInscricao`,
+     `mostrarErroInsc`, `atualizarPreviewFlamula`, `renderGrupoPreviewWelcome`,
+     `renderRecuperarIdentidadeModal`, `recuperarIdentidade` e a variável órfã `status`.
+     **Achado adicional durante a limpeza (mesmo cluster morto, fora da lista original):**
+     `selecionarTipo()` — zero chamadores em todo o arquivo, referenciava `#tipo-opt-*` inexistente
+     no HTML atual. Removida junto. **Bug introduzido e corrigido no mesmo turno:** ao remover o
+     ramo morto, uma chave de fechamento ficou faltando (fechava só o `if(jaInscrito)`, não a
+     função) — pego pelo teste imediato (`typeof renderInscricaoBody === 'function'`) antes de
+     qualquer regressão maior, corrigido na hora. Mantidas intocadas (compartilhadas com o aceite
+     de convite real ou fluxos legítimos): `getMeuGrupoAtivo`/`renderTrocaDeGrupoModal`/
+     `buscarCadastroExistente`/`renderIdentidadeRecuperadaModal`/`startJourney`/`getGrupoStatus`/
+     `getProximoGrupoVazio`/`isGrupoAcessivel`. **Testado:** cadeia completa por convite · tela do
+     próprio grupo · bloqueio de grupo alheio/vazio · **recuperação de identidade em aparelho
+     novo** (mesmo nome+WhatsApp, ponta a ponta incluindo o modal) · console limpo · nenhuma
+     escrita real ao Firebase.
 7. `UX-01`/`UX-02` — permissões e interface por papel.
 8. Auditoria completa da arquitetura antes de uma nova homologação (RC2).
 
