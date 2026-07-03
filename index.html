@@ -1550,6 +1550,7 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
     <div class="xp-hint" id="h-xphint">0 / 300 XP para próximo nível</div>
   </div>
 
+  <!-- ═══ BLOCO 1 — Meu Caminho Hoje ═══ -->
   <div class="stats">
     <div class="scard"><div class="scard-v" id="h-xp">0</div><div class="scard-l">XP Total</div></div>
     <div class="scard"><div class="scard-v" id="h-done">0/13</div><div class="scard-l">Estudos</div></div>
@@ -1568,25 +1569,35 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
     <div class="track-pct" id="h-pct">0% concluído — 13 estudos pela frente</div>
   </div>
 
-  <div class="sec-label">Conquistas</div>
-  <div class="badges-scroll" id="h-badges"></div>
+  <div class="next-area" id="next-area"></div>
 
   <div class="sec-label" id="lbl-previous" style="display:none">Estudos anteriores</div>
   <div id="h-previous"></div>
 
+  <!-- ═══ BLOCO 2 — Meu Pequeno Grupo ═══ (chip do grupo + progresso do PG + Painel da Comunidade, inseridos por renderGruposBtnHome/renderPgProgressHome/renderComunidadeBtnHome) -->
+  <div id="h-grupo-area"></div>
+
+  <!-- ═══ BLOCO 3 — Minha Formação ═══ -->
+  <div class="sec-label">Conquistas</div>
+  <div class="badges-scroll" id="h-badges"></div>
   <div id="h-level-card"></div>
   <div id="h-attrs"></div>
   <div id="h-radar-wrap"></div>
-
   <div id="h-bosses"></div>
+
+  <!-- ═══ BLOCO 4 — Minha Missão ═══ -->
   <div id="h-missions"></div>
 
-  <div class="next-area" id="next-area"></div>
-
+  <!-- ═══ BLOCO 5 — Ferramentas ═══ -->
   <div id="h-journal-btn"></div>
-  <div id="h-share-area"></div>
+  <div id="h-progress-area"></div>
   <div id="h-ai-area"></div>
-  <div id="h-tutor-area"></div>
+  <div id="h-companion-area"></div>
+
+  <!-- ═══ BLOCO 6 — Liderança do Pequeno Grupo ═══ (só Tutor/Coordenador; preenchido por renderShareArea) -->
+  <div id="h-lideranca-area"></div>
+
+  <!-- ═══ BLOCO 7 — Sistema ═══ -->
   <div id="h-install-area"></div>
 
 
