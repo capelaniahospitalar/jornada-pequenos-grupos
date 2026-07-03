@@ -1,5 +1,20 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-03] — FUNC-02a: move "Instalar na Tela Inicial" para a Home
+
+Primeira sub-etapa do `FUNC-02` (remoção física do legado de autocadastro). Diagnóstico completo
+identificou que `instalarApp()`/`mostrarInstrucoesInstalacao()` (prompt de instalação PWA) é
+funcionalidade real, mas seu único botão vivia dentro do `screen-welcome`, já morto — apagar a
+tela sem mover o botão perderia essa função.
+
+- Novo `<div id="h-install-area">` na Home + `renderInstallArea()` (chamada em `renderHome()`),
+  botão discreto e em área própria, não misturado com as ações de Tutor/Coordenador/Participante.
+- `instalarApp()`/`mostrarInstrucoesInstalacao()` não foram alteradas.
+- Botão removido de `screen-welcome` (o resto da tela continua intacto, aguardando `FUNC-02b`).
+- Testado: botão aparece na Home, clique mostra instruções corretamente, console limpo.
+
+---
+
 ## [2026-07-03] — RC2: item 5 concluído + UX-LEGACY-01 (remove acesso à tela antiga de escolha de papel)
 
 Diagnóstico do item 5 da RC2 (fluxo do Participante/Colaborador): a arquitetura de convites já

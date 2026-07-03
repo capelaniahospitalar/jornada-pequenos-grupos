@@ -568,6 +568,29 @@ de autocadastro e consolidar a arquitetura 100% baseada em convites hierárquico
      painel dedicado (`?tutor`) · cadeia completa por convite continua funcionando · Home utilizável
      · console limpo · nenhuma escrita real ao Firebase.
 6. `FUNC-02` — remover definitivamente o legado de autocadastro (código físico, não só acesso).
+   Diagnóstico completo feito em 2026-07-03 (mapa de funções mortas/vivas/compartilhadas), plano
+   incremental aprovado em 4 sub-etapas:
+   - ✅ **`FUNC-02a` — mover "Instalar na Tela Inicial" para a Home — CONCLUÍDO (2026-07-03).**
+     Achado do diagnóstico: `instalarApp()`/`mostrarInstrucoesInstalacao()` é funcionalidade real
+     (prompt PWA nativo + instruções manuais por SO), mas seu único botão vivia dentro do
+     `screen-welcome` morto — apagar a tela sem mover o botão perderia a função de instalar o app.
+     Novo `<div id="h-install-area">` na Home + `renderInstallArea()` (chamada em `renderHome()`
+     junto de `renderShareArea()`/`renderAIArea()`), botão discreto (texto simples, sem destaque),
+     em área própria — não misturado com `h-share-area`/`h-tutor-area`. `instalarApp()`/
+     `mostrarInstrucoesInstalacao()` não foram alteradas. Botão removido de `screen-welcome`
+     (mantém as demais funções/HTML da tela intactos, aguardando `FUNC-02b`). **Testado:** botão
+     aparece na Home · clique sem `deferredInstallPrompt` mostra as instruções corretamente ·
+     console limpo · nenhuma escrita real ao Firebase.
+   - `FUNC-02b` — próximo item: apagar `screen-welcome` inteira + `selectProfile`/
+     `prefillWelcomeForm`/`renderWelcomeLevelBadge` (zero chamador restante após o `FUNC-02a`).
+   - `FUNC-02c` — apagar `screen-grupos` inteira + `renderGrupoList`/`filterGrupos`.
+   - `FUNC-02d` — apagar o ramo morto de autocadastro em `renderInscricaoBody`
+     (`confirmarInscricao`/`mostrarErroInsc`/`atualizarPreviewFlamula`/`renderGrupoPreviewWelcome`/
+     `renderRecuperarIdentidadeModal`/`recuperarIdentidade` + variável órfã `status`). **Não tocar**
+     em `getMeuGrupoAtivo`/`renderTrocaDeGrupoModal`/`buscarCadastroExistente`/
+     `renderIdentidadeRecuperadaModal` (compartilhadas com o aceite de convite real) nem em
+     `startJourney`/`getGrupoStatus`/`getProximoGrupoVazio`/`isGrupoAcessivel` (usadas por fluxos
+     legítimos — `ATIVACAO-01` e a tela do próprio grupo).
 7. `UX-01`/`UX-02` — permissões e interface por papel.
 8. Auditoria completa da arquitetura antes de uma nova homologação (RC2).
 
