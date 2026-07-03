@@ -581,9 +581,20 @@ de autocadastro e consolidar a arquitetura 100% baseada em convites hierárquico
      (mantém as demais funções/HTML da tela intactos, aguardando `FUNC-02b`). **Testado:** botão
      aparece na Home · clique sem `deferredInstallPrompt` mostra as instruções corretamente ·
      console limpo · nenhuma escrita real ao Firebase.
-   - `FUNC-02b` — próximo item: apagar `screen-welcome` inteira + `selectProfile`/
-     `prefillWelcomeForm`/`renderWelcomeLevelBadge` (zero chamador restante após o `FUNC-02a`).
-   - `FUNC-02c` — apagar `screen-grupos` inteira + `renderGrupoList`/`filterGrupos`.
+   - ✅ **`FUNC-02b` — apagar `screen-welcome` e funções órfãs — CONCLUÍDO (2026-07-03).** Removida
+     a tela inteira (123 linhas de HTML) + `selectProfile()`/`prefillWelcomeForm()`/
+     `renderWelcomeLevelBadge()`, todas com zero chamador restante após o `FUNC-02a`. **Achado
+     durante a limpeza:** `renderGrupoBarWelcome()` e o ramo em `initGrupos()` que a invocava
+     (`if (document.getElementById('screen-welcome')...)`) também só existiam para essa tela —
+     removidos junto, mesma origem, risco zero (função já se autoprotegia com
+     `if (!welcomeHero) return`). `instalarApp()`/`mostrarInstrucoesInstalacao()` intocadas (já
+     movidas para a Home no `FUNC-02a`). **Testado:** visitante novo sem convite cai em "Convite
+     necessário" sem erro · cadeia completa Tutor→Coordenador→Colaborador por convite, de ponta a
+     ponta · botão de instalar na Home · tela do próprio grupo intacta · `getProximoGrupoVazio()`
+     intacta (`ATIVACAO-01`) · console limpo · nenhuma escrita real ao Firebase. CSS órfão
+     (`#screen-welcome .profile-opt` etc.) deixado de propósito — limpeza cosmética, sem risco,
+     fica para uma faxina de CSS separada se o usuário quiser.
+   - `FUNC-02c` — próximo item: apagar `screen-grupos` inteira + `renderGrupoList`/`filterGrupos`.
    - `FUNC-02d` — apagar o ramo morto de autocadastro em `renderInscricaoBody`
      (`confirmarInscricao`/`mostrarErroInsc`/`atualizarPreviewFlamula`/`renderGrupoPreviewWelcome`/
      `renderRecuperarIdentidadeModal`/`recuperarIdentidade` + variável órfã `status`). **Não tocar**

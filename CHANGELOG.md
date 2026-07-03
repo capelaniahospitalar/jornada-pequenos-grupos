@@ -1,5 +1,22 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-03] — FUNC-02b: remove screen-welcome e funções órfãs
+
+Segunda sub-etapa do `FUNC-02` (remoção física do legado de autocadastro).
+
+- Removida a `screen-welcome` inteira (123 linhas) + `selectProfile()`/`prefillWelcomeForm()`/
+  `renderWelcomeLevelBadge()` — zero chamador restante desde o `FUNC-02a`.
+- Achado durante a limpeza: `renderGrupoBarWelcome()` e o ramo em `initGrupos()` que a chamava
+  também só existiam para essa tela — removidos junto (mesma origem, risco zero).
+- `instalarApp()`/`mostrarInstrucoesInstalacao()` não foram tocadas (já vivem na Home desde o
+  `FUNC-02a`).
+- CSS órfão (`#screen-welcome .profile-opt` etc.) deixado de propósito — cosmético, sem risco.
+- Testado: visitante novo sem convite cai em "Convite necessário" sem erro · cadeia completa por
+  convite (Tutor→Coordenador→Colaborador) · botão de instalar na Home · tela do próprio grupo
+  intacta · `getProximoGrupoVazio()` intacta (`ATIVACAO-01`) · console limpo.
+
+---
+
 ## [2026-07-03] — FUNC-02a: move "Instalar na Tela Inicial" para a Home
 
 Primeira sub-etapa do `FUNC-02` (remoção física do legado de autocadastro). Diagnóstico completo
