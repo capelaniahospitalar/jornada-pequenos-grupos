@@ -1560,11 +1560,6 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
   <!-- PASSOS — fundo escuro contínuo -->
   <div style="background:#0D2137;padding:0 1rem 6rem;display:flex;flex-direction:column;gap:.75rem;min-height:100%">
 
-    <!-- Instalar na Tela Inicial (PWA) — discreto, não interfere no fluxo de cadastro -->
-    <button onclick="instalarApp()" style="align-self:center;margin:.6rem 0 .1rem;background:rgba(255,255,255,0.07);border:0.5px solid rgba(255,255,255,0.18);border-radius:20px;padding:.4rem 1rem;font-size:13px;color:rgba(255,255,255,0.75);cursor:pointer;font-family:var(--ff-body)">
-      📲 Instalar na Tela Inicial
-    </button>
-
     <!-- PASSO 1: Nome do Participante -->
     <div class="welcome-step-card">
       <div class="welcome-step-hdr">
@@ -1712,6 +1707,7 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
   <div id="h-share-area"></div>
   <div id="h-ai-area"></div>
   <div id="h-tutor-area"></div>
+  <div id="h-install-area"></div>
 
 
 </div>
@@ -4474,6 +4470,17 @@ function renderShareArea() {
     </div>`;
 }
 
+// FUNC-02a: ação utilitária discreta, movida da tela antiga de boas-vindas (screen-welcome,
+// já sem nenhum caminho de acesso) — não é fluxo principal, não é específica de nenhum papel.
+function renderInstallArea() {
+  document.getElementById('h-install-area').innerHTML = `
+    <div style="text-align:center;margin:.5rem 0 .25rem">
+      <button onclick="instalarApp()" style="background:transparent;border:none;color:var(--text3);font-size:13px;cursor:pointer;font-family:var(--ff-body)">
+        📲 Instalar na Tela Inicial
+      </button>
+    </div>`;
+}
+
 function renderAIArea() {
   document.getElementById('h-ai-area').innerHTML = `
     <div style="margin:.75rem 1rem 0">
@@ -4805,6 +4812,7 @@ function renderHome() {
   // Phase 3 — Share, AI, Panel
   renderShareArea();
   renderAIArea();
+  renderInstallArea();
   renderCompanionHomeBtn();
   setTimeout(() => {
     if (typeof renderGruposBtnHome === 'function') renderGruposBtnHome();
