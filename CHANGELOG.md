@@ -1,5 +1,23 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-03] — FUNC-02c: remove screen-grupos (grade legada) e funções órfãs
+
+Terceira sub-etapa do `FUNC-02` (remoção física do legado de autocadastro).
+
+- Removida a `screen-grupos` inteira (grade dos 50 Pequenos Grupos) + `renderGrupoList()`/
+  `filterGrupos()`.
+- **Achado real durante a limpeza:** `salvarFbConfig()` (tela de configuração inicial do Firebase)
+  chamava `renderGrupoList()` diretamente — ficaria quebrada com uma referência inexistente.
+  Chamada removida. Um segundo resíduo equivalente dentro do poller `startFbPoll` também foi
+  limpo, embora já fosse inalcançável.
+- `renderGrupoSyncBadge()`/`isGrupoAcessivel()`/`getGrupoStatus()`/`getProximoGrupoVazio()` não
+  foram tocadas — usadas por fluxos legítimos (`ATIVACAO-01`) ou já protegidas contra elemento
+  ausente.
+- Testado: cadeia completa por convite, bloqueio de grupo vazio/alheio via `openInscricao`, tela
+  do próprio grupo intacta, console limpo.
+
+---
+
 ## [2026-07-03] — FUNC-02b: remove screen-welcome e funções órfãs
 
 Segunda sub-etapa do `FUNC-02` (remoção física do legado de autocadastro).

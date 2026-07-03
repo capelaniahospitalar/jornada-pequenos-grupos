@@ -594,7 +594,16 @@ de autocadastro e consolidar a arquitetura 100% baseada em convites hierárquico
      intacta (`ATIVACAO-01`) · console limpo · nenhuma escrita real ao Firebase. CSS órfão
      (`#screen-welcome .profile-opt` etc.) deixado de propósito — limpeza cosmética, sem risco,
      fica para uma faxina de CSS separada se o usuário quiser.
-   - `FUNC-02c` — próximo item: apagar `screen-grupos` inteira + `renderGrupoList`/`filterGrupos`.
+   - ✅ **`FUNC-02c` — apagar `screen-grupos` e funções órfãs — CONCLUÍDO (2026-07-03).** Removida
+     a tela inteira (grade dos 50 PGs) + `renderGrupoList()`/`filterGrupos()`. **Achado real durante
+     a limpeza:** `salvarFbConfig()` (tela de configuração inicial do Firebase, admin) chamava
+     `renderGrupoList()` diretamente — ficaria quebrada com uma referência inexistente; chamada
+     removida. Um segundo resíduo (`if (active==='screen-grupos') renderGrupoList()` dentro do
+     poller `startFbPoll`) também foi limpo pela mesma razão, embora já inalcançável.
+     `renderGrupoSyncBadge()`/`isGrupoAcessivel()`/`getGrupoStatus()`/`getProximoGrupoVazio()`
+     mantidas — usadas por fluxos legítimos ou já protegidas contra elemento ausente. **Testado:**
+     cadeia completa por convite · bloqueio de grupo vazio/alheio via `openInscricao` · tela do
+     próprio grupo intacta · console limpo · nenhuma escrita real ao Firebase.
    - `FUNC-02d` — apagar o ramo morto de autocadastro em `renderInscricaoBody`
      (`confirmarInscricao`/`mostrarErroInsc`/`atualizarPreviewFlamula`/`renderGrupoPreviewWelcome`/
      `renderRecuperarIdentidadeModal`/`recuperarIdentidade` + variável órfã `status`). **Não tocar**
