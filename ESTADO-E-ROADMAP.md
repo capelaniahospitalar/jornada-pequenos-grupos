@@ -133,7 +133,7 @@ Cada commit é precedido de **Mapa de Impacto** (análise, sem código); tombsto
   o que já era comprovadamente inalcançável foi tirado. `CHANGELOG.md` atualizado. Verificado:
   busca global sem duplicatas remanescentes; app carrega sem erros de console nem requisições
   falhas.
-- **UX-01 — Revisar acesso à Comunidade/Mural de Gratidão na Home (novo, 2026-07-02).**
+- ✅ **UX-01 — Consolidação do módulo comunitário na Home — CONCLUÍDO (2026-07-03)** (registrado 2026-07-02).
   Achado durante o C5: a Home tem hoje **dois botões** que levam para a mesma tela — "Mural de
   Gratidão" (dentro de `renderGruposBtnHome`, só aparece se já estiver num grupo) e "Comunidade"
   (`renderComunidadeBtnHome`, sempre aparece, com contador "X compartilhada(s) por você"). Esse
@@ -143,6 +143,17 @@ Cada commit é precedido de **Mapa de Impacto** (análise, sem código); tombsto
   para quando for feito: eliminar a duplicidade, unificar num único botão, remover o contador
   baseado em `localStorage` (ou trocar por um derivado do Firebase). Planejado para depois da RC e
   da homologação, como rodada de refinamento de UX — não antes.
+  - **Implementado (2026-07-03):** os dois cards da Home ("Comunidade" em `renderComunidadeBtnHome`
+    e "Mural de Gratidão" dentro de `renderGruposBtnHome`, ambos abrindo o MESMO `openComunidade`)
+    foram consolidados em **um único card "❤️ Painel da Comunidade — [nome do PG]"** (nome dinâmico),
+    subtítulo "Gratidões • Orações • Celebrações". `openComunidade()` NÃO foi tocado — ele já reúne
+    gratidões, pedidos de oração e celebrações (estas via patch `injectCelebsIntoComunidade`).
+    Contador morto (`totalGrat`/`loadGratidoes`) removido do card (função não apagada — limpeza fora
+    de escopo). Chip "Grupo N — Nome" preservado. **Só UI** — nenhuma regra de negócio, permissão,
+    Firebase, convite ou banco tocados. Validado no preview (rede neutralizada): 1 card só;
+    título/subtítulo corretos; `openComunidade` abre mural + celebrações sem erro; console limpo.
+    Diff só em `index.html`. Decisão de nomenclatura do usuário: marcar o próprio `UX-01` como
+    concluído em vez de abrir um `UX-03`, para não fragmentar uma melhoria já prevista.
 - **`ATIVACAO-01` — Criação de Pequenos Grupos pelo Tutor — Etapa 2 da RC2 CONCLUÍDA
   (2026-07-02).** Um Tutor autenticado pela allowlist (Etapa 1, `ARCH-02`) agora pode criar PGs de
   verdade, sem reativar nenhum autocadastro.
@@ -648,6 +659,41 @@ de autocadastro e consolidar a arquitetura 100% baseada em convites hierárquico
      vê os 2 botões normalmente · Tutor legado-participante preservado por compatibilidade ·
      console limpo · nenhuma escrita real ao Firebase.
 8. Auditoria completa da arquitetura antes de uma nova homologação (RC2).
+
+## ARCH-04 — Remoção definitiva da entrada pública do aplicativo (decisão arquitetural, 2026-07-03)
+
+> Nota de nomenclatura: `ARCH-02` (entrada `?tutor`) e `ARCH-03` (identidade do Tutor) já existem
+> neste documento; esta decisão é numerada `ARCH-04` para não colidir.
+
+O aplicativo passou a operar **exclusivamente por convites**. A URL base deixou de ser uma
+entrada — tornou-se uma **página institucional informativa e terminal**
+(`showInstitutionalLanding()` / tela `#screen-landing`), **sem ações de cadastro ou navegação
+(sem botão)**.
+
+**Regra estrutural (não reabrir sem decisão explícita):** não existe entrada pública. As ÚNICAS
+portas de entrada do sistema são:
+- `?tutor` → Painel do Tutor (autorizado pela allowlist `tutores`)
+- `?conv=<id>` → cadastro pelo convite de uso único
+- `welcomeDone == true` → retorno automático do participante já autenticado (Home)
+- qualquer outro acesso (URL base sem contexto) → página institucional terminal
+
+**Motivação:** fechar a divergência entre a arquitetura (acesso 100% por convite) e a interface —
+a antiga tela "Convite necessário" parecia uma entrada pública e tinha um botão "Ir para o início"
+que, sem `welcomeDone`, voltava para si mesma (resíduo do autocadastro removido no `FUNC-02`). Quem
+perde o acesso pede um novo convite ao Coordenador (caso operacional; o `IDENT-01` recupera o
+progresso ao re-aceitar — não é preciso fluxo de recuperação próprio). **Se no futuro alguém
+sugerir "colocar um botão de cadastro na página inicial", isso contraria esta decisão deliberada.**
+
+**Responsabilidade única por tela** (resultado da consolidação): Página institucional → informa ·
+Link do Tutor → administra · Link de Convite → ingressa · Home → participa.
+
+**Implementado** em `index.html` (+36/−9, 2026-07-03): função dedicada `showInstitutionalLanding()`
+(separada de propósito da infraestrutura de mensagens de convite/erro) + tela `#screen-landing` +
+roteamento do ramo `else` do `initApp`; `telaConviteMensagem` preservada para as mensagens de
+DENTRO do app (convite usado/expirado/grupo alheio), onde o botão "Ir para o início" continua
+legítimo (`welcomeDone == true` → Home). **Validado em runtime** (landing sem botão; mensagens
+internas intactas; rotas `?conv=`/`?tutor` preservadas; console limpo; nenhuma escrita ao Firebase).
+**Aguardando commit.**
 
 **Processo mantido (igual à RC1, reafirmado pelo usuário):** diagnóstico + mapa de impacto →
 proposta técnica detalhada (arquivos afetados) → aprovação explícita → implementação de **uma

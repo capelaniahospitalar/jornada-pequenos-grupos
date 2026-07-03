@@ -1736,6 +1736,11 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
   <div id="convite-body"></div>
 </div>
 
+<!-- PÁGINA INSTITUCIONAL TERMINAL (URL base sem contexto — acesso 100% por convite) -->
+<div id="screen-landing" class="screen">
+  <div id="landing-body"></div>
+</div>
+
 <!-- TUTOR PANEL SCREEN -->
 <div id="screen-panel" class="screen">
   <div class="study-hdr">
@@ -5109,11 +5114,10 @@ function initApp() {
     renderCompanionFab();
     setTimeout(initGrupos, 80);
   } else {
-    // BLOCKER-001: sem convite válido, não existe mais autocadastro — só a
-    // mensagem orientando a pedir um convite. Ver HOMOLOGACAO-RC1.md.
-    showScreen('convite');
-    const body = document.getElementById('convite-body');
-    if (body) body.innerHTML = telaConviteMensagem('sem_convite');
+    // Fim da transição p/ acesso 100% por convite: a URL base sem contexto
+    // (nem ?conv=, nem ?tutor, nem welcomeDone) não é uma entrada pública —
+    // é a porta institucional terminal, sem ação. Ver ESTADO-E-ROADMAP.md.
+    showInstitutionalLanding();
   }
 }
 
@@ -7359,11 +7363,34 @@ function irParaInicioLimpo() {
   window.history.replaceState({}, '', window.location.pathname);
   if (ST.welcomeDone) { showScreen('home'); renderHome(); renderCompanionFab(); setTimeout(initGrupos, 80); }
   else {
-    // BLOCKER-001: sem convite válido, não há para onde voltar além da mensagem.
-    showScreen('convite');
-    const body = document.getElementById('convite-body');
-    if (body) body.innerHTML = telaConviteMensagem('sem_convite');
+    // Sem estado local e sem convite: não há "início" — é a porta institucional.
+    showInstitutionalLanding();
   }
+}
+
+// Porta institucional terminal do app. A URL base sem contexto (sem ?conv=,
+// sem ?tutor, sem welcomeDone) NÃO é uma entrada pública — o acesso é 100% por
+// convite. Página SEM ação: não é mensagem de convite nem de erro nem de auth.
+function showInstitutionalLanding() {
+  showScreen('landing');
+  const body = document.getElementById('landing-body');
+  if (!body) return;
+  body.innerHTML = `
+  <div style="background:#0D2137;min-height:100vh;padding:3.5rem 1.75rem 4rem;text-align:center;display:flex;flex-direction:column;align-items:center">
+    <div style="font-size:40px;margin-bottom:1.25rem">🌿</div>
+    <div style="font-family:var(--ff-serif);font-size:24px;color:#fff;line-height:1.3">Jornada em Pequenos Grupos</div>
+    <div style="font-size:13.5px;letter-spacing:.6px;color:var(--gold);margin-top:.45rem;text-transform:uppercase;font-family:var(--ff-body)">Capelania Hospital Adventista Silvestre</div>
+    <div style="width:48px;height:2px;background:rgba(255,255,255,0.15);margin:1.6rem 0"></div>
+    <p style="font-size:16px;color:rgba(255,255,255,0.85);font-family:var(--ff-body);line-height:1.65;max-width:340px;margin:0 0 1rem">
+      Este aplicativo é destinado exclusivamente aos participantes dos Pequenos Grupos da Capelania.
+    </p>
+    <p style="font-size:16px;color:rgba(255,255,255,0.85);font-family:var(--ff-body);line-height:1.65;max-width:340px;margin:0 0 1rem">
+      O acesso é realizado somente por meio de um convite enviado pelo Tutor ou pelo Coordenador do seu grupo.
+    </p>
+    <p style="font-size:15px;color:rgba(255,255,255,0.6);font-family:var(--ff-body);line-height:1.6;max-width:340px;margin:0">
+      Caso você já participe de um Pequeno Grupo e precise voltar a acessar o aplicativo, solicite um novo convite ao Coordenador.
+    </p>
+  </div>`;
 }
 
 // Tela de entrada por convite — os 4 elementos (mockup aprovado).
@@ -8430,25 +8457,8 @@ function renderGruposBtnHome() {
     // ficou inalcançável junto com a tela antiga de autocadastro (BLOCKER-001).
     : '';
 
-  // Botão Mural de Gratidão (só aparece se estiver em um grupo)
-  const meuGrupoAtual = loadMeuGrupo();
-  if (meuGrupoAtual) {
-    let muralBtn = document.getElementById('mural-home-btn');
-    if (!muralBtn) {
-      muralBtn = document.createElement('div');
-      muralBtn.id = 'mural-home-btn';
-      muralBtn.style.cssText = 'margin:.5rem 1rem 0';
-      div.after(muralBtn);
-    }
-    muralBtn.innerHTML = `<button onclick="openComunidade()" style="display:flex;align-items:center;gap:10px;width:100%;background:var(--gold-pale);border:0.5px solid rgba(184,134,11,.35);border-radius:var(--radius-sm);padding:.65rem 1rem;cursor:pointer;font-family:var(--ff-body)">
-      <span style="font-size:22px">❤️</span>
-      <div style="flex:1;text-align:left">
-        <div style="font-weight:600;font-size:15px;color:var(--gold)">Mural de Gratidão</div>
-        <div style="font-size:13px;color:var(--text3)">Compartilhe gratidões e pedidos de oração</div>
-      </div>
-      <span style="color:var(--text3);font-size:18px">›</span>
-    </button>`;
-  }
+  // UX-01: o card "Mural de Gratidão" foi removido daqui — consolidado no único card
+  // "Painel da Comunidade" (renderComunidadeBtnHome). O chip do grupo acima é preservado.
 }
 
 
@@ -8983,15 +8993,18 @@ function renderComunidadeBtnHome() {
   if (existing) return;
   const anchor = document.getElementById('pg-progress-card') || document.getElementById('grupos-home-btn') || document.getElementById('h-tutor-area');
   if (!anchor) return;
+  const mg = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
+  const nomePg = mg ? (mg.grupoNome || ('Grupo ' + mg.grupoNum)) : '';
   const div = document.createElement('div');
   div.id = 'comunidade-home-btn';
   div.style.cssText = 'margin:.75rem 1rem 0';
-  const totalGrat = loadGratidoes().length;
+  // UX-01: card único da vida comunitária do PG. Abre openComunidade(), que já reúne
+  // gratidões, pedidos de oração e celebrações. Contador antigo (localStorage morto) removido.
   div.innerHTML = `<button onclick="openComunidade()" style="display:flex;align-items:center;gap:9px;width:100%;background:var(--card);border:0.5px solid rgba(184,134,11,.3);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">
     <span style="font-size:22px">❤️</span>
     <div style="flex:1;text-align:left">
-      <div style="font-weight:600;color:var(--gold)">Comunidade</div>
-      <div style="font-size:13px;color:var(--text3)">Mural de Gratidão${totalGrat ? ' · ' + totalGrat + ' compartilhada' + (totalGrat>1?'s':'') + ' por você' : ''}</div>
+      <div style="font-weight:600;color:var(--gold)">Painel da Comunidade${nomePg ? ' — ' + sanitize(nomePg) : ''}</div>
+      <div style="font-size:13px;color:var(--text3)">Gratidões • Orações • Celebrações</div>
     </div>
     <span style="color:var(--text3);font-size:18px">›</span>
   </button>`;
