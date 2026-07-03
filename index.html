@@ -1922,22 +1922,6 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
      SISTEMA DE PEQUENOS GRUPOS
 ══════════════════════════════════════ -->
 
-<!-- Seleção / listagem de grupos -->
-<div id="screen-grupos" class="screen">
-  <div class="grupo-hdr">
-    <button class="grupo-exit-btn" onclick="goHome()" aria-label="Voltar">&#8592; Voltar</button>
-    <div class="grupo-hdr-icon">🌿</div>
-    <div class="grupo-hdr-title">Jornada Discipular em Pequenos Grupos</div>
-    <div class="grupo-hdr-sub">Aos Pés do Mestre Jesus</div>
-  </div>
-  <div class="grupo-search-wrap">
-    <input class="grupo-search" id="grupo-search-input" type="text"
-      placeholder="🔍 Buscar grupo já criado por número…"
-      oninput="filterGrupos(this.value)">
-  </div>
-  <div class="grupo-list" id="grupo-list-body"></div>
-</div>
-
 <!-- Criação / inscrição num grupo -->
 <div id="screen-inscricao" class="screen">
   <div class="insc-hdr">
@@ -7888,7 +7872,6 @@ function startFbPoll() {
     const updated = await syncFromFirebase();
     if (updated) {
       const active = document.querySelector('.screen.active')?.id;
-      if (active === 'screen-grupos') renderGrupoList();
       if (active === 'screen-comunidade') renderComunidade();
       if (active === 'screen-companion') renderCompanionScreen();
     }
@@ -8006,7 +7989,6 @@ async function salvarFbConfig() {
     }
     document.getElementById('fb-setup-overlay')?.remove();
     renderGrupoSyncBadge();
-    renderGrupoList();
     startFbPoll();
     alert('✅ Sincronização ativada! Os grupos agora são compartilhados automaticamente entre todos os dispositivos.');
   } catch (e) {
@@ -8052,103 +8034,8 @@ function openGrupos() {
   if (body) body.innerHTML = telaConviteMensagem('sem_convite');
 }
 
-// ── Render: lista de grupos ────────────────────────────────────────────
-// Mostra apenas: grupos já existentes (em formação ou completos) + o único
-// próximo grupo disponível para criação. Os demais grupos vazios/bloqueados
-// (a grande maioria, no início do uso do app) NUNCA aparecem na tela —
-// nem mesmo como itens bloqueados — para não ocupar espaço sem necessidade.
-function renderGrupoList(filtro = '') {
-  const body = document.getElementById('grupo-list-body');
-  if (!body) return;
-
-  loadGrupos();
-
-  const proximoVazio = getProximoGrupoVazio();
-
-  // Grupos visíveis: já existem (formação/completo) OU é o único próximo disponível
-  let gruposVisiveis = PEQUENOS_GRUPOS.filter(g => {
-    const status = getGrupoStatus(g);
-    if (status !== 'vazio') return true;               // já existe — sempre mostrado
-    return proximoVazio && g.num === proximoVazio.num;  // só o próximo da fila
-  });
-
-  // Aplicar busca textual (apenas sobre os grupos já existentes — não faz
-  // sentido buscar texto dentro de um grupo que ainda não tem nome/tutor)
-  if (filtro) {
-    const f = filtro.toLowerCase();
-    gruposVisiveis = gruposVisiveis.filter(g => {
-      const status = getGrupoStatus(g);
-      if (status === 'vazio') return true; // mantém o card de "criar próximo" visível mesmo buscando
-      return String(g.num).includes(f) ||
-             (g.nome && g.nome.toLowerCase().includes(f)) ||
-             (g.tutor && g.tutor.toLowerCase().includes(f)) ||
-             (g.coordenador && g.coordenador.toLowerCase().includes(f));
-    });
-  }
-
-  if (!gruposVisiveis.length) {
-    body.innerHTML = `<div style="text-align:center;padding:2rem;font-size:16px;color:var(--text3);font-family:var(--ff-body)">Nenhum grupo encontrado.</div>`;
-    return;
-  }
-
-  const meuGrupo = loadMeuGrupo();
-
-  body.innerHTML = gruposVisiveis.map(g => {
-    const status = getGrupoStatus(g);
-    const total = g.participantes.length;
-    const cheio = g.maxParticipantes !== null && total >= g.maxParticipantes;
-    const isMeu = meuGrupo && meuGrupo.grupoNum === g.num;
-
-    let vTag = '';
-    let cardCls = '';
-    let nomeDisplay = '';
-    let metaDisplay = '';
-
-    if (status === 'vazio') {
-      // Só chega aqui se for o próximo grupo da fila — sempre acessível
-      vTag = '<span class="grupo-vagas vagas-disponivel">✨ Disponível para criar</span>';
-      cardCls = 'disponivel';
-      nomeDisplay = '<em style="color:var(--text3);font-style:italic">Aguardando criação…</em>';
-      metaDisplay = 'Seja o primeiro a se inscrever neste grupo';
-    } else if (status === 'formacao') {
-      vTag = `<span class="grupo-vagas vagas-formacao">🛠️ Em formação</span>`;
-      nomeDisplay = g.nome || '<em style="color:var(--text3);font-style:italic">Nome ainda não definido</em>';
-      const faltam = [];
-      if (!g.tutor) faltam.push('tutor');
-      if (!g.coordenador) faltam.push('coordenador');
-      metaDisplay = `Falta: ${faltam.join(' e ')} · ${total} inscrito${total===1?'':'s'}`;
-    } else {
-      vTag = cheio
-        ? '<span class="grupo-vagas vagas-cheio">Encerrado</span>'
-        : isMeu
-          ? '<span class="grupo-vagas vagas-ok">✓ Meu grupo</span>'
-          : `<span class="grupo-vagas vagas-ok">${total} inscrito${total===1?'':'s'}</span>`;
-      nomeDisplay = g.nome;
-      metaDisplay = `👨‍🏫 ${sanitize(g.tutor)} · 🤝 ${sanitize(g.coordenador)}`;
-    }
-
-    const clickable = !cheio;
-
-    const badgeHtml = g.nome
-      ? `<div style="width:34px;height:48px;flex-shrink:0">${generatePennantSvg(g.num, g.nome, {width:60, height:84})}</div>`
-      : `<div class="grupo-num-badge${status==='vazio'?' vazio':''}">${g.num}</div>`;
-
-    return `<div class="grupo-card ${cardCls}" onclick="${clickable ? `openInscricao(${g.num})` : ''}">
-      <div class="grupo-card-inner">
-        ${badgeHtml}
-        <div class="grupo-info">
-          <div class="grupo-nome">${nomeDisplay}</div>
-          <div class="grupo-meta">${metaDisplay}</div>
-        </div>
-        ${vTag}
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function filterGrupos(val) {
-  renderGrupoList(val.trim());
-}
+// FUNC-02c: renderGrupoList()/filterGrupos() removidas junto com a screen-grupos (grade legada
+// dos 50 PGs) — ingresso só pela cadeia de convites (BLOCKER-001/BLOCKER-01).
 
 // ── Render: tela de criação / inscrição ─────────────────────────────────
 // BLOCKER-01: ingresso e alteração de autoridade só pela cadeia de convites da RC2 — esta tela
