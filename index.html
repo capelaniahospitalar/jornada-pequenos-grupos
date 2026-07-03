@@ -2069,7 +2069,6 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 <div id="screen-inscricao" class="screen">
   <div class="insc-hdr">
     <button class="grupo-exit-btn insc-exit-btn" onclick="goHome()" aria-label="Voltar">&#8592; Voltar</button>
-    <button class="back-btn" onclick="showScreen('grupos');renderGrupoList()" style="color:rgba(255,255,255,.6);background:none;border:none;font-size:22px;cursor:pointer;margin-bottom:.35rem">&#8592;</button>
     <div class="insc-hdr-num" id="insc-grupo-num">Grupo 1</div>
     <div class="insc-hdr-nome" id="insc-grupo-nome">—</div>
     <div class="insc-hdr-tutor" id="insc-grupo-tutor"></div>
@@ -8308,7 +8307,17 @@ function filterGrupos(val) {
 }
 
 // ── Render: tela de criação / inscrição ─────────────────────────────────
+// BLOCKER-01: ingresso e alteração de autoridade só pela cadeia de convites da RC2 — esta tela
+// só pode exibir o grupo que já é o meu (visualização/gestão do meu próprio PG). Tentar abrir
+// qualquer outro grupo por aqui (grade legada, ou chamada direta) cai na mesma mensagem de
+// "convite necessário" do openGrupos(), em vez do formulário de autocadastro antigo.
 function openInscricao(num) {
+  if (loadMeuGrupo()?.grupoNum !== num) {
+    showScreen('convite');
+    const body = document.getElementById('convite-body');
+    if (body) body.innerHTML = telaConviteMensagem('sem_convite');
+    return;
+  }
   loadGrupos();
   syncFromFirebase().then(updated => {
     if (!updated) return;
@@ -8386,7 +8395,6 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
           <div class="grupo-info-lbl">Tutor</div>
           <div class="grupo-info-val">${sanitize(g.tutor || '— ainda não definido —')}</div>
         </div>
-        ${podeGerenciar && g.tutor ? `<button class="grupo-troca-papel-btn" onclick="iniciarTrocaPapel(${g.num},'tutor')">Trocar</button>` : ''}
       </div>
       <div class="grupo-info-row">
         <span class="grupo-info-ico">🤝</span>
@@ -8394,7 +8402,6 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
           <div class="grupo-info-lbl">Coordenador</div>
           <div class="grupo-info-val">${sanitize(g.coordenador || '— ainda não definido —')}</div>
         </div>
-        ${podeGerenciar && g.coordenador ? `<button class="grupo-troca-papel-btn" onclick="iniciarTrocaPapel(${g.num},'coordenador')">Trocar</button>` : ''}
       </div>
       <div class="grupo-info-row">
         <span class="grupo-info-ico">🗓️</span>
@@ -8424,7 +8431,6 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
         <div class="insc-confirm-msg">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
             <strong>${meuGrupo.nome}</strong>
-            <button onclick="showScreen('grupos');renderGrupoList()" style="background:none;border:0.5px solid var(--teal);border-radius:20px;padding:3px 12px;font-size:13px;color:var(--teal);cursor:pointer;font-family:var(--ff-body);flex-shrink:0">Trocar</button>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:4px">
             <span>${meuGrupo.papel === 'tutor' ? '👨‍🏫 Você é o Tutor deste grupo' : meuGrupo.papel === 'coordenador' ? '🤝 Você é o Coordenador deste grupo' : (meuGrupo.tipo === 'colaborador' ? `🏥 ${meuGrupo.departamento}` : meuGrupo.tipo === 'amigo' ? '🤝 Amigo dos Adventistas' : meuGrupo.tipo === 'membro' ? '⛪ Membro IASD' : '🌿 Participante')}</span>
@@ -8665,59 +8671,13 @@ function mostrarErroInsc(msg) {
   if (el) { el.textContent = msg; el.style.display = 'block'; }
 }
 
-// ── Trocar Tutor ou Coordenador de um grupo já existente ────────────────
-function iniciarTrocaPapel(grupoNum, papel) {
-  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
-  if (!g) return;
-  const label = papel === 'tutor' ? 'Tutor' : 'Coordenador';
-  const atual = papel === 'tutor' ? g.tutor : g.coordenador;
-
-  const body = document.getElementById('insc-body');
-  if (!body) return;
-
-  const formHtml = `
-    <div class="papel-form-card" id="troca-papel-form">
-      <div class="papel-form-hdr ${papel}">🔄 Trocar ${label} do grupo</div>
-      <div class="papel-form-body">
-        <div class="papel-status-row">
-          <span class="papel-status-ico">${papel === 'tutor' ? '👨‍🏫' : '🤝'}</span>
-          <span class="papel-status-txt">Atual: <span class="papel-status-nome">${atual}</span></span>
-        </div>
-        <div class="insc-field">
-          <label>Novo nome do ${label.toLowerCase()} *</label>
-          <input class="insc-input" id="troca-papel-nome" type="text" maxlength="80" placeholder="Nome completo">
-        </div>
-        <div style="display:flex;gap:8px;margin-top:.6rem">
-          <button class="insc-submit-btn" style="margin:0;flex:1" onclick="confirmarTrocaPapel(${grupoNum},'${papel}')">✓ Confirmar troca</button>
-          <button onclick="cancelarTrocaPapel(${grupoNum})" style="background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">Cancelar</button>
-        </div>
-      </div>
-    </div>`;
-
-  // Inserir o formulário no topo do corpo, antes do restante do conteúdo
-  const existing = document.getElementById('troca-papel-form');
-  if (existing) existing.remove();
-  body.insertAdjacentHTML('afterbegin', formHtml);
-  setTimeout(() => document.getElementById('troca-papel-nome')?.focus(), 50);
-}
-
+// BLOCKER-01: iniciarTrocaPapel/confirmarTrocaPapel (troca livre de Tutor/Coordenador por nome
+// digitado, sem allowlist/convite) foram removidas — só existiam os 2 botões "Trocar" que as
+// chamavam, já removidos de renderInscricaoBody. Tutor só por allowlist+criação do PG,
+// Coordenador só por convite do Tutor. cancelarTrocaPapel() continua existindo abaixo, reusada
+// pelo "Cancelar" do formulário de troca de reunião (não mexe em tutor/coordenador).
 function cancelarTrocaPapel(grupoNum) {
   openInscricao(grupoNum);
-}
-
-function confirmarTrocaPapel(grupoNum, papel) {
-  const novoNome = document.getElementById('troca-papel-nome')?.value.trim();
-  if (!novoNome) { alert('Informe o nome do novo ' + (papel === 'tutor' ? 'tutor' : 'coordenador') + '.'); return; }
-
-  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
-  if (!g) return;
-
-  if (papel === 'tutor') g.tutor = novoNome;
-  if (papel === 'coordenador') g.coordenador = novoNome;
-  saveGrupos();
-
-  openInscricao(grupoNum);
-  setTimeout(() => renderGrupoPreviewWelcome(), 100);
 }
 
 // ── Trocar dia/horário de reunião do grupo ──────────────────────────────

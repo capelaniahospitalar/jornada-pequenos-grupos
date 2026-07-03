@@ -508,9 +508,46 @@ de autocadastro e consolidar a arquitetura 100% baseada em convites hierárquico
      quando o Coordenador já está definido · botão some quando a pessoa logada é a Coordenadora
      (não a Tutora) daquele grupo · clique gera o convite e mostra a tela de sucesso normalmente ·
      console limpo.
-   - **Item 4B — próximo item:** revisar a experiência do Coordenador após o aceite (cai no grupo
-     correto; não vê funções de Tutor; consegue convidar Participantes; sem seletor de grupo; sem
-     escolha de papel; sem caminho de autocadastro).
+   - **`BLOCKER-01` — fechamento de caminhos legados alcançáveis de ingresso e alteração de
+     autoridade — CORRIGIDO (2026-07-03), aguardando commit.** Encontrado durante a auditoria de
+     campo do Item 4B (ver abaixo): a tela legada `screen-inscricao`/`openInscricao(num)` (do
+     autocadastro antigo) continuava **ativamente alcançável** pela Home normal — um chip
+     (`onclick="openInscricao(meuGrupo.grupoNum)"`) para qualquer membro logado no seu próprio
+     grupo. De dentro dela, dois vetores confirmados ao vivo:
+     1. **Escalonamento de autoridade sem invite:** botões "Trocar" chamavam
+        `iniciarTrocaPapel(grupoNum,'tutor'|'coordenador')` → `confirmarTrocaPapel()`, que gravava
+        `g.tutor`/`g.coordenador` a partir de um campo de texto livre, **sem checar allowlist,
+        convite ou autoridade**. Reproduzido: um Colaborador (papel mais baixo) conseguia se
+        autonomear Tutor do próprio PG.
+     2. **Reabertura do autocadastro:** um botão "Trocar" (`showScreen('grupos');
+        renderGrupoList()`) reabria a grade completa dos 50 PGs — inclusive o próximo slot vazio
+        — sem passar pelo `openGrupos()` já neutralizado pelo `BLOCKER-001`. Clicar num grupo (vazio
+        ou de terceiros) caía em `confirmarInscricao()`, o formulário completo do autocadastro
+        antigo (nomear grupo, virar tutor/colaborador sem convite).
+     - **Correção:** `openInscricao(num)` agora checa `loadMeuGrupo()?.grupoNum === num` **antes**
+       de qualquer outra coisa — se o grupo não é o meu, mostra a mesma tela "Convite necessário"
+       do `openGrupos()`, em vez do formulário. Os 2 botões "Trocar" de papel (tutor/coordenador)
+       foram removidos de `renderInscricaoBody`; as funções `iniciarTrocaPapel`/`confirmarTrocaPapel`
+       foram removidas (sem outro caller). O botão que reabria a grade foi removido dos 2 lugares
+       (cabeçalho de `screen-inscricao` e card do "já inscrito"). `cancelarTrocaPapel()` foi mantida
+       (reusada pelo cancelar do formulário de troca de reunião, que não mexe em autoridade).
+     - **Fora do escopo, mantido intacto:** troca de dia/horário de reunião (`iniciarTrocaReuniao`,
+       não é escalonamento de autoridade); visualização informativa do grupo; sair do próprio grupo
+       (`cancelarInscricao`, autosserviço sobre si mesmo). Nenhum formato de dado mudou — só
+       caminhos de UI/lógica foram cortados.
+     - **Testado (preview, dados fictícios, com as 4 funções de rede — inclusive `fbWriteGrupos` —
+       neutralizadas):** Colaborador e Coordenador, cada um logado de verdade, não veem mais os
+       botões de troca de papel · `openInscricao` num grupo vazio e num grupo populado de terceiros
+       cai em "Convite necessário" · cadeia completa Tutor→Coordenador→Colaborador por convite
+       testada de ponta a ponta e continua funcionando · troca de reunião testada e funcionando ·
+       console limpo · nenhuma escrita real disparada ao Firebase durante os testes.
+     - **Item 4B pausado durante a correção; retoma após o commit deste achado.**
+   - **Item 4B — revisar a experiência do Coordenador após o aceite** (cai no grupo correto; não vê
+     funções de Tutor; consegue convidar Participantes; sem seletor de grupo; sem escolha de papel;
+     sem caminho de autocadastro). **Checklist original já validado ao vivo antes do `BLOCKER-01`**
+     (cai no grupo certo, recebe papel de Coordenador, painel sem funções de Tutor, convida
+     Colaborador corretamente, sem seletor de grupo/papel) — retomar após o commit do `BLOCKER-01`
+     só para reconfirmar com o código corrigido.
 5. Adequar o fluxo do Participante.
 6. `FUNC-02` — remover definitivamente o legado de autocadastro (código físico, não só acesso).
 7. `UX-01`/`UX-02` — permissões e interface por papel.

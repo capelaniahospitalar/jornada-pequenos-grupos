@@ -1,5 +1,34 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-03] — BLOCKER-01: fecha caminhos legados de escalonamento de autoridade sem convite
+
+Achado durante a auditoria de campo do item 4B da RC2: a tela legada do autocadastro antigo
+(`screen-inscricao`/`openInscricao`) continuava alcançável pela Home normal, com dois vetores que
+contornavam por completo a arquitetura de convites da RC2.
+
+- **Vetor 1 (escalonamento de autoridade):** os botões "Trocar" de Tutor/Coordenador chamavam
+  `iniciarTrocaPapel()`/`confirmarTrocaPapel()`, que gravavam `g.tutor`/`g.coordenador` a partir de
+  texto livre — sem allowlist, sem convite, sem checar autoridade. Reproduzido ao vivo: um
+  Colaborador conseguia se autonomear Tutor do próprio PG.
+- **Vetor 2 (reabertura do autocadastro):** um botão "Trocar" reabria a grade completa dos 50 PGs
+  (`showScreen('grupos'); renderGrupoList()`), sem passar pelo `openGrupos()` já neutralizado pelo
+  `BLOCKER-001`. De lá, dava para entrar num grupo vazio ou de terceiros e cair no formulário
+  completo do autocadastro antigo (`confirmarInscricao`).
+- **Correção:** `openInscricao(num)` agora exige `loadMeuGrupo()?.grupoNum === num` antes de
+  qualquer coisa — caso contrário mostra "Convite necessário" (mesma tela do `openGrupos()`). Os 2
+  botões de troca de papel foram removidos; `iniciarTrocaPapel`/`confirmarTrocaPapel` foram
+  removidas do código (sem outro caller). O botão que reabria a grade foi removido dos 2 lugares
+  onde existia. `cancelarTrocaPapel()` foi mantida — é reaproveitada pelo cancelar da troca de
+  reunião, que não mexe em autoridade.
+- **Fora do escopo, intacto:** troca de dia/horário de reunião, visualização informativa do grupo,
+  sair do próprio grupo (`cancelarInscricao`) — nenhum desses altera autoridade de terceiros.
+- Testado com as 4 funções de rede neutralizadas (incluindo `fbWriteGrupos`): Colaborador e
+  Coordenador não veem mais os botões de troca de papel · acesso a grupo vazio ou de terceiros cai
+  em "Convite necessário" · cadeia completa Tutor→Coordenador→Colaborador por convite continua
+  funcionando de ponta a ponta · troca de reunião funcionando · console limpo.
+
+---
+
 ## [2026-07-03] — RC2: botão permanente para (re)convidar o Coordenador (item 4A)
 
 Primeira parte do item 4 da RC2 ("Adequar o fluxo do Coordenador"). Fecha um buraco operacional
