@@ -3402,6 +3402,10 @@ function renderTutorGruposList(nome) {
 function renderTutorGrupoDetalhe(grupoNum, nome) {
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
   if (!g) return;
+  // Item 4A: só o Tutor deste grupo específico pode (re)convidar o Coordenador — um Coordenador
+  // autenticado no mesmo painel nunca vê essa ação (gerarConvite já barra no backend, isto é só
+  // pra não oferecer um botão que sempre falharia).
+  const souTutorDesteGrupo = !!g.tutor && g.tutor.trim().toLowerCase() === nome.trim().toLowerCase();
   const progresso = getOrInitPgProgress(grupoNum);
   const metas     = getPgWeekMetas(grupoNum);
   const grpW      = (typeof getPgGroupWeek === 'function') ? getPgGroupWeek(grupoNum) : { oracoes:0, bondades:0, estudosMedia:0 };
@@ -3484,6 +3488,7 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
       ${participantesHtml}
     </div>
     ${renderProgramaSemanal()}
+    ${!g.coordenador && souTutorDesteGrupo ? `<button onclick="gerarConvidarCoordenadorAutoEExibir('${nome.replace(/'/g,"\\'")}', ${grupoNum})" style="margin-top:.5rem;width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body)">🤝 Convidar Coordenador</button>` : ''}
     <button onclick="renderTutorGruposList('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Voltar aos meus grupos</button>
 `;
 

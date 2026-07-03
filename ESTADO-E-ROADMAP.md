@@ -492,7 +492,25 @@ de autocadastro e consolidar a arquitetura 100% baseada em convites hierárquico
    `welcomeDone`, validado contra a allowlist `tutores`). **Feito em 2026-07-02.**
 2. ✅ `ATIVACAO-01` — fluxo de criação de Pequenos Grupos pelo Tutor. **Feito em 2026-07-02.**
 3. ✅ `ARCH-03` + convite automático do Coordenador ao criar o grupo. **Feito em 2026-07-02.**
-4. Adequar o fluxo do Coordenador. **Próximo item.**
+4. Adequar o fluxo do Coordenador — dividido em duas partes pelo usuário:
+   - ✅ **Item 4A — botão permanente para (re)convidar o Coordenador — CONCLUÍDO (2026-07-03).**
+     Fecha o buraco operacional que ficou da Etapa 3 (`ARCH-03`): se o Tutor saísse da tela de
+     sucesso/falha sem completar o envio, não havia mais nenhum lugar no app para gerar esse
+     convite depois. `renderTutorGrupoDetalhe(grupoNum, nome)` ganhou a variável
+     `souTutorDesteGrupo` (`g.tutor` bate com o nome autenticado no painel) e, quando
+     `!g.coordenador && souTutorDesteGrupo`, mostra o botão "🤝 Convidar Coordenador" —
+     reaproveita `gerarConvidarCoordenadorAutoEExibir()` sem nenhum código novo (mesma
+     reaproveitação de convite pendente, mesma tela de sucesso/falha já testadas na Etapa 3). A
+     trava de autoridade já existe no backend (`gerarConvite`/`souTutorAdminDoGrupo`); o gate de
+     UI é só para não oferecer um botão que sempre falharia para quem é apenas Coordenador do
+     mesmo grupo. **Testado (preview, dados fictícios, com todas as funções de rede
+     neutralizadas):** botão aparece só para o Tutor do grupo sem Coordenador ainda · botão some
+     quando o Coordenador já está definido · botão some quando a pessoa logada é a Coordenadora
+     (não a Tutora) daquele grupo · clique gera o convite e mostra a tela de sucesso normalmente ·
+     console limpo.
+   - **Item 4B — próximo item:** revisar a experiência do Coordenador após o aceite (cai no grupo
+     correto; não vê funções de Tutor; consegue convidar Participantes; sem seletor de grupo; sem
+     escolha de papel; sem caminho de autocadastro).
 5. Adequar o fluxo do Participante.
 6. `FUNC-02` — remover definitivamente o legado de autocadastro (código físico, não só acesso).
 7. `UX-01`/`UX-02` — permissões e interface por papel.

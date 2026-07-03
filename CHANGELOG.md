@@ -1,5 +1,26 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-03] — RC2: botão permanente para (re)convidar o Coordenador (item 4A)
+
+Primeira parte do item 4 da RC2 ("Adequar o fluxo do Coordenador"). Fecha um buraco operacional
+registrado na Etapa 3 (`ARCH-03`): se o Tutor saísse da tela de sucesso/falha do convite
+automático sem completar o envio, não havia mais nenhum lugar no app para gerar esse convite
+depois.
+
+- `renderTutorGrupoDetalhe(grupoNum, nome)`: nova variável `souTutorDesteGrupo` (nome autenticado
+  no painel bate com `g.tutor` deste grupo específico). Quando `!g.coordenador &&
+  souTutorDesteGrupo`, mostra o botão "🤝 Convidar Coordenador".
+- Botão reaproveita `gerarConvidarCoordenadorAutoEExibir()` sem nenhum código novo de convite —
+  mesma reaproveitação de convite pendente e mesmas telas de sucesso/falha já testadas na Etapa 3.
+- **Gate de UI é só cosmético:** a autoridade real já é checada no backend
+  (`gerarConvite`/`souTutorAdminDoGrupo`); o botão só evita oferecer uma ação que sempre falharia
+  para quem é Coordenador (não Tutor) do mesmo grupo.
+- Testado: botão aparece só para o Tutor do grupo sem Coordenador · some quando o Coordenador já
+  está definido · some quando a pessoa logada é a Coordenadora (não a Tutora) do grupo · clique
+  gera o convite e mostra a tela de sucesso normalmente · console limpo.
+
+---
+
 ## [2026-07-02] — RC2: convite automático do Coordenador ao criar o PG (ARCH-03)
 
 Etapa 3 da RC2. Resolve a identidade dupla de "quem é o Tutor" que impedia um Tutor puro-admin
