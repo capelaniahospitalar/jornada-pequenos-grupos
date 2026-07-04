@@ -553,12 +553,20 @@ de autocadastro e consolidar a arquitetura 100% baseada em convites hierárquico
        testada de ponta a ponta e continua funcionando · troca de reunião testada e funcionando ·
        console limpo · nenhuma escrita real disparada ao Firebase durante os testes.
      - **Item 4B pausado durante a correção; retoma após o commit deste achado.**
-   - **Item 4B — revisar a experiência do Coordenador após o aceite** (cai no grupo correto; não vê
-     funções de Tutor; consegue convidar Participantes; sem seletor de grupo; sem escolha de papel;
-     sem caminho de autocadastro). **Checklist original já validado ao vivo antes do `BLOCKER-01`**
-     (cai no grupo certo, recebe papel de Coordenador, painel sem funções de Tutor, convida
-     Colaborador corretamente, sem seletor de grupo/papel) — retomar após o commit do `BLOCKER-01`
-     só para reconfirmar com o código corrigido.
+   - ✅ **Item 4B — experiência completa do Coordenador — RECONFIRMADO (2026-07-03).** Revalidado
+     com o código corrigido (pós-BLOCKER-01/UX-04), por **trilha de código + simulação isolada**
+     (nuvem mockada em memória, `fbReadDoc`/`fbWriteGrupos`/`saveGruposToFirebase` neutralizados —
+     **zero escrita em produção, sem reload durante o teste**). Os 7 pontos passaram:
+     1. Tutor (admin, `ST.tutorPanelAuth` = `g.tutor`) gera convite de Coordenador → ok, link
+        `?conv=`, texto WhatsApp padrão. 2. Coordenador aceita (`aceitarConvite`, com WhatsApp do
+        `IDENT-01`) → papel `coordenador`, `g.coordenador` gravado. 3. Entra automaticamente no PG
+        correto (`grupoAberto`/vínculo = grupo do convite). 4. Acesso ao Painel: `getGruposDoResponsavel`
+        acha o grupo dele; `verificarWhatsappDoPapel` (PERM-01) libera com WhatsApp certo, bloqueia
+        com errado, `sem_registro` p/ nome inexistente. 5. Gera convite de Colaborador → ok; Colaborador
+        aceita → papel `colaborador`. 6. Painel da Comunidade abre sem erro. 7. Permissões: vê o Bloco
+        6 "Liderança do Pequeno Grupo" (Convidar Participante + Painel do Tutor/Coordenador); NÃO
+        consegue convidar Coordenador (só Tutor). Nenhum `BUG-XXX`/`BLOCKER` encontrado. **A prova
+        final com 2 aparelhos reais é a homologação operacional (próximo item da fila).**
 5. ✅ **Adequar o fluxo do Participante/Colaborador — CONCLUÍDO (2026-07-03).** Diagnóstico ao vivo
    (cadeia completa Tutor→Coordenador→Colaborador por convite) confirmou que a arquitetura já
    entregava tudo o que o checklist pedia, sem código novo necessário: entra automaticamente no
