@@ -658,6 +658,36 @@ de autocadastro e consolidar a arquitetura 100% baseada em convites hierárquico
      grupo, já testado extensivamente). **Testado:** Colaborador vê só "Meu progresso" · Coordenador
      vê os 2 botões normalmente · Tutor legado-participante preservado por compatibilidade ·
      console limpo · nenhuma escrita real ao Firebase.
+- ✅ **UX-04 — Reorganização da Home em blocos temáticos — CONCLUÍDO (2026-07-03).**
+  Reorganização da tela inicial para refletir a jornada do participante. **Sem funcionalidade nova
+  e sem tocar em regra de negócio** (Firebase/convites/permissões/papéis/estudos/XP/missões/
+  comunidade intactos). Nova ordem em 7 blocos:
+  1. **Meu Caminho Hoje:** XP/Estudos/Sequência · Progresso da Trilha · **Iniciar Estudo** (CTA subiu) · Estudos anteriores.
+  2. **Meu Pequeno Grupo:** chip do grupo · Progresso do PG · Painel da Comunidade.
+  3. **Minha Formação:** Conquistas (medalhas) · Jornada das Conquistas · Atributos · Mapa de Discipulado · Obstáculos/Bosses.
+  4. **Minha Missão:** Missões.
+  5. **Ferramentas:** Meu Diário · Meu Progresso · Mentor IA · Companheiro de Jornada.
+  6. **Liderança do Pequeno Grupo** (role-gated): Tutor → Painel do Tutor + Convidar Coordenador; Coordenador → Painel do Coordenador + Convidar Participante; Participante → bloco oculto.
+  7. **Sistema:** Instalar aplicativo (fim absoluto).
+  - **Decisões do usuário:** "Descrição do grupo" fora do escopo (não existe, não criar); Estudos
+    anteriores no Bloco 1; Obstáculos no Bloco 3; Conquistas (medalhas) migram p/ o Bloco 3; bloco
+    admin renomeado "Liderança do Pequeno Grupo"; rótulo do Convidar por papel (só texto, sem alterar
+    `openShare`/`gerarConvite`); **Painel mantido para o Coordenador** (evita regressão do UX-02).
+  - **Implementação (só `index.html`, +33/−18):** reordenados os placeholders estáticos do
+    `#screen-home` nos 7 blocos; re-apontadas as inserções dinâmicas (`renderGruposBtnHome`→
+    `#h-grupo-area`, `renderCompanionHomeBtn`→`#h-companion-area`, fallback de
+    `renderComunidadeBtnHome`→`#h-grupo-area`); `renderShareArea` dividida em "Meu Progresso"
+    (`#h-progress-area`, Bloco 5) e "Liderança" (`#h-lideranca-area`, Bloco 6, role-gated, rótulos
+    por papel). Nenhuma lógica de negócio alterada.
+  - **Validado no preview (rede neutralizada, sem escrita ao Firebase):** ordem dos 7 blocos correta
+    de cima para baixo; Bloco 6 vazio p/ Participante, "Convidar Participante + Painel do Coordenador"
+    p/ Coordenador, "Convidar Coordenador + Painel do Tutor" p/ Tutor; nenhum componente sumiu;
+    console limpo.
+  - **Observação arquitetural registrada (NÃO é uma nova tarefa):** a Home ainda depende de uma
+    composição híbrida entre HTML estático e inserções dinâmicas por âncoras (`anchor.after(...)`/
+    `appendChild`). Isso aumenta o custo de manutenção e de reorganização visual. Recomenda-se, numa
+    versão futura, **refatorar a Home para uma composição por blocos independentes**, preservando
+    integralmente as regras de negócio. (Sem abrir item próprio no roadmap.)
 8. Auditoria completa da arquitetura antes de uma nova homologação (RC2).
 
 ## ARCH-04 — Remoção definitiva da entrada pública do aplicativo (decisão arquitetural, 2026-07-03)

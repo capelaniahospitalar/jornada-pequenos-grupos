@@ -4296,25 +4296,40 @@ function renderRadar() {
 // gerencia o grupo (tutor ou coordenador — inclui o registro legado de tutor-participante, por
 // compatibilidade). Pra Colaborador ou quem não tem grupo, as duas só levavam a becos sem saída
 // ("apenas o Coordenador pode convidar" / "acesso restrito") — ocultas, não desabilitadas.
+// UX-04: dividido em dois blocos. "Meu Progresso" (ferramenta pessoal, todos) vai para o
+// BLOCO 5; "Convidar" + "Painel" (ferramentas de liderança) vão para o BLOCO 6, só p/
+// Tutor/Coordenador, com rótulo por papel. openShare()/openTutorPanel()/gerarConvite()
+// NÃO foram alterados — só o rótulo apresentado.
 function renderShareArea() {
   const mg = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
   const funcao = mg ? getMinhaFuncaoNoGrupo(mg.grupoNum) : null;
   const podeGerenciar = funcao === 'tutor' || funcao === 'coordenador';
 
-  document.getElementById('h-share-area').innerHTML = `
-    <div style="margin:.75rem 1rem 0;display:grid;grid-template-columns:${podeGerenciar ? '1fr 1fr' : '1fr'};gap:8px">
-      ${podeGerenciar ? `<button onclick="openShare()" style="background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem .5rem;font-size:16px;color:var(--text);cursor:pointer;font-family:var(--ff-body);display:flex;flex-direction:column;align-items:center;gap:4px">
-        <span style="font-size:25px">🔗</span>Convidar Participante
-      </button>` : ''}
-      <button onclick="openPanel()" style="background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem .5rem;font-size:16px;color:var(--text);cursor:pointer;font-family:var(--ff-body);display:flex;flex-direction:column;align-items:center;gap:4px">
-        <span style="font-size:25px">📈</span>Meu progresso
+  // BLOCO 5 — Ferramentas: "Meu Progresso" (para todos)
+  const prog = document.getElementById('h-progress-area');
+  if (prog) prog.innerHTML = `
+    <div style="margin:.75rem 1rem 0">
+      <button onclick="openPanel()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);cursor:pointer;font-family:var(--ff-body)">
+        <span style="font-size:22px">📈</span> Meu progresso
       </button>
-    </div>
-    ${podeGerenciar ? `<div style="margin:.5rem 1rem 0">
-      <button onclick="openTutorPanel()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">
-        🧑‍🏫 Painel do Tutor/Coordenador
+    </div>`;
+
+  // BLOCO 6 — Liderança do Pequeno Grupo: só Tutor/Coordenador (Participante não vê nada)
+  const lid = document.getElementById('h-lideranca-area');
+  if (!lid) return;
+  if (!podeGerenciar) { lid.innerHTML = ''; return; }
+  const rotuloConvidar = funcao === 'tutor' ? 'Convidar Coordenador' : 'Convidar Participante';
+  const rotuloPainel   = funcao === 'tutor' ? 'Painel do Tutor' : 'Painel do Coordenador';
+  lid.innerHTML = `
+    <div class="sec-label">Liderança do Pequeno Grupo</div>
+    <div style="margin:0 1rem;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button onclick="openShare()" style="background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem .5rem;font-size:15px;color:var(--text);cursor:pointer;font-family:var(--ff-body);display:flex;flex-direction:column;align-items:center;gap:4px">
+        <span style="font-size:24px">🔗</span>${rotuloConvidar}
       </button>
-    </div>` : ''}`;
+      <button onclick="openTutorPanel()" style="background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem .5rem;font-size:15px;color:var(--text);cursor:pointer;font-family:var(--ff-body);display:flex;flex-direction:column;align-items:center;gap:4px">
+        <span style="font-size:24px">🧑‍🏫</span>${rotuloPainel}
+      </button>
+    </div>`;
 }
 
 // FUNC-02a: ação utilitária discreta, movida da tela antiga de boas-vindas (screen-welcome,
@@ -5713,7 +5728,7 @@ function showCompanionToast(msg) {
 
 
 function renderCompanionHomeBtn() {
-  const area = document.getElementById('h-tutor-area');
+  const area = document.getElementById('h-companion-area');   // BLOCO 5 — Ferramentas
   if (!area) return;
   // Verificar se botão companheiro já existe
   if (document.getElementById('home-companion-btn')) return;
@@ -5739,7 +5754,7 @@ function renderCompanionHomeBtn() {
     : `<button onclick="openCompanion()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--purple-light);border:0.5px solid rgba(92,61,143,.35);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;color:var(--purple);cursor:pointer;font-family:var(--ff-body);font-weight:500">
         ${pendentes ? `📨 ${pendentes} convite${pendentes>1?'s':''} de companheiro — toque para responder` : '🤝 Escolher Companheiro de Jornada'}
       </button>`;
-  area.after(div);
+  area.appendChild(div);
 }
 
 
@@ -8441,14 +8456,14 @@ function initGrupos() {
 
 // Tela de grupos acessível via botão na home
 function renderGruposBtnHome() {
-  const tutor = document.getElementById('h-tutor-area');
-  if (!tutor) return;
+  const cont = document.getElementById('h-grupo-area');   // BLOCO 2 — Meu Pequeno Grupo
+  if (!cont) return;
   let div = document.getElementById('grupos-home-btn');
   if (!div) {
     div = document.createElement('div');
     div.id = 'grupos-home-btn';
     div.style.cssText = 'margin:.75rem 1rem 0';
-    tutor.after(div);
+    cont.appendChild(div);
   }
   const meuGrupo = loadMeuGrupo();
   div.innerHTML = meuGrupo
@@ -9002,7 +9017,7 @@ function saveGratidoes(list) {
 function renderComunidadeBtnHome() {
   const existing = document.getElementById('comunidade-home-btn');
   if (existing) return;
-  const anchor = document.getElementById('pg-progress-card') || document.getElementById('grupos-home-btn') || document.getElementById('h-tutor-area');
+  const anchor = document.getElementById('pg-progress-card') || document.getElementById('grupos-home-btn') || document.getElementById('h-grupo-area');
   if (!anchor) return;
   const mg = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
   const nomePg = mg ? (mg.grupoNome || ('Grupo ' + mg.grupoNum)) : '';
