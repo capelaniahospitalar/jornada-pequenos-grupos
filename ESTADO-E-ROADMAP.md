@@ -667,7 +667,7 @@ de autocadastro e consolidar a arquitetura 100% baseada em convites hierárquico
   3. **Minha Formação:** Conquistas (medalhas) · Jornada das Conquistas · Atributos · Mapa de Discipulado · Obstáculos/Bosses.
   4. **Minha Missão:** Missões.
   5. **Ferramentas:** Meu Diário · Meu Progresso · Mentor IA · Companheiro de Jornada.
-  6. **Liderança do Pequeno Grupo** (role-gated): Tutor → Painel do Tutor + Convidar Coordenador; Coordenador → Painel do Coordenador + Convidar Participante; Participante → bloco oculto.
+  6. **Liderança do Pequeno Grupo** (role-gated): **Convidar** por papel (Tutor → Convidar Coordenador; Coordenador → Convidar Participante) + **Painel do Tutor/Coordenador** (rótulo combinado — é uma tela ÚNICA compartilhada, `openTutorPanel`, então não se rotula por papel; ajuste feito após revisão do usuário); Participante → bloco oculto.
   7. **Sistema:** Instalar aplicativo (fim absoluto).
   - **Decisões do usuário:** "Descrição do grupo" fora do escopo (não existe, não criar); Estudos
     anteriores no Bloco 1; Obstáculos no Bloco 3; Conquistas (medalhas) migram p/ o Bloco 3; bloco

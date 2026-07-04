@@ -4319,15 +4319,15 @@ function renderShareArea() {
   if (!lid) return;
   if (!podeGerenciar) { lid.innerHTML = ''; return; }
   const rotuloConvidar = funcao === 'tutor' ? 'Convidar Coordenador' : 'Convidar Participante';
-  const rotuloPainel   = funcao === 'tutor' ? 'Painel do Tutor' : 'Painel do Coordenador';
+  // O Painel é uma tela ÚNICA compartilhada (openTutorPanel) — rótulo combinado, não por papel.
   lid.innerHTML = `
     <div class="sec-label">Liderança do Pequeno Grupo</div>
-    <div style="margin:0 1rem;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <button onclick="openShare()" style="background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem .5rem;font-size:15px;color:var(--text);cursor:pointer;font-family:var(--ff-body);display:flex;flex-direction:column;align-items:center;gap:4px">
-        <span style="font-size:24px">🔗</span>${rotuloConvidar}
+    <div style="margin:0 1rem;display:flex;flex-direction:column;gap:8px">
+      <button onclick="openShare()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">
+        🔗 ${rotuloConvidar}
       </button>
-      <button onclick="openTutorPanel()" style="background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem .5rem;font-size:15px;color:var(--text);cursor:pointer;font-family:var(--ff-body);display:flex;flex-direction:column;align-items:center;gap:4px">
-        <span style="font-size:24px">🧑‍🏫</span>${rotuloPainel}
+      <button onclick="openTutorPanel()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">
+        🧑‍🏫 Painel do Tutor/Coordenador
       </button>
     </div>`;
 }
