@@ -1,1 +1,5 @@
 .claude/launch.json
+
+# Snapshots/diagnósticos do Firebase — contêm PII (WhatsApp dos capelães), nunca versionar
+_diag_cloud.json
+_prod_atual.json

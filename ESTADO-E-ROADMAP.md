@@ -295,6 +295,20 @@ Cada commit é precedido de **Mapa de Impacto** (análise, sem código); tombsto
 - Validação local (sem node/python): servidor estático PowerShell + preview do assistente.
 
 ## Estado dos dados na nuvem
+
+### MARCO ZERO — Produção reinicializada (2026-07-05)
+Estado inicial da homologação operacional. Gravado via REST direto (fora do app) com **`updateMask`
+(só `dados`+`ts`)** + pré-condição `currentDocument.updateTime` (HTTP 200) — `tutores`/`convites`
+intocados. Backup prévio: `PRE-HOMOLOGACAO-2026-07-04.json` (Desktop, fora do repo — contém PII).
+Verificado por releitura:
+- **50 grupos vazios** — o Grupo 1 "CAPELANIA" foi zerado; deixa de ser exceção pré-semeada.
+- nenhum participante · nenhum coordenador · nenhum tutor associado a grupo · nenhum convite ativo.
+- **allowlist dos 4 tutores PRESERVADA** (Felipe, Ualace, Renan, Wladimir) — é autorização, não grupo.
+
+A partir deste ponto, **todo grupo nasce EXCLUSIVAMENTE pelo fluxo oficial:**
+`Link do Tutor → cria o PG → convida o Coordenador → Coordenador convida Participantes`.
+Não existe mais nenhum "Grupo CAPELANIA" pré-existente. (Resposta a "qual era o estado inicial da RC1?".)
+
 **Atualizado 2026-07-02:** Grupos 2–6 (dados de teste) zerados sob autorização do usuário —
 voltaram ao mesmo estado em branco dos Grupos 7–50 (`nome`/`tutor`/`coordenador`/`diaReuniao`/
 `horaReuniao` = null, `participantes`/`gratidoes` = []). Gravação feita via REST direto (fora do
