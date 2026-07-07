@@ -1,8 +1,32 @@
-# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-07-02)
+# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-07-05)
 
 > Documento para retomar o trabalho em outra máquina/sessão. Cole o conteúdo de volta
 > para o assistente ao recomeçar — a "memória" do assistente **não viaja entre máquinas**;
 > só este arquivo (via GitHub) viaja. **Nenhuma alteração de código sem aprovação do desenho.**
+
+## ⭐ STATUS ATUAL — retomar por aqui (2026-07-05)
+
+**Onde estamos:** produção reinicializada (**MARCO ZERO**, 2026-07-05) — 50 grupos vazios, Grupo 1
+"CAPELANIA" apagado, allowlist dos 4 tutores preservada, sem convites. Backup:
+`PRE-HOMOLOGACAO-2026-07-04.json` (Desktop, fora do repo — contém PII). Detalhes na seção
+"Estado dos dados na nuvem".
+
+**Trabalho recente (todos commitados):** UX-01 (Painel da Comunidade consolidado na Home),
+ARCH-04 (página institucional terminal — acesso 100% por convite, sem entrada pública), UX-04
+(Home reorganizada em 7 blocos temáticos), Item 4B (experiência do Coordenador revalidada —
+7/7 checkpoints por trilha de código + simulação isolada), e o Marco Zero.
+
+**PII no histórico do Git:** `_diag_cloud.json`/`_prod_atual.json` (WhatsApp dos 4 capelães) foram
+commitados no passado (`70f8abc`). **Decisão do usuário = Opção A:** removidos do projeto +
+`.gitignore` (feito). **Rewrite de histórico NÃO agora** — reavaliar na v1.0.
+
+**PRÓXIMO PASSO — homologação operacional (atividade atual):**
+1. **Resetar** cada aparelho de teste (`<url>?resetar` + limpar cache + remover PWA) — como celular novo.
+2. Rodar o roteiro do **`HOMOLOGACAO-RC1.md`** (Fases 0–5, contra a **produção real**, pelo **link do
+   Tutor**). Há um **"Roteiro rápido"** no topo desse arquivo para seguir com os celulares na mão.
+3. Registrar cada falha como `BUG-XXX` no `HOMOLOGACAO-RC1.md` — **sem corrigir durante a homologação.**
+4. Depois: corrigir os `BUG-XXX` em lote → declarar versão estável → só então a reorganização da
+   navegação por páginas (evolução de UX; não bloqueia a validação do fluxo principal).
 
 ## 🚨 Incidente de contaminação de produção (2026-07-01) — RESOLVIDO
 

@@ -4,23 +4,91 @@
 > tag `v3-rc1-baseline` + snapshot `BASELINE-RC1-2026-07-02.json`
 > (`C:\Users\wladimir.souza\Documents\backups-firebase-jdpg\`).
 
-## Checklist de testes
+## Roteiro rápido (seguir com os celulares na mão)
 
-| Item | Status | Observações |
+**Antes:** em cada celular → `<url>?resetar` → limpar cache → remover o app da tela inicial (se instalado).
+
+- **📱 Celular 1 — Tutor (Wladimir):** abrir `<url>?tutor` → nome + WhatsApp + criar senha → **"Criar
+  Primeiro Pequeno Grupo"** → dar nome → gerar **convite do Coordenador** → enviar o link ao Celular 2.
+- **📱 Celular 2 — Coordenador:** abrir o link → nome + WhatsApp → **"Entrar na Jornada"** → **"Convidar
+  Participante"** → enviar o link ao Celular 3.
+- **📱 Celular 3 — Participante:** abrir o link → nome + WhatsApp → **"Entrar na Jornada"**.
+
+**✅ 3 verificações:** (1) abrir um link **já usado** → *"convite já utilizado"*; (2) postar uma
+gratidão num celular → **aparece nos outros**; (3) o Participante **não** vê "Convidar"/"Painel", o
+Coordenador vê.
+
+**🎯 Deu certo se:** a corrente Tutor → Coordenador → Participante funcionou toda por link, cada um no
+**grupo e papel certos**, e as 3 verificações passaram.
+
+*(Detalhamento completo, com o "Esperado" de cada passo, nas Fases 0–5 abaixo.)*
+
+---
+
+## Roteiro de homologação operacional
+
+> Primeira homologação **oficial** da cadeia por convites, contra a **produção no estado Marco Zero**.
+> Regra de ouro: achou problema → registra `BUG-XXX` abaixo e **NÃO corrige durante a homologação**
+> (correção em lote depois — ver "Regra da homologação").
+
+### FASE 0 — Preparação
+- ☐ Produção reinicializada (Marco Zero — ver `ESTADO-E-ROADMAP.md` › "Estado dos dados na nuvem")
+- ☐ Grupo 1 (CAPELANIA) inexistente — os 50 slots vazios
+- ☐ Nenhum participante / coordenador / tutor associado a grupo · nenhum convite ativo
+- ☐ Allowlist dos 4 tutores preservada (Felipe, Ualace, Renan, Wladimir)
+- ☐ Backup `PRE-HOMOLOGACAO-2026-07-04.json` realizado (fora do repo — contém PII)
+- ☐ Todos os aparelhos resetados (`<url>?resetar` + limpar cache + remover PWA) — como celular novo
+- ☐ Em mãos: URL do app, link do Tutor (`<url>?tutor`), este documento aberto p/ registrar `BUG-XXX`
+
+### FASE 1 — Aparelho do Tutor (Wladimir)
+| # | O que fazer | Esperado | OK |
+|---|---|---|---|
+| 1 | Abrir `<url>?tutor` | Tela "Painel do Tutor/Coordenador" (login por nome) | ☐ |
+| 2 | Nome (Wladimir) → WhatsApp cadastrado → criar senha | Aceita (está na allowlist); WhatsApp errado bloquearia | ☐ |
+| 3 | Painel abre | "Autorizado, sem grupo" + **"➕ Criar Primeiro Pequeno Grupo"** | ☐ |
+| 4 | Criar o PG (dar um nome) | PG criado no 1º slot vazio; Wladimir vira Tutor | ☐ |
+| 5 | Convite do Coordenador | Gera link `?conv=` automático + texto WhatsApp pronto | ☐ |
+| 6 | Enviar o link ao aparelho do Coordenador | — | ☐ |
+
+### FASE 2 — Aparelho do Coordenador
+| # | O que fazer | Esperado | OK |
+|---|---|---|---|
+| 1 | Abrir o link recebido | Entrada: nome + WhatsApp, função **"Coordenador" (travada 🔒)**, nº+nome do PG | ☐ |
+| 2 | Preencher e "Entrar na Jornada" | Entra **automaticamente no PG correto**, papel Coordenador | ☐ |
+| 3 | Ver a Home | Aparece o **Bloco Liderança** (Convidar Participante + Painel do Tutor/Coordenador) | ☐ |
+| 4 | Abrir o Painel | Login por nome + WhatsApp + senha; mostra o grupo dele | ☐ |
+| 5 | Gerar convite de **Participante** | Link `?conv=` + texto WhatsApp | ☐ |
+| 6 | Enviar ao aparelho do Participante | — | ☐ |
+
+### FASE 3 — Aparelho do Participante
+| # | O que fazer | Esperado | OK |
+|---|---|---|---|
+| 1 | Abrir o link | Entrada: nome + WhatsApp, função **"Colaborador" (travada)**, nº+nome do PG | ☐ |
+| 2 | "Entrar na Jornada" | Entra como Colaborador no PG certo | ☐ |
+| 3 | Ver a Home | Visão de participante — **SEM** Bloco de Liderança (não vê Convidar/Painel) | ☐ |
+| 4 | Abrir "Painel da Comunidade" | Mural funciona (gratidão / oração / celebração) | ☐ |
+
+### FASE 4 — Testes de Robustez
+*(concorrência, sincronização e consistência — não só funcionalidade básica)*
+| # | Teste | Esperado | OK |
+|---|---|---|---|
+| A | Abrir o **mesmo link** de convite de novo (outra pessoa) | "Convite já utilizado" | ☐ |
+| B | **2 aparelhos, mesmo link, tocar "Entrar" juntos** | **Só um entra**; o outro vê "já utilizado" — **sem duplicata** | ☐ |
+| C | Coordenador **revoga** convite pendente → tentar usar | "Convite cancelado" | ☐ |
+| D | Postar gratidão/oração num aparelho | Aparece nos outros aparelhos do grupo (sincroniza) | ☐ |
+| E | Conferir progresso do PG após ações | Atualiza corretamente entre dispositivos | ☐ |
+
+*(Expiração de 7 dias: impraticável esperar — já validado por simulação; pode pular.)*
+
+### FASE 5 — Encerramento
+| Item | Verificação | OK |
 |---|---|---|
-| Tutor gera convite | ☐ | |
-| Coordenador aceita convite | ☐ | |
-| Coordenador gera convite de colaborador | ☐ | |
-| Colaborador ingressa no PG | ☐ | |
-| Mural de Gratidão | ☐ | |
-| Pedido de oração | ☐ | |
-| Atualização em tempo real | ☐ | |
-| XP e progresso | ☐ | |
-| Sincronização entre dispositivos | ☐ | |
-| Logout/Login | ☐ | |
-| Reconexão após perda de internet | ☐ | |
-
-Marcar ☑ quando passar, ✗ quando falhar (e abrir um `BUG-XXX` na seção abaixo).
+| Banco consistente | ☐ | |
+| Nenhum convite pendente indevido | ☐ | |
+| Participantes corretos | ☐ | |
+| Grupo criado corretamente | ☐ | |
+| Backup pós-homologação realizado | ☐ | |
+| BUGs registrados | ☐ | |
 
 ## Regra da homologação
 
@@ -116,3 +184,19 @@ com usuários reais, durante a revisão da tela de entrada da RC1.
 - **Correção:**
 - **Commit:**
 - **Retestado:**
+
+---
+
+## Assinatura da homologação
+
+**Homologação operacional RC1**
+
+- Data: ____________________
+- Tutor: ____________________
+- Coordenador: ____________________
+- Responsável pela validação: ____________________
+
+Resultado:
+- ☐ Aprovada
+- ☐ Aprovada com ressalvas
+- ☐ Reprovada
