@@ -3162,7 +3162,7 @@ async function gerarConvidarCoordenadorAutoEExibir(nomeTutor, grupoNum) {
     : await gerarConvite({ funcao: 'coordenador', grupoNum });
 
   if (res.ok) renderPgCriadoComConvite(nomeTutor, grupoNum, res);
-  else renderPgCriadoSemConvite(nomeTutor, grupoNum, res.motivo);
+  else renderPgCriadoSemConvite(nomeTutor, grupoNum, res.motivo, res.detalhe);
 }
 
 function renderPgCriadoComConvite(nomeTutor, grupoNum, res) {
@@ -3194,14 +3194,16 @@ function abrirWhatsappConviteCoordenador(inviteId) {
 }
 
 // Falha parcial (PG criado, convite não): nunca silenciosa — mensagem clara + tentar de novo.
-function renderPgCriadoSemConvite(nomeTutor, grupoNum, motivo) {
+function renderPgCriadoSemConvite(nomeTutor, grupoNum, motivo, detalhe) {
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
   const msg = { sem_conexao: 'Sem conexão com a internet.', conflito: 'Muitas alterações ao mesmo tempo.', tamanho: 'Limite de tamanho da base atingido.' }[motivo]
     || 'Não foi possível gerar o convite agora.';
+  const linhaDetalhe = detalhe ? `<p class="body-text" style="font-size:12px;color:var(--text3);word-break:break-word">Detalhe técnico: ${sanitize(detalhe)}</p>` : '';
   document.getElementById('tutorpanel-body').innerHTML = `
     <div class="content-card">
       <div class="phase-tag tag-content">⚠️ Pequeno Grupo criado, mas o convite falhou</div>
       <p class="body-text"><strong>${sanitize(g ? g.nome : '')}</strong> foi criado normalmente. ${msg} O convite do Coordenador não foi gerado — tente novamente.</p>
+      ${linhaDetalhe}
     </div>
     <button onclick="gerarConvidarCoordenadorAutoEExibir('${nomeTutor.replace(/'/g,"\\'")}', ${grupoNum})" style="width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">
       🔁 Tentar gerar o convite novamente
@@ -7187,14 +7189,14 @@ async function commitConviteChange(construir) {
   for (let tentativa = 1; tentativa <= 4; tentativa++) {
     let remote;
     try { remote = await fbReadDoc(cfg); }
-    catch { return { ok: false, motivo: 'sem_conexao' }; }
+    catch (e) { return { ok: false, motivo: 'sem_conexao', detalhe: String(e && e.message || e) }; }
     const built = construir(remote || {});
     if (built.rejeitar) return built.rejeitar;
     let w;
     try {
       w = await fbWriteGrupos(cfg, built.dados, TUTORS.length ? TUTORS : undefined,
                               remote ? remote.updateTime : null, built.convites);
-    } catch { return { ok: false, motivo: 'sem_conexao' }; }
+    } catch (e) { return { ok: false, motivo: 'sem_conexao', detalhe: String(e && e.message || e) }; }
     if (w.ok) {
       fbLastKnownTs = w.ts;
       built.aplicarLocal();                       // ajuste #1: só agora toca o estado local
