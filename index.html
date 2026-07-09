@@ -3723,13 +3723,49 @@ const JOURNEY_MISSIONS = [
   // ── Missões de campanha dos Pequenos Grupos (desbloqueiam pelo mês) ──────
   // unlockFn substitui unlock[] quando presente
   { id:'pg_visita_jul',   label:'Visitar outro Pequeno Grupo em Julho — cantar e orar juntos',             icon:'🚶', xp:50,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=7, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_visita_jul') },
-  { id:'pg_emb_jul',      label:'Participar dos Embaixadores de Esperança — Julho',                        icon:'🌟', xp:40,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=7, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_emb_jul') },
   { id:'pg_visita_ago',   label:'Visitar outro Pequeno Grupo em Agosto — cantar e orar juntos',            icon:'🚶', xp:50,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=8, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_visita_ago') },
-  { id:'pg_emb_ago',      label:'Participar dos Embaixadores de Esperança — Agosto',                       icon:'🌟', xp:40,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=8, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_emb_ago') },
   { id:'pg_visita_set',   label:'Visitar outro Pequeno Grupo em Setembro — cantar e orar juntos',          icon:'🚶', xp:50,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=9, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_visita_set') },
-  { id:'pg_emb_set',      label:'Participar dos Embaixadores de Esperança — Setembro',                     icon:'🌟', xp:40,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=9, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_emb_set') },
   { id:'pg_oracao',       label:'Participar da Semana de Oração com Pastor convidado',                     icon:'🙏', xp:60,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=9, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_oracao') },
 ];
+
+// ── Embaixadores da Esperança: evento recorrente mensal (registrado no participante,
+// sincronizado com o grupo/Firebase — substitui as antigas missões fixas pg_emb_jul/ago/set,
+// que só ficavam salvas no aparelho e nunca chegavam ao painel do Tutor) ──────────────────
+const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+function embMonthKey(d) {
+  d = d || new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+function embMonthLabel(monthKey) {
+  const [y, m] = monthKey.split('-');
+  return MESES_PT[parseInt(m, 10) - 1] + '/' + y;
+}
+function getMeuEmbaixadoresParticipante() {
+  const meuGrupo = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
+  if (!meuGrupo) return null;
+  loadGrupos();
+  const g = PEQUENOS_GRUPOS.find(x => x.num === meuGrupo.grupoNum);
+  return g ? findMeuParticipante(g) : null;
+}
+function confirmarEmbaixadores() {
+  const eu = getMeuEmbaixadoresParticipante();
+  if (!eu) return;
+  const monthKey = embMonthKey();
+  if (eu.embaixadores && eu.embaixadores[monthKey] && eu.embaixadores[monthKey].participou) return;
+  const agora = new Date();
+  eu.embaixadores = {
+    ...(eu.embaixadores || {}),
+    [monthKey]: {
+      participou: true,
+      data: agora.toLocaleDateString('pt-BR'),
+      hora: agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    },
+  };
+  eu.progresso = { ...(eu.progresso || {}), updatedAt: Date.now() };
+  saveGrupos();
+  ST.xp = (ST.xp || 0) + 40; save(ST);
+  renderMissions();
+}
 
 function confirmMission(id) {
   completeMission(id, JOURNEY_MISSIONS.find(m => m.id === id)?.xp || 0);
@@ -3935,8 +3971,33 @@ function renderMissions(){
       </div>`;
   }).join('');
 
-  const campSection = visibleCampanha.length ? `
+  // ── Embaixadores da Esperança (evento recorrente mensal, sincronizado com o grupo) ──
+  const embMonth = embMonthKey();
+  const embLabel = embMonthLabel(embMonth);
+  const euEmb = getMeuEmbaixadoresParticipante();
+  const embRegistro = euEmb && euEmb.embaixadores ? euEmb.embaixadores[embMonth] : null;
+  const embRow = !euEmb ? '' : (embRegistro && embRegistro.participou ? `
+      <div class="mission-item">
+        <div class="mission-check done">✓</div>
+        <div class="mission-info">
+          <div class="mission-name" style="opacity:.7">🌟 Embaixadores da Esperança — ${embLabel}</div>
+          <div class="mission-meta">✔ Participação registrada em ${embRegistro.data}</div>
+        </div>
+      </div>` : `
+      <div style="background:var(--blue-pale);border-radius:var(--radius-sm);padding:.6rem .75rem;margin:.2rem 0">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:28px;height:28px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:17.5px;flex-shrink:0">🌟</div>
+          <div class="mission-info">
+            <div class="mission-name" style="color:var(--navy)">Embaixadores da Esperança — ${embLabel}</div>
+            <div class="mission-meta">Você participou da ação missionária deste mês?</div>
+          </div>
+        </div>
+        <button onclick="confirmarEmbaixadores()" style="margin-top:.5rem;width:100%;background:var(--teal);color:#fff;border:none;border-radius:var(--radius-sm);padding:.5rem;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--ff-body)">✅ Confirmar participação</button>
+      </div>`);
+
+  const campSection = (visibleCampanha.length || embRow) ? `
     <div style="border-top:0.5px solid var(--border);margin-top:.5rem;padding-top:.5rem">
+      ${embRow}
       ${campRows}
     </div>` : '';
 
@@ -4302,7 +4363,12 @@ function renderRadar() {
 function renderShareArea() {
   const mg = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
   const funcao = mg ? getMinhaFuncaoNoGrupo(mg.grupoNum) : null;
-  const podeGerenciar = funcao === 'tutor' || funcao === 'coordenador';
+  const souGerenteDoGrupo = funcao === 'tutor' || funcao === 'coordenador';
+  // ARCH-01: o Tutor autentica pela allowlist, não como "participante" de um PG — por isso
+  // ST.tutorPanelAuth (já logado no Painel alguma vez neste aparelho) também dá acesso ao botão,
+  // mesmo sem vínculo de participante com papel tutor/coordenador em nenhum grupo.
+  const souTutorAutenticado = !!ST.tutorPanelAuth;
+  const podeGerenciar = souGerenteDoGrupo || souTutorAutenticado;
 
   // BLOCO 5 — Ferramentas: "Meu Progresso" (para todos)
   const prog = document.getElementById('h-progress-area');
@@ -4318,13 +4384,17 @@ function renderShareArea() {
   if (!lid) return;
   if (!podeGerenciar) { lid.innerHTML = ''; return; }
   const rotuloConvidar = funcao === 'tutor' ? 'Convidar Coordenador' : 'Convidar Participante';
+  // "Convidar" exige um grupo vinculado (openShare depende de loadMeuGrupo()) — um Tutor sem
+  // vínculo de participante convida por dentro do próprio Painel, não por aqui.
+  const botaoConvidar = souGerenteDoGrupo ? `
+      <button onclick="openShare()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">
+        🔗 ${rotuloConvidar}
+      </button>` : '';
   // O Painel é uma tela ÚNICA compartilhada (openTutorPanel) — rótulo combinado, não por papel.
   lid.innerHTML = `
     <div class="sec-label">Liderança do Pequeno Grupo</div>
     <div style="margin:0 1rem;display:flex;flex-direction:column;gap:8px">
-      <button onclick="openShare()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">
-        🔗 ${rotuloConvidar}
-      </button>
+      ${botaoConvidar}
       <button onclick="openTutorPanel()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">
         🧑‍🏫 Painel do Tutor/Coordenador
       </button>
