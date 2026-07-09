@@ -9156,10 +9156,27 @@ function openComunidade() {
 }
 
 function renderComunidade() {
+  const body = document.getElementById('comunidade-body');
   const meuGrupo = loadMeuGrupo();
-  if (!meuGrupo) return;
+  if (!meuGrupo) {
+    if (body) body.innerHTML = `
+      <div class="content-card">
+        <div class="phase-tag tag-opening">Comunidade</div>
+        <p class="body-text">Você ainda não faz parte de um Pequeno Grupo como participante — por isso não há um Mural de Gratidão e Oração para mostrar aqui.</p>
+      </div>
+      <button class="nav-btn" onclick="goHome()">Voltar ao início</button>`;
+    return;
+  }
   const g = PEQUENOS_GRUPOS.find(x => x.num === meuGrupo.grupoNum);
-  if (!g) return;
+  if (!g) {
+    if (body) body.innerHTML = `
+      <div class="content-card">
+        <div class="phase-tag tag-opening">Comunidade</div>
+        <p class="body-text">Não foi possível carregar os dados do seu Pequeno Grupo agora. Tente novamente em instantes.</p>
+      </div>
+      <button class="nav-btn" onclick="goHome()">Voltar ao início</button>`;
+    return;
+  }
 
   const lista = (g.gratidoes || []).slice().sort((a, b) => b.ts - a.ts);
 
