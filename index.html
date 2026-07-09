@@ -1597,9 +1597,6 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
   <!-- ═══ BLOCO 6 — Liderança do Pequeno Grupo ═══ (só Tutor/Coordenador; preenchido por renderShareArea) -->
   <div id="h-lideranca-area"></div>
 
-  <!-- ═══ BLOCO 7 — Sistema ═══ -->
-  <div id="h-install-area"></div>
-
 
 </div>
 
@@ -3682,7 +3679,7 @@ function renderBosses() {
 // unlockedWhen (estudos concluídos necessários para aparecer), check (condição de conclusão)
 const JOURNEY_MISSIONS = [
   // Sem estudo
-  { id:'mj_tutor',   label:'Escolher seu Tutor de Jornada',                             icon:'🙋', xp:50,  unlock:[], check:()=>ST.tutor!==undefined },
+  { id:'mj_tutor',   label:'Escolher seu Tutor de Jornada',                             icon:'🙋', xp:50,  unlock:[], check:()=>!!((typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null) },
   // Estudo 1 — O Amor de Deus
   { id:'mj_s1',      label:'Concluir o Estudo 1 — O Amor de Deus',                      icon:'❤️', xp:30,  unlock:[],  check:()=>ST.done.includes(0) },
   { id:'mj_s1_nat',  label:'Observar algo na natureza e registrar sobre o amor de Deus', icon:'🌿', xp:20,  unlock:[0], manual:true, check:()=>(ST.missionsDone||[]).includes('mj_s1_nat') },
@@ -4334,17 +4331,6 @@ function renderShareArea() {
     </div>`;
 }
 
-// FUNC-02a: ação utilitária discreta, movida da tela antiga de boas-vindas (screen-welcome,
-// já sem nenhum caminho de acesso) — não é fluxo principal, não é específica de nenhum papel.
-function renderInstallArea() {
-  document.getElementById('h-install-area').innerHTML = `
-    <div style="text-align:center;margin:.5rem 0 .25rem">
-      <button onclick="instalarApp()" style="background:transparent;border:none;color:var(--text3);font-size:13px;cursor:pointer;font-family:var(--ff-body)">
-        📲 Instalar na Tela Inicial
-      </button>
-    </div>`;
-}
-
 function renderAIArea() {
   document.getElementById('h-ai-area').innerHTML = `
     <div style="margin:.75rem 1rem 0">
@@ -4676,7 +4662,6 @@ function renderHome() {
   // Phase 3 — Share, AI, Panel
   renderShareArea();
   renderAIArea();
-  renderInstallArea();
   renderCompanionHomeBtn();
   setTimeout(() => {
     if (typeof renderGruposBtnHome === 'function') renderGruposBtnHome();
@@ -5693,7 +5678,12 @@ function sendMyPrayer() {
   // Grava no meu participante para o companheiro ver (sincroniza na nuvem)
   loadGrupos();
   const eu = cpMyParticipant();
-  if (eu) { eu.pedidoOracao = txt; eu.pedidoOracaoData = new Date().toLocaleDateString('pt-BR'); saveGrupos(); }
+  if (eu) {
+    eu.pedidoOracao = txt;
+    eu.pedidoOracaoData = new Date().toLocaleDateString('pt-BR');
+    eu.progresso = { ...(eu.progresso || {}), updatedAt: Date.now() };
+    saveGrupos();
+  }
   showCompanionToast('🙏 Pedido enviado ao seu companheiro!');
   renderCompanionScreen();
 }
@@ -5703,7 +5693,11 @@ function clearMyPrayer() {
   saveCP();
   loadGrupos();
   const eu = cpMyParticipant();
-  if (eu) { eu.pedidoOracao = ''; saveGrupos(); }
+  if (eu) {
+    eu.pedidoOracao = '';
+    eu.progresso = { ...(eu.progresso || {}), updatedAt: Date.now() };
+    saveGrupos();
+  }
   renderCompanionScreen();
 }
 
@@ -7481,6 +7475,10 @@ async function renderTelaConvite(inviteId) {
     <button id="conv-entrar-btn" onclick="confirmarEntradaConvite('${inv.inviteId}')"
       style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:var(--gold);border:none;border-radius:var(--radius-sm);padding:1rem;font-size:18px;font-weight:700;color:#0D2137;cursor:pointer;font-family:var(--ff-body);box-shadow:0 4px 16px rgba(255,215,0,0.25)">
       Entrar na Jornada →
+    </button>
+    <button onclick="instalarApp()"
+      style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:transparent;border:1px solid rgba(255,255,255,0.3);border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:15px;font-weight:600;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-top:.6rem">
+      📲 Instalar app na tela inicial
     </button>
   </div>`;
 }
