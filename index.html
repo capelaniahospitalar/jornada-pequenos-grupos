@@ -3664,9 +3664,9 @@ function openPanel() {
       <div class="phase-tag tag-content">Painel do Discípulo</div>
       <p class="body-text">Este é seu painel de discípulo. Compartilhe com o tutor ou coordenador do seu Pequeno Grupo para acompanhamento personalizado.</p>
     </div>
-    <button onclick="openJournal('panel')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.8rem;font-size:17.5px;color:var(--text);cursor:pointer;font-family:var(--ff-body);margin-bottom:.75rem">
+    <button onclick="openJournal('panel')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);padding:.8rem;font-size:17.5px;font-weight:500;cursor:pointer;font-family:var(--ff-body);margin-bottom:.75rem">
       📔 Meu Diário Espiritual
-      <span style="font-size:14px;color:var(--text3);margin-left:auto">${(ST.journal||[]).length} registro(s)</span>
+      <span style="font-size:14px;color:rgba(255,255,255,0.75);margin-left:auto">${(ST.journal||[]).length} registro(s)</span>
     </button>
     ${buildCompanionBtnHtml()}
     <div class="panel-section">
@@ -5856,12 +5856,10 @@ function buildCompanionBtnHtml() {
   }
   const pendentes = (eu && eu.compConvites) ? eu.compConvites.length : 0;
   return p
-    ? `<button onclick="openCompanion('panel')" style="display:flex;align-items:center;gap:10px;width:100%;background:var(--card);border:0.5px solid rgba(92,61,143,.35);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body);margin-bottom:.75rem">
-        <span style="font-size:22px">${p.icon}</span>
-        <div style="flex:1;text-align:left"><div style="font-weight:600;color:var(--purple)">${sanitize(p.name.split(' ')[0])}</div><div style="font-size:13px;color:var(--text3)">🤝 Companheiro de Jornada · 🔥 ${p.streak} dias</div></div>
-        <span style="color:var(--text3);font-size:18px">›</span>
+    ? `<button onclick="openCompanion('panel')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);padding:.8rem;font-size:17.5px;font-weight:500;cursor:pointer;font-family:var(--ff-body);margin-bottom:.75rem">
+        ${p.icon} ${sanitize(p.name.split(' ')[0])} — Companheiro de Jornada · 🔥 ${p.streak} dias
       </button>`
-    : `<button onclick="openCompanion('panel')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--purple-light);border:0.5px solid rgba(92,61,143,.35);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;color:var(--purple);cursor:pointer;font-family:var(--ff-body);font-weight:500;margin-bottom:.75rem">
+    : `<button onclick="openCompanion('panel')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);padding:.8rem;font-size:17.5px;font-weight:500;cursor:pointer;font-family:var(--ff-body);margin-bottom:.75rem">
         ${pendentes ? `📨 ${pendentes} convite${pendentes>1?'s':''} de companheiro — toque para responder` : '🤝 Escolher Companheiro de Jornada'}
       </button>`;
 }
