@@ -220,17 +220,7 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 .np-lbl{font-size:12.5px;color:var(--text3);letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px;font-family:var(--ff-body)}
 .np-title{font-family:var(--ff-serif);font-size:19px;font-weight:500;color:var(--text)}
 
-/* ── PHASE 1: RPG ATTRIBUTES, RADAR, LEVELS, TUTORS ── */
-.attr-section{margin:.75rem 1rem 0;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius);padding:1rem}
-.attr-title{font-size:14px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:.75rem;font-family:var(--ff-body)}
-.attr-row{display:flex;align-items:center;gap:8px;margin-bottom:.5rem}
-.attr-row:last-child{margin-bottom:0}
-.attr-icon{font-size:20px;width:22px;text-align:center;flex-shrink:0}
-.attr-label{font-size:15px;color:var(--text2);width:80px;flex-shrink:0;font-family:var(--ff-body)}
-.attr-bar-outer{flex:1;height:7px;background:var(--bg);border-radius:10px;overflow:hidden}
-.attr-bar-inner{height:100%;border-radius:10px;transition:width .6s ease}
-.attr-val{font-size:14px;color:var(--text3);width:28px;text-align:right;flex-shrink:0;font-family:var(--ff-body)}
-
+/* ── PHASE 1: RPG LEVELS, TUTORS ── */
 .level-card{margin:.75rem 1rem 0;background:linear-gradient(135deg,var(--navy),var(--navy2));border-radius:var(--radius);padding:1rem 1.25rem;display:flex;align-items:center;gap:12px}
 .level-ico{font-size:35px;flex-shrink:0}
 .level-info{flex:1}
@@ -1578,17 +1568,13 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
   <div class="sec-label">Conquistas</div>
   <div class="badges-scroll" id="h-badges"></div>
   <div id="h-level-card"></div>
-  <div id="h-attrs"></div>
-  <div id="h-bosses"></div>
 
   <!-- ═══ BLOCO 4 — Minha Missão ═══ -->
   <div id="h-missions"></div>
 
   <!-- ═══ BLOCO 5 — Ferramentas ═══ -->
-  <div id="h-journal-btn"></div>
   <div id="h-progress-area"></div>
   <div id="h-ai-area"></div>
-  <div id="h-companion-area"></div>
 
   <!-- ═══ BLOCO 6 — Liderança do Pequeno Grupo ═══ (só Tutor/Coordenador; preenchido por renderShareArea) -->
   <div id="h-lideranca-area"></div>
@@ -1776,7 +1762,7 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 <div id="screen-companion" class="screen">
 
   <div class="comp-hdr">
-    <button class="back-btn" onclick="goHome()" aria-label="Voltar">&#8592;</button>
+    <button class="back-btn" onclick="companionBack()" aria-label="Voltar">&#8592;</button>
     <div class="comp-hdr-info">
       <div class="comp-hdr-tag">Jornada Discipular · Pequenos Grupos</div>
       <div class="comp-hdr-title">🤝 Companheiro de Jornada</div>
@@ -3658,10 +3644,6 @@ function openPanel() {
   const attrRows = ATTRIBUTES.map(a =>
     `<div class="panel-stat"><span>${a.icon} ${a.label}</span><strong>${attrs[a.id]||0}/100</strong></div>`
   ).join('');
-  const bossRows = OBSTACLES.filter(o => getObstacleProgress(o)>=100)
-    .map(o => `<div class="panel-stat"><span>${o.icon} ${o.label}</span><strong style="color:var(--teal)">✓ Vencido</strong></div>`)
-    .join('') || '<div style="font-size:16px;color:var(--text3);padding:.4rem 0">Nenhum ainda</div>';
-
   function buildWaMsg(nome) {
     return encodeURIComponent(
       `Olá ${nome}! Aqui está meu progresso na jornada "Aos Pés do Mestre Jesus":\n\n` +
@@ -3688,9 +3670,14 @@ function openPanel() {
 
   document.getElementById('panel-body').innerHTML = `
     <div class="content-card">
-      <div class="phase-tag tag-content">Meu progresso</div>
+      <div class="phase-tag tag-content">Painel do Discípulo</div>
       <p class="body-text">Este é seu painel de discípulo. Compartilhe com o tutor ou coordenador do seu Pequeno Grupo para acompanhamento personalizado.</p>
     </div>
+    <button onclick="openJournal('panel')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.8rem;font-size:17.5px;color:var(--text);cursor:pointer;font-family:var(--ff-body);margin-bottom:.75rem">
+      📔 Meu Diário Espiritual
+      <span style="font-size:14px;color:var(--text3);margin-left:auto">${(ST.journal||[]).length} registro(s)</span>
+    </button>
+    ${buildCompanionBtnHtml()}
     <div class="panel-section">
       <div class="panel-title">Resumo geral</div>
       <div class="panel-stat"><span>🏆 Nível</span><strong>${lv.icon} ${lv.name}</strong></div>
@@ -3703,10 +3690,7 @@ function openPanel() {
       <div class="panel-title">Crescimento cristão</div>
       ${attrRows}
     </div>
-    <div class="panel-section">
-      <div class="panel-title">Obstáculos vencidos</div>
-      ${bossRows}
-    </div>
+    ${buildBossesHtml()}
     ${enviarBtns}
     <button class="nav-btn" onclick="goHome()" style="background:transparent;color:var(--blue);border:0.5px solid var(--blue)">Voltar ao início</button>`;
 }
@@ -3757,17 +3741,13 @@ function doObstacleAction(obsId) {
   ST.obstacleActions[obsId] = today;
   ST.xp = (ST.xp || 0) + 5;
   save(ST);
-  renderBosses();
-  renderHome();
+  openPanel();
 }
 
-function renderBosses() {
+function buildBossesHtml() {
   const unlocked = OBSTACLES.filter(isObstacleUnlocked);
 
-  if (unlocked.length === 0) {
-    document.getElementById('h-bosses').innerHTML = '';
-    return;
-  }
+  if (unlocked.length === 0) return '';
 
   // Obstáculos já vencidos (100%)
   const defeatedList = unlocked.filter(o => getObstacleProgress(o) >= 100);
@@ -3812,7 +3792,7 @@ function renderBosses() {
     ? `<div style="font-size:14px;color:var(--text3);text-align:center;padding:.4rem 0;opacity:.55">Outros obstáculos surgirão à medida que você avança</div>`
     : '';
 
-  document.getElementById('h-bosses').innerHTML = `
+  return `
     <div class="boss-section">
       <div class="boss-title">⚔️ Obstáculos Espirituais</div>
       <div class="boss-subtitle">Cada estudo concluído enfraquece estes obstáculos. As ações abaixo ajudam você a vencê-los no dia a dia.</div>
@@ -4158,20 +4138,19 @@ function renderMissions(){
       ${lockedRow}
       ${campSection}
     </div>`;
-  document.getElementById('h-journal-btn').innerHTML=`
-    <div style="margin:.75rem 1rem 0">
-      <button onclick="openJournal()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.8rem;font-size:17.5px;color:var(--text);cursor:pointer;font-family:var(--ff-body)">
-        📔 Meu Diário Espiritual
-        <span style="font-size:14px;color:var(--text3);margin-left:auto">${(ST.journal||[]).length} registro(s)</span>
-      </button>
-    </div>`;
 }
 
 let jTab='entries';
-function openJournal(){ showScreen('journal'); renderJournal(); }
+// Lembra de onde o Diário foi aberto (Home ou Painel do Discípulo) para "Voltar" retornar
+// ao lugar certo — não sempre para a Home.
+let journalOrigem = 'home';
+function openJournal(origem){ journalOrigem = origem || 'home'; showScreen('journal'); renderJournal(); }
 function journalBack(){
   if (pendingJournalIdx !== null && !hasJournalForStudy(pendingJournalIdx)) {
     showScreen('complete');
+  } else if (journalOrigem === 'panel') {
+    showScreen('panel');
+    openPanel();
   } else {
     goHome();
   }
@@ -4421,24 +4400,6 @@ function renderLevelCard() {
   document.getElementById('h-level').textContent = RPG_LEVELS[currentIdx].name;
 }
 
-function renderAttrs() {
-  const attrs = getAttrs();
-  const rows = ATTRIBUTES.map(a => {
-    const val = attrs[a.id] || 0;
-    return `<div class="attr-row">
-      <div class="attr-icon">${a.icon}</div>
-      <div class="attr-label">${a.label}</div>
-      <div class="attr-bar-outer"><div class="attr-bar-inner" style="width:${val}%;background:${a.color}"></div></div>
-      <div class="attr-val">${val}</div>
-    </div>`;
-  }).join('');
-  document.getElementById('h-attrs').innerHTML = `
-    <div class="attr-section" style="margin-top:.75rem">
-      <div class="attr-title">Crescimento Cristão</div>
-      ${rows}
-    </div>`;
-}
-
 // UX-02: "Convidar Participante" e "Painel do Tutor/Coordenador" só fazem sentido pra quem
 // gerencia o grupo (tutor ou coordenador — inclui o registro legado de tutor-participante, por
 // compatibilidade). Pra Colaborador ou quem não tem grupo, as duas só levavam a becos sem saída
@@ -4462,7 +4423,7 @@ function renderShareArea() {
   if (prog) prog.innerHTML = `
     <div style="margin:.75rem 1rem 0">
       <button onclick="openPanel()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);cursor:pointer;font-family:var(--ff-body)">
-        <span style="font-size:22px">📈</span> Meu progresso
+        <span style="font-size:22px">📈</span> Painel do Discípulo
       </button>
     </div>`;
 
@@ -4811,14 +4772,11 @@ function renderHome() {
 
   // Phase 1 — RPG elements
   renderLevelCard();
-  renderAttrs();
   // Phase 2 — Bosses, Missions, Journal
-  renderBosses();
   renderMissions();
   // Phase 3 — Share, AI, Panel
   renderShareArea();
   renderAIArea();
-  renderCompanionHomeBtn();
   setTimeout(() => {
     if (typeof renderGruposBtnHome === 'function') renderGruposBtnHome();
     if (typeof renderPgProgressHome === 'function') renderPgProgressHome();
@@ -5361,12 +5319,24 @@ function getISOWeek() {
   return `${d.getUTCFullYear()}-W${Math.ceil((((d - yearStart) / 86400000) + 1) / 7)}`;
 }
 
-function openCompanion() {
+// Lembra de onde o Companheiro de Jornada foi aberto (Home ou Painel do Discípulo) para
+// "Voltar" retornar ao lugar certo — mesmo padrão usado pelo Diário Espiritual.
+let companionOrigem = 'home';
+function openCompanion(origem) {
+  companionOrigem = origem || 'home';
   loadCP();
   showScreen('companion');
   renderCompanionScreen();
   if (typeof syncFromFirebase === 'function') {
     syncFromFirebase().then(u => { if (u) renderCompanionScreen(); });
+  }
+}
+function companionBack() {
+  if (companionOrigem === 'panel') {
+    showScreen('panel');
+    openPanel();
+  } else {
+    goHome();
   }
 }
 
@@ -5879,14 +5849,7 @@ function showCompanionToast(msg) {
 
 
 
-function renderCompanionHomeBtn() {
-  const area = document.getElementById('h-companion-area');   // BLOCO 5 — Ferramentas
-  if (!area) return;
-  // Verificar se botão companheiro já existe
-  if (document.getElementById('home-companion-btn')) return;
-  const div = document.createElement('div');
-  div.id = 'home-companion-btn';
-  div.style.cssText = 'margin:.75rem 1rem 0';
+function buildCompanionBtnHtml() {
   loadCP();
   loadGrupos();
   const eu = (typeof cpMyParticipant === 'function') ? cpMyParticipant() : null;
@@ -5897,16 +5860,15 @@ function renderCompanionHomeBtn() {
     if (parc) p = cpDisplay(parc, 0);
   }
   const pendentes = (eu && eu.compConvites) ? eu.compConvites.length : 0;
-  div.innerHTML = p
-    ? `<button onclick="openCompanion()" style="display:flex;align-items:center;gap:10px;width:100%;background:var(--card);border:0.5px solid rgba(92,61,143,.35);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">
+  return p
+    ? `<button onclick="openCompanion('panel')" style="display:flex;align-items:center;gap:10px;width:100%;background:var(--card);border:0.5px solid rgba(92,61,143,.35);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body);margin-bottom:.75rem">
         <span style="font-size:22px">${p.icon}</span>
         <div style="flex:1;text-align:left"><div style="font-weight:600;color:var(--purple)">${sanitize(p.name.split(' ')[0])}</div><div style="font-size:13px;color:var(--text3)">🤝 Companheiro de Jornada · 🔥 ${p.streak} dias</div></div>
         <span style="color:var(--text3);font-size:18px">›</span>
       </button>`
-    : `<button onclick="openCompanion()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--purple-light);border:0.5px solid rgba(92,61,143,.35);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;color:var(--purple);cursor:pointer;font-family:var(--ff-body);font-weight:500">
+    : `<button onclick="openCompanion('panel')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--purple-light);border:0.5px solid rgba(92,61,143,.35);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;color:var(--purple);cursor:pointer;font-family:var(--ff-body);font-weight:500;margin-bottom:.75rem">
         ${pendentes ? `📨 ${pendentes} convite${pendentes>1?'s':''} de companheiro — toque para responder` : '🤝 Escolher Companheiro de Jornada'}
       </button>`;
-  area.appendChild(div);
 }
 
 
