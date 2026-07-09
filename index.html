@@ -78,12 +78,6 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 .scard-v{font-size:21px;font-weight:600;color:var(--text);font-family:var(--ff-body)}
 .scard-l{font-size:12.5px;color:var(--text3);margin-top:1px}
 
-/* ── STREAK ── */
-.streak{margin:.75rem 1rem 0;background:var(--blue-pale);border:0.5px solid var(--blue-light);border-radius:var(--radius-sm);padding:.65rem 1rem;display:flex;align-items:center;gap:10px}
-.streak-ico{font-size:25px}
-.streak-txt{font-size:19px;color:var(--navy2);flex:1;line-height:1.4}
-.streak-num{font-size:25px;font-weight:600;color:var(--blue)}
-
 /* ── NEXT CARD ── */
 .next-area{padding:.85rem 1rem 0}
 .next-card{background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden}
@@ -1544,11 +1538,11 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
     <div class="scard"><div class="scard-v" id="h-streak">0🔥</div><div class="scard-l">Sequência</div></div>
   </div>
 
-  <div class="streak">
-    <div class="streak-ico">🕊️</div>
-    <div class="streak-txt" id="h-streak-msg">Comece sua jornada em Pequenos Grupos hoje!</div>
-    <div class="streak-num" id="h-streak-num">0</div>
-  </div>
+  <div class="sec-label">Conquistas</div>
+  <div class="badges-scroll" id="h-badges"></div>
+
+  <div id="h-progress-area"></div>
+  <div id="h-comunidade-area"></div>
 
   <div class="progress-section">
     <div class="progress-lbl">Progresso na trilha</div>
@@ -1561,24 +1555,23 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
   <div class="sec-label" id="lbl-previous" style="display:none">Estudos anteriores</div>
   <div id="h-previous"></div>
 
-  <!-- ═══ BLOCO 2 — Meu Pequeno Grupo ═══ (chip do grupo + progresso do PG + Painel da Comunidade, inseridos por renderGruposBtnHome/renderPgProgressHome/renderComunidadeBtnHome) -->
+  <!-- ═══ BLOCO 2 — Meu Pequeno Grupo ═══ (chip do grupo + progresso do PG, inseridos por renderGruposBtnHome/renderPgProgressHome) -->
   <div id="h-grupo-area"></div>
 
   <!-- ═══ BLOCO 3 — Minha Formação ═══ -->
-  <div class="sec-label">Conquistas</div>
-  <div class="badges-scroll" id="h-badges"></div>
   <div id="h-level-card"></div>
 
   <!-- ═══ BLOCO 4 — Minha Missão ═══ -->
   <div id="h-missions"></div>
 
   <!-- ═══ BLOCO 5 — Ferramentas ═══ -->
-  <div id="h-progress-area"></div>
   <div id="h-ai-area"></div>
 
   <!-- ═══ BLOCO 6 — Liderança do Pequeno Grupo ═══ (só Tutor/Coordenador; preenchido por renderShareArea) -->
   <div id="h-lideranca-area"></div>
 
+  <!-- ═══ BLOCO 7 — Sistema ═══ -->
+  <div id="h-update-area"></div>
 
 </div>
 
@@ -4422,7 +4415,7 @@ function renderShareArea() {
   const prog = document.getElementById('h-progress-area');
   if (prog) prog.innerHTML = `
     <div style="margin:.75rem 1rem 0">
-      <button onclick="openPanel()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);cursor:pointer;font-family:var(--ff-body)">
+      <button onclick="openPanel()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;font-weight:700;color:var(--navy);cursor:pointer;font-family:var(--ff-body)">
         <span style="font-size:22px">📈</span> Painel do Discípulo
       </button>
     </div>`;
@@ -4454,6 +4447,22 @@ function renderAIArea() {
     <div style="margin:.75rem 1rem 0">
       <button onclick="openAI()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);padding:.8rem;font-size:17.5px;font-weight:500;cursor:pointer;font-family:var(--ff-body)">
         🧭 Mentor IA — Dúvidas Bíblicas
+      </button>
+    </div>`;
+}
+
+// No iPhone instalado na tela inicial (modo standalone, sem barra do Safari), o gesto nativo
+// de "puxar para atualizar" depende do iOS e é instável entre versões — não é algo que o app
+// controla. Este botão força buscar a versão mais nova, sem depender desse gesto.
+function forcarAtualizacaoApp() {
+  const url = window.location.origin + window.location.pathname + '?atualizar=' + Date.now();
+  window.location.href = url;
+}
+function renderUpdateArea() {
+  document.getElementById('h-update-area').innerHTML = `
+    <div style="margin:.75rem 1rem 0">
+      <button onclick="forcarAtualizacaoApp()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.8rem;font-size:16px;font-weight:600;color:var(--navy);cursor:pointer;font-family:var(--ff-body)">
+        🔄 Verificar atualização do app
       </button>
     </div>`;
 }
@@ -4657,9 +4666,6 @@ function renderHome() {
   document.getElementById('h-xp').textContent = ST.xp;
   document.getElementById('h-done').textContent = ST.done.length + '/' + STUDIES.length;
   document.getElementById('h-streak').textContent = ST.streak + '🔥';
-  document.getElementById('h-streak-num').textContent = ST.streak;
-  document.getElementById('h-streak-msg').textContent =
-    ST.streak > 1 ? ST.streak + ' dias consecutivos de caminhada!' : 'Comece sua jornada em Pequenos Grupos hoje!';
 
   const tp = Math.round(ST.done.length / STUDIES.length * 100);
   document.getElementById('h-track').style.width = tp + '%';
@@ -4777,6 +4783,7 @@ function renderHome() {
   // Phase 3 — Share, AI, Panel
   renderShareArea();
   renderAIArea();
+  renderUpdateArea();
   setTimeout(() => {
     if (typeof renderGruposBtnHome === 'function') renderGruposBtnHome();
     if (typeof renderPgProgressHome === 'function') renderPgProgressHome();
@@ -9108,26 +9115,23 @@ function saveGratidoes(list) {
 
 // ── Botão de acesso à Comunidade na Home ─────────────────────────────
 function renderComunidadeBtnHome() {
-  const existing = document.getElementById('comunidade-home-btn');
-  if (existing) return;
-  const anchor = document.getElementById('pg-progress-card') || document.getElementById('grupos-home-btn') || document.getElementById('h-grupo-area');
-  if (!anchor) return;
+  const area = document.getElementById('h-comunidade-area');
+  if (!area) return;
   const mg = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
   const nomePg = mg ? (mg.grupoNome || ('Grupo ' + mg.grupoNum)) : '';
-  const div = document.createElement('div');
-  div.id = 'comunidade-home-btn';
-  div.style.cssText = 'margin:.75rem 1rem 0';
   // UX-01: card único da vida comunitária do PG. Abre openComunidade(), que já reúne
   // gratidões, pedidos de oração e celebrações. Contador antigo (localStorage morto) removido.
-  div.innerHTML = `<button onclick="openComunidade()" style="display:flex;align-items:center;gap:9px;width:100%;background:var(--card);border:0.5px solid rgba(184,134,11,.3);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">
-    <span style="font-size:22px">❤️</span>
-    <div style="flex:1;text-align:left">
-      <div style="font-weight:600;color:var(--gold)">Painel da Comunidade${nomePg ? ' — ' + sanitize(nomePg) : ''}</div>
-      <div style="font-size:13px;color:var(--text3)">Gratidões • Orações • Celebrações</div>
-    </div>
-    <span style="color:var(--text3);font-size:18px">›</span>
-  </button>`;
-  anchor.after(div);
+  area.innerHTML = `
+    <div style="margin:.75rem 1rem 0">
+      <button onclick="openComunidade()" style="display:flex;align-items:center;gap:9px;width:100%;background:var(--card);border:0.5px solid rgba(184,134,11,.3);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">
+        <span style="font-size:22px">❤️</span>
+        <div style="flex:1;text-align:left">
+          <div style="font-weight:700;color:var(--gold)">Painel da Comunidade${nomePg ? ' — ' + sanitize(nomePg) : ''}</div>
+          <div style="font-size:13px;color:var(--text3)">Gratidões • Orações • Celebrações</div>
+        </div>
+        <span style="color:var(--text3);font-size:18px">›</span>
+      </button>
+    </div>`;
 }
 
 
