@@ -231,9 +231,6 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 .attr-bar-inner{height:100%;border-radius:10px;transition:width .6s ease}
 .attr-val{font-size:14px;color:var(--text3);width:28px;text-align:right;flex-shrink:0;font-family:var(--ff-body)}
 
-.radar-wrap{margin:.75rem 1rem 0;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius);padding:1rem;text-align:center}
-.radar-title{font-size:14px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:.75rem;font-family:var(--ff-body)}
-
 .level-card{margin:.75rem 1rem 0;background:linear-gradient(135deg,var(--navy),var(--navy2));border-radius:var(--radius);padding:1rem 1.25rem;display:flex;align-items:center;gap:12px}
 .level-ico{font-size:35px;flex-shrink:0}
 .level-info{flex:1}
@@ -1582,7 +1579,6 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
   <div class="badges-scroll" id="h-badges"></div>
   <div id="h-level-card"></div>
   <div id="h-attrs"></div>
-  <div id="h-radar-wrap"></div>
   <div id="h-bosses"></div>
 
   <!-- ═══ BLOCO 4 — Minha Missão ═══ -->
@@ -3024,6 +3020,24 @@ function renderTutorCreatePass(nome, errorMsg) {
     </div>`;
 }
 
+// DEDUP-01: procura, em TODOS os grupos, um participante Tutor/Coordenador com esse WhatsApp,
+// independente do nome digitado agora — o WhatsApp é a prova real de identidade, não o nome.
+// Evita criar uma segunda credencial/nome para a mesma pessoa quando ela digita uma variação
+// do nome (ex.: só o primeiro nome) num acesso posterior.
+function encontrarNomeTutorPorWhatsapp(waDigits) {
+  if (!waDigits || typeof PEQUENOS_GRUPOS === 'undefined') return null;
+  for (const g of PEQUENOS_GRUPOS) {
+    const p = (g.participantes || []).find(x => {
+      const ehLideranca = x.papel === 'tutor' || x.papel === 'coordenador' || x.tipo === 'tutor' || x.tipo === 'coordenador';
+      if (!ehLideranca) return false;
+      const xw = String(x.wa || '').replace(/\D/g, '');
+      return xw && (xw === waDigits || xw.endsWith(waDigits) || waDigits.endsWith(xw));
+    });
+    if (p) return p.nome;
+  }
+  return null;
+}
+
 function tutorConfirmarCriarPass(nome) {
   const wa = document.getElementById('tp-wa-create')?.value;
   const pass = document.getElementById('tp-pass-create')?.value;
@@ -3032,21 +3046,27 @@ function tutorConfirmarCriarPass(nome) {
     renderTutorCreatePass(nome, 'Informe o WhatsApp cadastrado (com DDD) para este papel.');
     return;
   }
-  // PERM-01: bloqueia criação da credencial sem prova de posse do WhatsApp cadastrado.
-  // ARCH-01: se não há registro de participante (Tutor novo, sem grupo ainda), a allowlist
-  // `tutores` — fonte de verdade da identidade do Tutor — também é aceita como prova válida.
-  const verificacao = verificarWhatsappDoPapel(nome, wa);
-  let nomeFinal = nome;
-  if (!verificacao.ok) {
-    const naAllowlist = verificacao.motivo === 'sem_registro' ? estaNaAllowlistTutores({ nome, wa }) : null;
-    if (naAllowlist) {
-      nomeFinal = naAllowlist.name || nome; // nome canônico da allowlist — o WhatsApp é a chave real
-    } else {
-      const msg = verificacao.motivo === 'sem_registro'
-        ? 'Acesso restrito — esse WhatsApp não foi encontrado nem como participante de um grupo, nem na lista de Tutores autorizados.'
-        : 'O WhatsApp informado não corresponde ao cadastrado para este papel.';
-      renderTutorCreatePass(nome, msg);
-      return;
+  const waDigits = wa.replace(/\D/g, '');
+  // DEDUP-01: se esse WhatsApp já pertence a um Tutor/Coordenador cadastrado em qualquer
+  // grupo, sempre converge para o nome já existente — tem prioridade sobre a checagem abaixo.
+  let nomeFinal = encontrarNomeTutorPorWhatsapp(waDigits);
+  if (!nomeFinal) {
+    // PERM-01: bloqueia criação da credencial sem prova de posse do WhatsApp cadastrado.
+    // ARCH-01: se não há registro de participante (Tutor novo, sem grupo ainda), a allowlist
+    // `tutores` — fonte de verdade da identidade do Tutor — também é aceita como prova válida.
+    const verificacao = verificarWhatsappDoPapel(nome, wa);
+    nomeFinal = nome;
+    if (!verificacao.ok) {
+      const naAllowlist = verificacao.motivo === 'sem_registro' ? estaNaAllowlistTutores({ nome, wa }) : null;
+      if (naAllowlist) {
+        nomeFinal = naAllowlist.name || nome; // nome canônico da allowlist — o WhatsApp é a chave real
+      } else {
+        const msg = verificacao.motivo === 'sem_registro'
+          ? 'Acesso restrito — esse WhatsApp não foi encontrado nem como participante de um grupo, nem na lista de Tutores autorizados.'
+          : 'O WhatsApp informado não corresponde ao cadastrado para este papel.';
+        renderTutorCreatePass(nome, msg);
+        return;
+      }
     }
   }
   if (!pass || pass.length < 4) { renderTutorCreatePass(nome, 'Crie uma senha com pelo menos 4 caracteres.'); return; }
@@ -3264,9 +3284,137 @@ function renderTutorGruposList(nome) {
       <p class="body-text">${grupos.length} Pequeno${grupos.length===1?'':'s'} Grupo${grupos.length===1?'':'s'} sob seus cuidados.</p>
     </div>
     ${cards}
+    <button onclick="abrirRelatoriosMensais('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">📊 Relatórios Mensais</button>
     ${souTutorDeAlgum ? `<button onclick="renderCriarPgForm('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body)">➕ Criar outro Pequeno Grupo</button>` : ''}
     <button onclick="renderTutorResetPassScreen('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">🔑 Trocar minha senha</button>
     <button onclick="tutorLogout()" style="width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">🚪 Sair</button>`;
+}
+
+// ── Relatórios Mensais: frequência do PG × participação nos Embaixadores ────
+function abrirRelatoriosMensais(nome) {
+  loadGrupos();
+  const grupos = getGruposDoResponsavel(nome);
+  const hoje = new Date();
+  const meses = [];
+  for (let i = 0; i < 6; i++) {
+    meses.push(embMonthKey(new Date(hoje.getFullYear(), hoje.getMonth() - i, 1)));
+  }
+  const monthOptions = meses.map(mk => `<option value="${mk}">${embMonthLabel(mk)}</option>`).join('');
+  const grupoOptions = grupos.map(g => `<option value="${g.num}">${sanitize(g.nome || 'Grupo ' + g.num)}</option>`).join('');
+
+  document.getElementById('tutorpanel-body').innerHTML = `
+    <div class="content-card">
+      <div class="phase-tag tag-content">📊 Relatórios Mensais</div>
+      <p class="body-text">Selecione o mês e o Pequeno Grupo para gerar o relatório.</p>
+    </div>
+    <div class="panel-section">
+      <label style="display:block;font-size:14px;color:var(--text3);margin-bottom:4px">Mês</label>
+      <select id="rel-mes" style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box;margin-bottom:.6rem">${monthOptions}</select>
+      <label style="display:block;font-size:14px;color:var(--text3);margin-bottom:4px">Pequeno Grupo</label>
+      <select id="rel-grupo" style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box;margin-bottom:.6rem">${grupoOptions}</select>
+      <button onclick="gerarRelatorioMensal('${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body)">Gerar relatório</button>
+    </div>
+    <button onclick="renderTutorGruposList('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Voltar aos meus grupos</button>`;
+  resetScroll();
+}
+
+function marcarFrequenciaPg(grupoNum, monthKey, aconteceu, nome) {
+  loadGrupos();
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return;
+  g.reunioesMes = {
+    ...(g.reunioesMes || {}),
+    [monthKey]: { aconteceu, marcadoPor: nome, data: new Date().toLocaleDateString('pt-BR') },
+  };
+  saveGrupos();
+  gerarRelatorioMensal(nome, grupoNum, monthKey);
+}
+
+function gerarRelatorioMensal(nome, grupoNumParam, monthKeyParam) {
+  loadGrupos();
+  const grupoNum = grupoNumParam != null ? grupoNumParam : parseInt(document.getElementById('rel-grupo').value, 10);
+  const monthKey = monthKeyParam || document.getElementById('rel-mes').value;
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return;
+  const monthLabel = embMonthLabel(monthKey);
+  const freq = (g.reunioesMes || {})[monthKey];
+  const nomeEsc = nome.replace(/'/g,"\\'");
+
+  const freqSection = freq ? `
+      <div class="panel-stat"><span>O PG se reuniu neste mês?</span><strong>${freq.aconteceu ? '✔ Sim' : '✖ Não'}</strong></div>
+      <button onclick="marcarFrequenciaPg(${grupoNum}, '${monthKey}', ${!freq.aconteceu}, '${nomeEsc}')" style="margin-top:.4rem;font-size:13px;background:none;border:none;color:var(--text3);cursor:pointer;font-family:var(--ff-body);padding:0">✎ Alterar resposta</button>` : `
+      <p class="body-text" style="margin:0 0 .5rem">O Pequeno Grupo se reuniu neste mês?</p>
+      <div style="display:flex;gap:8px">
+        <button onclick="marcarFrequenciaPg(${grupoNum}, '${monthKey}', true, '${nomeEsc}')" style="flex:1;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.7rem;font-size:15px;font-weight:600;color:#fff;cursor:pointer;font-family:var(--ff-body)">✔ Sim</button>
+        <button onclick="marcarFrequenciaPg(${grupoNum}, '${monthKey}', false, '${nomeEsc}')" style="flex:1;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">✖ Não</button>
+      </div>`;
+
+  const participantesSemDup = (g.participantes || []).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
+  const linhas = participantesSemDup.map(p => {
+    const participou = !!(p.embaixadores && p.embaixadores[monthKey] && p.embaixadores[monthKey].participou);
+    return `<tr><td style="padding:.35rem 0;border-bottom:0.5px solid var(--border)">${sanitize(p.nome)}</td><td style="padding:.35rem 0;border-bottom:0.5px solid var(--border);text-align:center">${participou ? '✔' : '✖'}</td></tr>`;
+  }).join('');
+  const total = participantesSemDup.length;
+  const participaram = participantesSemDup.filter(p => p.embaixadores && p.embaixadores[monthKey] && p.embaixadores[monthKey].participou).length;
+  const pct = total ? Math.round(participaram / total * 100) : 0;
+
+  document.getElementById('tutorpanel-body').innerHTML = `
+    <div class="content-card">
+      <div class="phase-tag tag-content">📊 Relatório — ${monthLabel}</div>
+      <p class="body-text" style="margin:0"><strong>${sanitize(g.nome || 'Grupo ' + grupoNum)}</strong><br>Tutor: ${sanitize(g.tutor || '—')} · Coordenador: ${sanitize(g.coordenador || '—')}</p>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title">Frequência do Pequeno Grupo</div>
+      ${freqSection}
+    </div>
+    <div class="panel-section">
+      <div class="panel-title">Embaixadores da Esperança (${embMonthLabel(monthKey)})</div>
+      <table style="width:100%;border-collapse:collapse;font-size:14.5px;font-family:var(--ff-body)">
+        <thead><tr><th style="text-align:left;padding:.3rem 0;border-bottom:1px solid var(--border);color:var(--text3);font-size:13px">Participante</th><th style="text-align:center;padding:.3rem 0;border-bottom:1px solid var(--border);color:var(--text3);font-size:13px">Participou</th></tr></thead>
+        <tbody>${linhas || '<tr><td colspan="2" style="padding:.5rem 0;color:var(--text3)">Nenhum participante inscrito.</td></tr>'}</tbody>
+      </table>
+      <div class="panel-stat" style="margin-top:.6rem"><span>Participantes</span><strong>${total}</strong></div>
+      <div class="panel-stat"><span>Participaram</span><strong>${participaram}</strong></div>
+      <div class="panel-stat"><span>Percentual</span><strong>${pct}%</strong></div>
+    </div>
+    <button onclick="enviarRelatorioWhatsApp(${grupoNum}, '${monthKey}')" style="margin-top:.5rem;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:#25D366;color:#fff;border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;cursor:pointer;font-family:var(--ff-body)">📤 Enviar por WhatsApp</button>
+    <button onclick="abrirRelatoriosMensais('${nomeEsc}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Escolher outro mês/grupo</button>
+    <button onclick="renderTutorGruposList('${nomeEsc}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Voltar aos meus grupos</button>`;
+  resetScroll();
+}
+
+// ── Envio do relatório por WhatsApp (texto formatado, sem número fixo — abre o
+// seletor de contato/grupo do próprio WhatsApp para o Tutor/Coordenador escolher) ──
+function montarTextoRelatorioMensal(grupoNum, monthKey) {
+  loadGrupos();
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return '';
+  const monthLabel = embMonthLabel(monthKey);
+  const freq = (g.reunioesMes || {})[monthKey];
+  const participantesSemDup = (g.participantes || []).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
+  const total = participantesSemDup.length;
+  const participaram = participantesSemDup.filter(p => p.embaixadores && p.embaixadores[monthKey] && p.embaixadores[monthKey].participou).length;
+  const pct = total ? Math.round(participaram / total * 100) : 0;
+  const linhasTxt = participantesSemDup.map(p => {
+    const ok = !!(p.embaixadores && p.embaixadores[monthKey] && p.embaixadores[monthKey].participou);
+    return `${ok ? '✔' : '✖'} ${p.nome}`;
+  }).join('\n');
+
+  return `📊 *Relatório Mensal — ${monthLabel}*\n`
+    + `*${g.nome || 'Grupo ' + grupoNum}*\n`
+    + `Tutor: ${g.tutor || '—'} · Coordenador: ${g.coordenador || '—'}\n\n`
+    + `*Frequência do Pequeno Grupo*\n`
+    + `O PG se reuniu neste mês? ${freq ? (freq.aconteceu ? '✔ Sim' : '✖ Não') : 'Não informado'}\n\n`
+    + `*Embaixadores da Esperança*\n`
+    + (linhasTxt || 'Nenhum participante inscrito.') + '\n\n'
+    + `Participantes: ${total}\n`
+    + `Participaram: ${participaram}\n`
+    + `Percentual: ${pct}%`;
+}
+
+function enviarRelatorioWhatsApp(grupoNum, monthKey) {
+  const texto = montarTextoRelatorioMensal(grupoNum, monthKey);
+  window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
 }
 
 // ── Detalhe de um PG: participantes individuais ─────────────────────────
@@ -3522,7 +3670,7 @@ function openPanel() {
       `⭐ XP: ${ST.xp}\n` +
       `🔥 Sequência: ${ST.streak} dias\n` +
       `📔 Registros no diário: ${(ST.journal||[]).length}\n\n` +
-      `Atributos espirituais:\n` +
+      `Crescimento cristão:\n` +
       ATTRIBUTES.map(a=>`${a.icon} ${a.label}: ${attrs[a.id]||0}`).join('\n')
     );
   }
@@ -3552,7 +3700,7 @@ function openPanel() {
       <div class="panel-stat"><span>📔 Registros no diário</span><strong>${(ST.journal||[]).length}</strong></div>
     </div>
     <div class="panel-section">
-      <div class="panel-title">Atributos espirituais</div>
+      <div class="panel-title">Crescimento cristão</div>
       ${attrRows}
     </div>
     <div class="panel-section">
@@ -4286,69 +4434,8 @@ function renderAttrs() {
   }).join('');
   document.getElementById('h-attrs').innerHTML = `
     <div class="attr-section" style="margin-top:.75rem">
-      <div class="attr-title">Atributos Espirituais</div>
+      <div class="attr-title">Crescimento Cristão</div>
       ${rows}
-    </div>`;
-}
-
-function renderRadar() {
-  const attrs = getAttrs();
-  const vals = ATTRIBUTES.map(a => attrs[a.id] || 0);
-  const labels = ATTRIBUTES.map(a => a.label);
-  const icons  = ATTRIBUTES.map(a => a.icon);
-  const n = 6;
-  const cx = 130, cy = 115, r = 85;
-  const levels = [20,40,60,80,100];
-
-  function pt(i, val) {
-    const angle = (Math.PI * 2 * i / n) - Math.PI / 2;
-    const dist = (val / 100) * r;
-    return [cx + dist * Math.cos(angle), cy + dist * Math.sin(angle)];
-  }
-  function gridPt(i, pct) {
-    const angle = (Math.PI * 2 * i / n) - Math.PI / 2;
-    const dist = (pct / 100) * r;
-    return [cx + dist * Math.cos(angle), cy + dist * Math.sin(angle)];
-  }
-
-  // Grid rings
-  const rings = levels.map(pct => {
-    const pts = Array.from({length:n}, (_,i) => gridPt(i, pct).join(',')).join(' ');
-    return `<polygon points="${pts}" fill="none" stroke="rgba(0,0,0,0.07)" stroke-width="0.5"/>`;
-  }).join('');
-
-  // Axes
-  const axes = Array.from({length:n}, (_,i) => {
-    const [x,y] = gridPt(i, 100);
-    return `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="rgba(0,0,0,0.08)" stroke-width="0.5"/>`;
-  }).join('');
-
-  // Value polygon
-  const polyPts = vals.map((_,i) => pt(i, vals[i]).join(',')).join(' ');
-
-  // Labels
-  const lbls = labels.map((lbl, i) => {
-    const angle = (Math.PI * 2 * i / n) - Math.PI / 2;
-    const dist = r + 20;
-    const x = cx + dist * Math.cos(angle);
-    const y = cy + dist * Math.sin(angle);
-    return `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="9" fill="#6B7A8D" font-family="Source Sans 3,sans-serif">${icons[i]} ${lbl}</text>`;
-  }).join('');
-
-  const svg = `<svg viewBox="0 0 260 230" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:280px">
-    ${rings}${axes}
-    <polygon points="${polyPts}" fill="rgba(30,95,140,0.15)" stroke="#1E5F8C" stroke-width="1.5"/>
-    ${vals.map((v,i) => {
-      const [x,y] = pt(i,v);
-      return `<circle cx="${x}" cy="${y}" r="3.5" fill="#1E5F8C"/>`;
-    }).join('')}
-    ${lbls}
-  </svg>`;
-
-  document.getElementById('h-radar-wrap').innerHTML = `
-    <div class="radar-wrap">
-      <div class="radar-title">Mapa de Discipulado</div>
-      ${svg}
     </div>`;
 }
 
@@ -4395,7 +4482,7 @@ function renderShareArea() {
     <div class="sec-label">Liderança do Pequeno Grupo</div>
     <div style="margin:0 1rem;display:flex;flex-direction:column;gap:8px">
       ${botaoConvidar}
-      <button onclick="openTutorPanel()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">
+      <button onclick="openTutorPanel()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem;font-size:16px;color:var(--navy);font-weight:700;cursor:pointer;font-family:var(--ff-body)">
         🧑‍🏫 Painel do Tutor/Coordenador
       </button>
     </div>`;
@@ -4725,7 +4812,6 @@ function renderHome() {
   // Phase 1 — RPG elements
   renderLevelCard();
   renderAttrs();
-  renderRadar();
   // Phase 2 — Bosses, Missions, Journal
   renderBosses();
   renderMissions();
@@ -6917,6 +7003,7 @@ const PEQUENOS_GRUPOS = Array.from({length:50}, (_, i) => ({
   horaReuniao: null,  // horário da reunião (HH:MM)
   participantes: [],
   gratidoes: [],
+  reunioesMes: {},    // frequência do PG por mês: {'2026-07': {aconteceu, marcadoPor, data}}
   maxParticipantes: null, // null = ilimitado
 }));
 
@@ -6939,6 +7026,7 @@ function loadGrupos() {
           PEQUENOS_GRUPOS[idx].horaReuniao = g.horaReuniao ?? null;
           PEQUENOS_GRUPOS[idx].participantes = g.participantes || [];
           PEQUENOS_GRUPOS[idx].gratidoes = g.gratidoes || [];
+          PEQUENOS_GRUPOS[idx].reunioesMes = g.reunioesMes || {};
         }
       });
     }
@@ -6957,6 +7045,7 @@ function saveGruposLocal() {
       horaReuniao: g.horaReuniao,
       participantes: g.participantes,
       gratidoes: g.gratidoes || [],
+      reunioesMes: g.reunioesMes || {},
     }));
     localStorage.setItem(GRUPOS_KEY, JSON.stringify(dadosSalvar));
   } catch(e) { console.warn('saveGrupos localStorage:', e); }
@@ -7847,6 +7936,7 @@ function applyGruposData(salvo) {
     const partic = g.participantes || [];
     PEQUENOS_GRUPOS[idx].participantes = partic.filter((p, i, arr) => arr.findIndex(x => (x.nome||'').trim().toLowerCase() === (p.nome||'').trim().toLowerCase()) === i);
     PEQUENOS_GRUPOS[idx].gratidoes = g.gratidoes || [];
+    PEQUENOS_GRUPOS[idx].reunioesMes = g.reunioesMes || {};
     PEQUENOS_GRUPOS[idx].pgProgress = g.pgProgress || null;
     PEQUENOS_GRUPOS[idx].pgNivel = g.pgNivel || null;
   });
@@ -7882,7 +7972,10 @@ function mergeGruposData(remoteList, localGroups) {
     localGrat.forEach(lgr => {
       if (!gratMerged.find(rgr => gratKey(rgr) === gratKey(lgr))) gratMerged.push(lgr);
     });
-    return { ...rg, participantes: merged, gratidoes: gratMerged,
+    // Une reunioesMes por chave de mês (mesma lógica de gratidoes) — evita perder o mês que
+    // só um dos dois lados ainda gravou, em vez de um lado descartar o mapa inteiro do outro.
+    const reunioesMerged = { ...(rg.reunioesMes || {}), ...(lg.reunioesMes || {}) };
+    return { ...rg, participantes: merged, gratidoes: gratMerged, reunioesMes: reunioesMerged,
       nome: lg.nome ?? rg.nome, tutor: lg.tutor ?? rg.tutor,
       coordenador: lg.coordenador ?? rg.coordenador,
       diaReuniao: lg.diaReuniao ?? rg.diaReuniao,
@@ -7949,6 +8042,7 @@ async function trySaveGrupos(cfg, baseUpdateTime) {
     coordenador: g.coordenador, diaReuniao: g.diaReuniao,
     horaReuniao: g.horaReuniao, participantes: g.participantes,
     gratidoes: g.gratidoes || [],
+    reunioesMes: g.reunioesMes || {},
   }));
   return fbWriteGrupos(cfg, payload, TUTORS.length ? TUTORS : undefined, baseUpdateTime);
 }
