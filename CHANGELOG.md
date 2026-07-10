@@ -1,5 +1,66 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-10] — BUG-TUTORES-CONVITES: gravações comuns apagavam a allowlist de Tutores e os convites
+
+Achado durante a homologação real (Grupo CAPELANIA já em uso pelos 4 capelães): pedidos de oração
+e gratidões pararam de aparecer no aparelho do Tutor, e o Companheiro de Jornada passou a dizer que
+ele não pertencia ao grupo. Investigação levou a um bug bem mais sério, sem relação direta com o
+sintoma relatado.
+
+- **Causa raiz:** `fbWriteGrupos()` grava no Firestore via `PATCH` sem `updateMask` — sem essa
+  máscara, o Firestore **substitui o documento inteiro pelos campos enviados**, apagando qualquer
+  campo omitido. `trySaveGrupos()` (usada por toda ação comum: gratidão, oração, missão,
+  Embaixadores, progresso etc.) nunca reenviava a lista de convites, e só reenviava a allowlist de
+  `tutores` se ela já estivesse carregada na memória do aparelho no momento da gravação — o que nem
+  sempre acontece. Resultado: **qualquer ação comum de qualquer participante apagava o campo
+  `convites` da nuvem**, e a allowlist de `tutores` podia ser apagada da mesma forma, sem chance de
+  se autorrecuperar (nada mais no app repovoa `tutores` a não ser uma leitura bem-sucedida da
+  própria nuvem).
+- **Confirmado por leitura direta da produção (2026-07-10):** o campo `tutores` estava
+  **completamente ausente** do documento `jdpg/grupos` — qualquer tentativa de acesso `?tutor` por
+  um dos 4 capelães num aparelho novo teria sido recusada por falta de allowlist. `dados` (grupos e
+  participantes) estava intacto — o mural sumido era um problema separado, só no aparelho do Tutor
+  (vínculo local perdido, provavelmente por `?resetar`/limpeza de cache depois de já ter entrado
+  como participante — resolvido pelo próprio Tutor reentrando com nome+WhatsApp iguais, sem
+  necessidade de mudança de código).
+- **Correção:** `fbWriteGrupos()` agora monta `updateMask.fieldPaths` só com os campos realmente
+  incluídos na gravação (`dados`+`ts` sempre; `tutores`/`convites` só quando fornecidos). Uma
+  gravação que não inclui `tutores`/`convites` agora **deixa esses campos como estão na nuvem**, em
+  vez de apagá-los — corrige a causa raiz de uma vez, sem depender de nenhuma função individual
+  "lembrar" de reenviar esses campos.
+- **Testado (preview, `fetch` interceptado para inspecionar a URL/corpo da gravação sem tocar
+  produção):** gravação sem `tutores`/`convites` → máscara só com `dados`+`ts` · gravação com os
+  dois → máscara com os 4 campos · nenhuma mudança de assinatura de função, todos os chamadores
+  existentes (`trySaveGrupos`, `commitConviteChange`, laço de retentativa de concorrência,
+  `salvarFbConfig`) continuam compatíveis.
+- **Restauração de dados (produção, com autorização explícita do usuário):** backup do estado
+  anterior salvo em `PRE-RESTAURACAO-TUTORES-2026-07-10.json`
+  (`C:\Users\wladimir.souza\Documents\backups-firebase-jdpg\`); gravação de **um único campo**
+  (`updateMask.fieldPaths=tutores`) com pré-condição de concorrência (`currentDocument.updateTime`
+  fresco), confirmada por releitura: os 4 capelães (Felipe Rodrigues, Ualace Bruno, Renan Castro,
+  Wladimir Gonçalves) restaurados; `dados` e `convites` confirmados intocados pela gravação.
+
+---
+
+## [2026-07-10] — Corrige "Cancelar minha inscrição" para limpar o vínculo local (achado de campo)
+
+Bug já documentado no roadmap ("Achado de campo — deadlock", ainda não resolvido) — corrigido nesta
+sessão a pedido do usuário, separado do `BUG-TUTORES-CONVITES` acima.
+
+- **Causa raiz:** `removerDoGrupoAtual()` só limpava a chave antiga (`MEU_GRUPO_KEY`), nunca o
+  registro em `Meus Vínculos` (sistema de identidade atual, `FB_FLAGS.identidadeUuid`). Depois de
+  "Cancelar minha inscrição", o aparelho continuava achando que pertencia ao grupo — quebrando
+  Comunidade, Companheiro e Progresso — e um sync de outro aparelho com cópia desatualizada podia
+  "ressuscitar" a pessoa na lista de participantes, bloqueando uma nova inscrição com "já inscrita".
+- **Correção:** nova função `removeVinculo(grupoNum)` remove o vínculo daquele grupo da lista
+  `Meus Vínculos`; `removerDoGrupoAtual()` passou a chamá-la.
+- **Testado (preview, rede neutralizada, dados fictícios):** antes de cancelar, vínculo e "meu
+  grupo" apontavam certos; depois de cancelar, vínculo removido, `loadMeuGrupo()` retorna vazio,
+  participante removido do grupo, tela avança corretamente para "Convite necessário" (em vez de
+  ficar presa num estado inconsistente). Console limpo, nenhuma escrita real ao Firebase.
+
+---
+
 ## [2026-07-09] — Painel do Discípulo, Relatórios Mensais e Embaixadores da Esperança recorrente
 
 Feito diretamente pelo usuário (10 commits em 09/07, fora do processo usual de Mapa de Impacto →

@@ -4,6 +4,45 @@
 > para o assistente ao recomeçar — a "memória" do assistente **não viaja entre máquinas**;
 > só este arquivo (via GitHub) viaja. **Nenhuma alteração de código sem aprovação do desenho.**
 
+## 🚨 BUG-TUTORES-CONVITES — RESOLVIDO (2026-07-10)
+
+Achado em campo durante a homologação real (Grupo CAPELANIA, 4 capelães já usando o app): o Tutor
+relatou que pedidos de oração e gratidões pararam de aparecer no aparelho dele, e que o Companheiro
+de Jornada dizia que ele não pertencia ao grupo. A investigação revelou um bug bem mais grave e sem
+relação direta: **`fbWriteGrupos()` gravava no Firestore via `PATCH` sem `updateMask`** — sem essa
+máscara, o Firestore substitui o documento inteiro pelos campos enviados, apagando qualquer campo
+omitido. `trySaveGrupos()` (toda ação comum do app: gratidão, oração, missão, Embaixadores,
+progresso etc.) nunca reenviava `convites`, e só reenviava a allowlist `tutores` se ela já estivesse
+carregada na memória do aparelho. **Confirmado por leitura direta da produção:** o campo `tutores`
+estava completamente ausente da nuvem — qualquer um dos 4 capelães, num aparelho novo, teria o
+acesso `?tutor` recusado por falta de allowlist. `dados` (grupos/participantes) estava intacto.
+
+**Correção (commit `a970fde`, publicada):** `fbWriteGrupos()` agora monta `updateMask.fieldPaths`
+só com os campos realmente incluídos na gravação (`dados`+`ts` sempre; `tutores`/`convites` só
+quando fornecidos) — uma gravação que não inclui esses dois campos agora **deixa-os como estão na
+nuvem**, em vez de apagá-los. Testado no preview (fetch interceptado, sem tocar produção): máscara
+correta nos dois cenários (com e sem tutores/convites); nenhuma mudança de assinatura, todos os
+chamadores existentes continuam compatíveis. **Restauração de dados** (autorizada explicitamente
+pelo usuário, lista de 4 nomes/WhatsApp confirmada antes de gravar): backup prévio em
+`PRE-RESTAURACAO-TUTORES-2026-07-10.json` + gravação de um único campo (`tutores`) com pré-condição
+de concorrência fresca; confirmado por releitura que `dados`/`convites` ficaram intocados.
+
+**Causa do sintoma original (mural/Companheiro sumidos só no aparelho do Tutor):** sem relação com
+o bug acima — o aparelho dele havia perdido localmente o vínculo com o grupo (`Meus Vínculos`),
+provavelmente por `?resetar`/limpeza de cache depois de já ter entrado como participante; o login
+de Tutor (`?tutor`, separado) continuou funcionando, mascarando o problema. Confirmado que os
+outros 3 capelães viam tudo normalmente nos aparelhos deles. Resolvido operacionalmente: o Tutor
+recebeu um novo convite e reentrou com nome+WhatsApp iguais aos originais — o sistema reconheceu o
+cadastro existente e recuperou o vínculo, sem duplicar nem perder o pareamento de Companheiro já
+feito com a Coordenadora.
+
+**Bug relacionado corrigido junto (mesmo commit):** "Cancelar minha inscrição"
+(`removerDoGrupoAtual`) já estava documentado como o "Achado de campo — deadlock" abaixo (ver seção
+"Roadmap") — corrigido agora: nova função `removeVinculo(grupoNum)` limpa também o registro em
+`Meus Vínculos` ao cancelar, então o botão deixou de ser reproduzível como bug. Testado no preview
+(rede neutralizada): depois de cancelar, `loadMeuGrupo()` volta vazio e a tela avança para "Convite
+necessário" corretamente, em vez de ficar presa num estado inconsistente.
+
 ## 📝 Registro retroativo — Painel do Discípulo, Relatórios Mensais, Embaixadores (2026-07-09)
 
 Entre a última atualização deste documento (2026-07-05) e esta (2026-07-10), o usuário fez **10
@@ -154,18 +193,16 @@ commits feitos por ele via **GitHub Desktop** (revisa o diff).
 - **Ponto de restauração:** tag `v2a-pre-identidade` (→ `c747675`, estado antes da Etapa 1/2,
   já publicada no GitHub). Restauração: `git checkout v2a-pre-identidade`.
 
-## Achado de campo (deadlock) — AINDA NÃO RESOLVIDO
-Ao usar **"Cancelar minha inscrição"** (`cancelarInscricao`, linha ~8492), o app apaga a chave
-antiga (`localStorage 'jdpg_meu_grupo_v1'`) e remove a pessoa da lista de participantes na nuvem
-— mas **não atualiza `Meus Vínculos`**, a lista nova criada na Etapa 1. Ou seja:
-1. O bug original (merge ressuscita o nome removido → "já inscrita" trava reinscrição) continua
-   presente, porque o `cancelarInscricao` não foi tocado.
-2. Risco novo: `Meus Vínculos` pode ficar com uma entrada "fantasma" apontando para um grupo do
-   qual a pessoa já foi removida na nuvem, já que ninguém limpa essa lista no cancelamento.
-
-Workaround sem código continua o mesmo: usar um **grupo novo** e não usar "Cancelar". Esse ponto
-precisa entrar no Mapa de Impacto antes de qualquer novo commit que mexa em vínculos/remoção
-(toca diretamente no C3 — tombstone — abaixo).
+## Achado de campo (deadlock) — RESOLVIDO (2026-07-10)
+Ao usar **"Cancelar minha inscrição"** (`cancelarInscricao`), o app apagava a chave antiga
+(`localStorage 'jdpg_meu_grupo_v1'`) e removia a pessoa da lista de participantes na nuvem — mas
+**não atualizava `Meus Vínculos`**, a lista nova criada na Etapa 1. Corrigido junto do
+`BUG-TUTORES-CONVITES` (ver seção no topo do documento): nova função `removeVinculo(grupoNum)`
+limpa também o vínculo daquele grupo; `removerDoGrupoAtual()` passou a chamá-la. O risco de
+"ressurreição" pelo merge deixa de se manifestar nesse caminho porque o vínculo local não fica mais
+órfão. **Continua valendo para uma versão futura:** um tombstone de verdade (`C3` abaixo) ainda é a
+solução estrutural mais robusta para remoção concorrente entre dispositivos — esta correção resolve
+o sintoma de campo, não substitui o `C3`.
 
 ## Roadmap
 Cada commit é precedido de **Mapa de Impacto** (análise, sem código); tombstone também leva **ADR**.
