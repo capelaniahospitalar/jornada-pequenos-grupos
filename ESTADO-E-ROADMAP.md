@@ -1,8 +1,40 @@
-# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-07-05)
+# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-07-10)
 
 > Documento para retomar o trabalho em outra máquina/sessão. Cole o conteúdo de volta
 > para o assistente ao recomeçar — a "memória" do assistente **não viaja entre máquinas**;
 > só este arquivo (via GitHub) viaja. **Nenhuma alteração de código sem aprovação do desenho.**
+
+## 📝 Registro retroativo — Painel do Discípulo, Relatórios Mensais, Embaixadores (2026-07-09)
+
+Entre a última atualização deste documento (2026-07-05) e esta (2026-07-10), o usuário fez **10
+commits diretamente** (671 linhas em `index.html`, sem passar pelo processo usual de Mapa de
+Impacto → aprovação → implementação por etapas). Investigado, confirmado com o usuário e testado
+no preview em 2026-07-10 (rede neutralizada, dados fictícios, nenhuma escrita real ao Firebase) —
+ver detalhamento completo no `CHANGELOG.md` (entrada `[2026-07-09]`). Resumo:
+
+- **Novo:** Relatórios Mensais no Painel do Tutor (frequência do PG + participação nos
+  Embaixadores, com envio por WhatsApp); campo `g.reunioesMes` sincronizado com merge por mês.
+- **Mudança de regra de negócio:** Embaixadores da Esperança deixou de ser 3 campanhas fixas
+  (jul/ago/set, progresso só local) e virou um evento recorrente mensal por participante
+  (`p.embaixadores`), sincronizado de verdade — confirmado intencional com o usuário.
+- **Reorganização estrutural da Home:** streak-card removido; Atributos ("Crescimento cristão"),
+  Obstáculos, Diário e Companheiro migraram para dentro do novo "Painel do Discípulo". **O Mapa de
+  Discipulado (gráfico radar) foi removido, não só movido** — confirmado intencional.
+  Diário/Companheiro agora "lembram" se foram abertos da Home ou do Painel para o botão Voltar
+  retornar ao lugar certo.
+- **Novo:** botão "🔄 Atualizar" na Home (recarrega com anticache, útil no PWA do iPhone) e botão
+  de instalar o app também na tela de aceite de convite.
+- **Correção de bug pré-existente:** missão "Escolher Tutor de Jornada" nunca podia ser concluída
+  (checava `ST.tutor`, que nunca é definido); agora checa vínculo com um Pequeno Grupo.
+- **DEDUP-01:** evita criar identidade duplicada de Tutor/Coordenador quando a pessoa digita uma
+  variação do nome — converge pelo WhatsApp já cadastrado em qualquer grupo.
+- **Testado no preview (2026-07-10):** todos os pontos acima, sem erros de console, sem escrita
+  real ao Firebase. Não exercitados ao vivo (risco baixo): clique real em "🔄 Atualizar" (recarrega
+  a página de propósito, por isso não testado contra produção) e o fluxo completo de criação de
+  senha do Tutor com `DEDUP-01` (revisado só por leitura de código).
+- **Pendência aberta por este achado:** este documento e o `HOMOLOGACAO-RC1.md` não foram mantidos
+  atualizados durante trabalho feito fora de uma sessão do assistente — se o usuário fizer mais
+  mudanças direto pelo GitHub, avisar no início da próxima sessão para não perder o rastro de novo.
 
 ## ⭐ STATUS ATUAL — retomar por aqui (2026-07-05)
 
