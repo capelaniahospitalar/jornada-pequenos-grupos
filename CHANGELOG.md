@@ -1,5 +1,63 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-09] — Painel do Discípulo, Relatórios Mensais e Embaixadores da Esperança recorrente
+
+Feito diretamente pelo usuário (10 commits em 09/07, fora do processo usual de Mapa de Impacto →
+aprovação → implementação); revisado, confirmado com o usuário e testado no preview em 2026-07-10
+(rede neutralizada, nenhuma escrita real ao Firebase). Registrado retroativamente neste
+`CHANGELOG.md` e no `ESTADO-E-ROADMAP.md`.
+
+- **Relatórios Mensais (novo, Painel do Tutor):** tela de seleção de mês + Pequeno Grupo
+  (`abrirRelatoriosMensais`) que gera um relatório (`gerarRelatorioMensal`) com a frequência do PG
+  no mês e a participação de cada integrante nos Embaixadores da Esperança, com botão para enviar
+  o texto pronto por WhatsApp (`enviarRelatorioWhatsApp`/`montarTextoRelatorioMensal`).
+- **Frequência do PG (novo):** campo `g.reunioesMes` (`{'2026-07': {aconteceu, marcadoPor, data}}`),
+  sincronizado com o Firebase pelo mesmo caminho de sempre (`saveGrupos`/`trySaveGrupos`) — com
+  merge por chave de mês (`mergeGruposData`), igual ao padrão já usado para `gratidoes`.
+- **Embaixadores da Esperança — redesenhado (mudança de regra de negócio):** antes eram 3
+  "campanhas" fixas (julho/agosto/setembro) dentro do sistema de Campanhas, com progresso só local
+  no aparelho (nunca chegava ao Tutor). Agora é um evento recorrente mensal, registrado no próprio
+  participante (`p.embaixadores[monthKey]`, via `confirmarEmbaixadores()`), sincronizado de
+  verdade e visível no Relatório Mensal. As 3 entradas antigas (`embaixadores_jul/ago/set`) foram
+  removidas de `PG_CAMPANHAS` — confirmado que não deixou nenhuma referência quebrada em
+  `renderCampanhasTutor`.
+- **Correção de bug pré-existente:** a missão "Escolher seu Tutor de Jornada" checava
+  `ST.tutor !== undefined`, mas `ST.tutor` nunca era definido em lugar nenhum do código — a missão
+  nunca podia ser concluída. Agora checa se a pessoa já entrou num Pequeno Grupo (`loadMeuGrupo()`).
+- **Reorganização da Home → "Painel do Discípulo":** o card fixo de sequência (streak) no topo da
+  Home foi removido. Atributos espirituais (renomeados "Crescimento cristão"), Obstáculos Vencidos,
+  Diário Espiritual e Companheiro de Jornada saíram da Home e passaram a viver dentro do "Painel do
+  Discípulo" (antigo "Meu progresso", renomeado). **O Mapa de Discipulado (gráfico radar em SVG) foi
+  removido, não apenas movido** — confirmado com o usuário que foi intencional.
+  `openJournal()`/`openCompanion()` agora recebem a origem (`'home'`/`'panel'`) para que o botão
+  "Voltar" retorne ao lugar certo (`journalBack()`/`companionBack()`) — testado nos dois sentidos.
+- **Botão "🔄 Atualizar" (novo):** círculo no canto superior direito da Home
+  (`forcarAtualizacaoApp()`) força recarregar com parâmetro anticache — útil para quem instalou o
+  app na tela inicial do iPhone, onde o gesto de "puxar para atualizar" é instável.
+- **Botão de instalar o app também na tela de convite** (`renderTelaConvite`) — antes só existia
+  dentro da Home.
+- **Ajuste de permissão do botão "Convidar":** agora distingue "tem vínculo real de participante
+  como tutor/coordenador" (`souGerenteDoGrupo`) de "está autenticado no Painel via allowlist"
+  (`souTutorAutenticado`) — o botão Convidar (que depende de `loadMeuGrupo()`) só aparece para quem
+  tem vínculo de fato, evitando oferecer uma ação que falharia para um Tutor sem participante.
+- **Anti-duplicação de identidade do Tutor/Coordenador (`DEDUP-01`):** se o WhatsApp digitado ao
+  criar a senha já pertence a um Tutor/Coordenador cadastrado em qualquer grupo, o sistema
+  converge para o nome já existente em vez de criar um nome novo por variação de digitação.
+- **Testado no preview (2026-07-10, rede neutralizada — `fbReadDoc`/`syncFromFirebase`/
+  `saveGruposToFirebase`/`fbWriteGrupos`/`trySaveGrupos` mockados, dados fictícios, sem reload):**
+  Home sem o card de streak antigo · Painel do Discípulo mostra Crescimento cristão/Obstáculos/
+  estudos realizados, sem o Radar · Diário e Companheiro abertos a partir do Painel voltam para o
+  Painel (não para a Home) · Relatórios Mensais gera corretamente, marca frequência do PG e monta o
+  texto de WhatsApp · Confirmar participação nos Embaixadores soma XP e atualiza o relatório do
+  Tutor · Painel da Comunidade abre sem erro · console limpo em todas as telas · nenhuma escrita
+  real disparada ao Firebase.
+- **Não testado neste preview (risco baixo, mecanismo simples):** clique real no botão "🔄
+  Atualizar" (recarregaria a página e reconectaria à nuvem de produção — evitado de propósito) e o
+  fluxo completo de criação de senha do Tutor com `DEDUP-01` (lógica revisada por leitura de
+  código, não exercitada ao vivo).
+
+---
+
 ## [2026-07-03] — UX-02: oculta becos sem saída da Home para Colaborador
 
 Item 7 da RC2 (permissões e interface por papel). Diagnóstico ao vivo confirmou que Tutor
