@@ -7041,6 +7041,11 @@ function upsertVinculo(v) {
   if (i >= 0) list[i] = { ...list[i], ...v }; else list.push(v);
   saveMeusVinculos(list);
 }
+// Remove o vínculo de um grupo (ex.: ao cancelar a própria inscrição) — sem isso o aparelho
+// continua "achando" que pertence ao grupo mesmo depois de sair (achado de campo, deadlock).
+function removeVinculo(grupoNum) {
+  saveMeusVinculos(loadMeusVinculos().filter(v => v.grupoNum !== grupoNum));
+}
 
 // ── Grupo Aberto: APENAS o grupo em exibição agora (estado efêmero de UI) ──
 // NUNCA é "vínculo ativo" — não altera Meus Vínculos, só marca o que está à vista.
@@ -7850,11 +7855,16 @@ async function fbWriteGrupos(cfg, data, tutoresData, baseUpdateTime, convitesDat
     dados: { stringValue: dadosStr },
     ts:    { integerValue: String(Date.now()) },
   };
-  if (tutoresData) fields.tutores = { stringValue: JSON.stringify(tutoresData) };
-  if (convitesData) fields.convites = { stringValue: JSON.stringify(convitesData) };  // ETAPA 2
+  // BUG-TUTORES-CONVITES: sem updateMask, o PATCH do Firestore substitui o documento inteiro
+  // pelos campos enviados — qualquer campo omitido (ex.: tutoresData/convitesData ausentes numa
+  // gravação comum, como postar uma gratidão) era APAGADO da nuvem. updateMask restringe a
+  // gravação só aos campos realmente enviados desta vez; os demais ficam intocados.
+  const maskFields = ['dados', 'ts'];
+  if (tutoresData) { fields.tutores = { stringValue: JSON.stringify(tutoresData) }; maskFields.push('tutores'); }
+  if (convitesData) { fields.convites = { stringValue: JSON.stringify(convitesData) }; maskFields.push('convites'); }  // ETAPA 2
   const body = { fields };
   // COMMIT 1: pré-condição de concorrência — só grava se o documento não mudou desde a leitura
-  let url = fbDocUrl(cfg);
+  let url = fbDocUrl(cfg) + maskFields.map(f => '&updateMask.fieldPaths=' + encodeURIComponent(f)).join('');
   if (FB_FLAGS.usePrecondition && baseUpdateTime) {
     url += '&currentDocument.updateTime=' + encodeURIComponent(baseUpdateTime);
   }
@@ -8437,6 +8447,7 @@ function confirmarTrocaReuniao(grupoNum) {
 function removerDoGrupoAtual(grupoNum) {
   const meuGrupo = loadMeuGrupo();
   localStorage.removeItem(MEU_GRUPO_KEY);
+  if (FB_FLAGS.identidadeUuid) removeVinculo(grupoNum);
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
   if (g && meuGrupo) {
     g.participantes = g.participantes.filter(p => p.ts !== meuGrupo.ts);
