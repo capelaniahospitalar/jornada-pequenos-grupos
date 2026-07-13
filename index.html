@@ -3480,8 +3480,11 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
   document.getElementById('tutorpanel-body').innerHTML = `
     <div class="content-card" style="display:flex;align-items:center;gap:14px">
       <div style="width:56px;height:78px;flex-shrink:0">${pennantDetalhe}</div>
-      <div>
-        <div class="phase-tag tag-content" style="margin-bottom:4px">🌿 ${sanitize(g.nome || 'Grupo ' + grupoNum)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="phase-tag tag-content" style="margin-bottom:4px">🌿 ${sanitize(g.nome || 'Grupo ' + grupoNum)}</div>
+          <button onclick="iniciarEditarNomeGrupo(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" aria-label="Editar nome do grupo" style="background:none;border:none;color:var(--text3);font-size:14px;cursor:pointer;padding:0 0 4px">✎</button>
+        </div>
         <p class="body-text" style="margin:0">Detalhes do Pequeno Grupo e seus participantes.</p>
       </div>
     </div>
@@ -3502,6 +3505,43 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
 `;
 
   resetScroll();
+}
+
+// ── Editar nome do Pequeno Grupo (Tutor/Coordenador, achado de campo: nome
+// digitado errado na criação e sem forma de corrigir) ──────────────────────
+function iniciarEditarNomeGrupo(grupoNum, nome) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  const body = document.getElementById('tutorpanel-body');
+  if (!g || !body) return;
+
+  const formHtml = `
+    <div class="panel-section" id="editar-nome-grupo-form">
+      <div class="panel-title">✎ Editar nome do Pequeno Grupo</div>
+      <input class="insc-input" id="edit-grupo-nome" type="text" maxlength="40" value="${sanitize(g.nome || '')}" style="margin-bottom:.6rem">
+      <div id="edit-grupo-nome-erro" style="color:#E05050;font-size:14px;margin:0 0 .5rem;min-height:18px"></div>
+      <div style="display:flex;gap:8px">
+        <button class="insc-submit-btn" style="margin:0;flex:1" onclick="confirmarEditarNomeGrupo(${grupoNum}, '${nome.replace(/'/g,"\\'")}')">✓ Salvar nome</button>
+        <button onclick="renderTutorGrupoDetalhe(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">Cancelar</button>
+      </div>
+    </div>`;
+
+  const existing = document.getElementById('editar-nome-grupo-form');
+  if (existing) existing.remove();
+  body.insertAdjacentHTML('afterbegin', formHtml);
+}
+
+function confirmarEditarNomeGrupo(grupoNum, nome) {
+  const novoNome = document.getElementById('edit-grupo-nome')?.value.trim();
+  if (!novoNome) {
+    const erro = document.getElementById('edit-grupo-nome-erro');
+    if (erro) erro.textContent = 'Dê um nome ao Pequeno Grupo.';
+    return;
+  }
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return;
+  g.nome = novoNome;
+  saveGrupos();
+  renderTutorGrupoDetalhe(grupoNum, nome);
 }
 
 function renderProgramaSemanal() {
