@@ -8079,13 +8079,22 @@ function stopFbPoll() {
   if (fbPollTimer) { clearInterval(fbPollTimer); fbPollTimer = null; }
 }
 
-// M4: pausa o polling quando a aba não está visível — retoma ao voltar
-document.addEventListener('visibilitychange', () => {
+// M4: pausa o polling quando a aba não está visível — retoma ao voltar.
+// Ao voltar a ficar visível (ex.: reabrir o app pelo atalho do celular, que só "acorda"
+// a página em vez de recarregar do zero), busca a nuvem uma vez na hora — antes disso,
+// só a tela "Grupos" reagia, deixando Mural e Companheiro com dados velhos até o próximo
+// toque manual em "Atualizar".
+document.addEventListener('visibilitychange', async () => {
   if (document.hidden) {
     stopFbPoll();
   } else {
     const active = document.querySelector('.screen.active')?.id;
     if (active === 'screen-grupos') startFbPoll();
+    const updated = await syncFromFirebase();
+    if (updated) {
+      if (active === 'screen-comunidade') renderComunidade();
+      if (active === 'screen-companion') renderCompanionScreen();
+    }
   }
 });
 
