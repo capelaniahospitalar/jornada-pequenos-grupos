@@ -2886,19 +2886,24 @@ function openTutorPanel() {
 }
 
 // ── Senhas dos Tutores/Coordenadores — criadas no primeiro acesso ──────
-// Chave: nome exato digitado (case-sensitive como cadastrado no grupo)
+// Chave: nome normalizado (trim + minúsculas) — evita pedir senha nova toda vez que o
+// nome é digitado com uma capitalização diferente da vez anterior (achado de campo).
 function getTutorPassStore() {
   try { return JSON.parse(localStorage.getItem('amjTutorPass') || '{}'); } catch { return {}; }
 }
+function normalizarChaveTutorPass(nome) {
+  return String(nome || '').trim().toLowerCase();
+}
 function setTutorPass(nome, pass) {
   const store = getTutorPassStore();
-  store[nome] = hashPass(pass);
+  store[normalizarChaveTutorPass(nome)] = hashPass(pass);
   try { localStorage.setItem('amjTutorPass', JSON.stringify(store)); }
   catch(e) { console.warn('setTutorPass:', e); }
 }
 function getTutorPass(nome) {
   const store = getTutorPassStore();
-  return store.hasOwnProperty(nome) ? store[nome] : undefined;
+  const chave = normalizarChaveTutorPass(nome);
+  return store.hasOwnProperty(chave) ? store[chave] : undefined;
 }
 function verifyTutorPass(nome, pass) {
   const stored = getTutorPass(nome);
