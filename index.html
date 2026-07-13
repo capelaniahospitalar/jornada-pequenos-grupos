@@ -6966,6 +6966,14 @@ const PEQUENOS_GRUPOS = Array.from({length:50}, (_, i) => ({
 const GRUPOS_KEY = 'jdpg_grupos_v1';
 const MEU_GRUPO_KEY = 'jdpg_meu_grupo_v1';
 
+// Gratidões e pedidos de oração expiram 7 dias após a publicação — evita
+// acúmulo de posts antigos no mural e no documento compartilhado da nuvem.
+const GRAT_VALIDADE_MS = 7 * 24 * 60 * 60 * 1000;
+function podarGratidoesExpiradas(lista) {
+  const limite = Date.now() - GRAT_VALIDADE_MS;
+  return (lista || []).filter(item => (item.ts || 0) >= limite);
+}
+
 function loadGrupos() {
   try {
     const s = localStorage.getItem(GRUPOS_KEY);
@@ -6980,7 +6988,7 @@ function loadGrupos() {
           PEQUENOS_GRUPOS[idx].diaReuniao = g.diaReuniao ?? null;
           PEQUENOS_GRUPOS[idx].horaReuniao = g.horaReuniao ?? null;
           PEQUENOS_GRUPOS[idx].participantes = g.participantes || [];
-          PEQUENOS_GRUPOS[idx].gratidoes = g.gratidoes || [];
+          PEQUENOS_GRUPOS[idx].gratidoes = podarGratidoesExpiradas(g.gratidoes || []);
           PEQUENOS_GRUPOS[idx].reunioesMes = g.reunioesMes || {};
         }
       });
@@ -7900,7 +7908,7 @@ function applyGruposData(salvo) {
     PEQUENOS_GRUPOS[idx].horaReuniao   = g.horaReuniao   ?? null;
     const partic = g.participantes || [];
     PEQUENOS_GRUPOS[idx].participantes = partic.filter((p, i, arr) => arr.findIndex(x => (x.nome||'').trim().toLowerCase() === (p.nome||'').trim().toLowerCase()) === i);
-    PEQUENOS_GRUPOS[idx].gratidoes = g.gratidoes || [];
+    PEQUENOS_GRUPOS[idx].gratidoes = podarGratidoesExpiradas(g.gratidoes || []);
     PEQUENOS_GRUPOS[idx].reunioesMes = g.reunioesMes || {};
     PEQUENOS_GRUPOS[idx].pgProgress = g.pgProgress || null;
     PEQUENOS_GRUPOS[idx].pgNivel = g.pgNivel || null;
@@ -9245,7 +9253,7 @@ function enviarGratidao() {
   loadGrupos();
   const g = PEQUENOS_GRUPOS.find(x => x.num === meuGrupo.grupoNum);
   if (!g) return;
-  if (!g.gratidoes) g.gratidoes = [];
+  g.gratidoes = podarGratidoesExpiradas(g.gratidoes || []);
   g.gratidoes.push({
     id: Date.now(),
     autor: meuGrupo.nome,
