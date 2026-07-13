@@ -3133,7 +3133,11 @@ async function confirmarCriarPg(nomeTutor) {
   g.diaReuniao = dia || null;
   g.horaReuniao = hora || null;
   g.tutor = nomeTutor;
-  saveGrupos();
+  // Espera a gravação do novo grupo chegar na nuvem antes de seguir — do contrário, o
+  // syncFromFirebase() logo abaixo (em gerarConvidarCoordenadorAutoEExibir) pode ler um
+  // instantâneo anterior à criação e reverter o nome do grupo localmente, fazendo o convite
+  // do Coordenador sair com os dados de outro Pequeno Grupo (achado de campo).
+  await saveGrupos();
 
   await gerarConvidarCoordenadorAutoEExibir(nomeTutor, g.num);
 }
@@ -3147,9 +3151,13 @@ async function gerarConvidarCoordenadorAutoEExibir(nomeTutor, grupoNum) {
   if (body) body.innerHTML = `<div class="content-card"><p class="body-text">Grupo criado. Gerando o convite do Coordenador…</p></div>`;
 
   await syncFromFirebase().catch(() => {});
+  const gAtual = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
   const existente = loadConvites().find(c =>
     c.grupoNum === grupoNum && c.funcao === 'coordenador' && c.status === 'pendente' &&
-    (!c.expiraEm || Date.now() <= c.expiraEm));
+    (!c.expiraEm || Date.now() <= c.expiraEm) &&
+    // Guarda extra: só reaproveita se o nome do grupo no convite ainda bate com o nome atual —
+    // evita reenviar um convite de outro Pequeno Grupo que ficou "pendente" com o mesmo número.
+    c.grupoNome === (gAtual && gAtual.nome));
 
   const res = existente
     ? { ok: true, invite: existente, inviteId: existente.inviteId, link: APP_URL + '?conv=' + existente.inviteId }
@@ -7015,7 +7023,7 @@ function saveGruposLocal() {
 }
 function saveGrupos() {
   saveGruposLocal();
-  saveGruposToFirebase();
+  return saveGruposToFirebase();
 }
 
 // ── Identidade permanente da PESSOA (memberId = UUID) ─────────────────────
