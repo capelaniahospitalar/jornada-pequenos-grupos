@@ -2882,7 +2882,11 @@ function openTutorPanel() {
   tutorPanelOrigem = 'home';
   showScreen('tutorpanel');
   ajustarCabecalhoPainelTutor();
-  renderTutorLogin();
+  // Se este aparelho já autenticou antes (ST.tutorPanelAuth persiste entre acessos),
+  // entra direto — não pede nome/WhatsApp/senha de novo a cada visita (achado de campo).
+  // "🚪 Sair", no Painel, continua sendo o jeito de encerrar essa sessão manualmente.
+  if (ST.tutorPanelAuth) renderTutorGruposList(ST.tutorPanelAuth);
+  else renderTutorLogin();
 }
 
 // ── Senhas dos Tutores/Coordenadores — criadas no primeiro acesso ──────
@@ -3481,13 +3485,11 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
     <div class="content-card" style="display:flex;align-items:center;gap:14px">
       <div style="width:56px;height:78px;flex-shrink:0">${pennantDetalhe}</div>
       <div style="flex:1;min-width:0">
-        <div style="display:flex;align-items:center;gap:8px">
-          <div class="phase-tag tag-content" style="margin-bottom:4px">🌿 ${sanitize(g.nome || 'Grupo ' + grupoNum)}</div>
-          <button onclick="iniciarEditarNomeGrupo(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" aria-label="Editar nome do grupo" style="background:none;border:none;color:var(--text3);font-size:14px;cursor:pointer;padding:0 0 4px">✎</button>
-        </div>
+        <div class="phase-tag tag-content" style="margin-bottom:4px">🌿 ${sanitize(g.nome || 'Grupo ' + grupoNum)}</div>
         <p class="body-text" style="margin:0">Detalhes do Pequeno Grupo e seus participantes.</p>
       </div>
     </div>
+    <button onclick="iniciarEditarNomeGrupo(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">✎ Editar nome do grupo</button>
     <div class="panel-section">
       <div class="panel-title">Progresso semanal do grupo</div>
       <div class="panel-stat"><span>🙏 Pedidos de oração</span><strong>${grpW.oracoes}/${metas.oracoes.meta}</strong></div>
@@ -5261,7 +5263,9 @@ function initApp() {
     tutorPanelOrigem = 'tutor';
     showScreen('tutorpanel');
     ajustarCabecalhoPainelTutor();
-    renderTutorLogin();
+    // Mesma lógica de openTutorPanel(): aparelho já autenticado antes entra direto.
+    if (ST.tutorPanelAuth) renderTutorGruposList(ST.tutorPanelAuth);
+    else renderTutorLogin();
     return;
   }
 
