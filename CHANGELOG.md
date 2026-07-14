@@ -1,5 +1,41 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-13/14] — Correções de campo + nova página "Desafios do Discipulado"
+
+Feito diretamente pelo usuário (9 commits, a maioria via sessões do assistente com mensagens de
+commit detalhadas); revisado por leitura completa dos diffs em 2026-07-14, sem achado que
+contradiga as mensagens dos commits. Registrado retroativamente neste `CHANGELOG.md` e no
+`ESTADO-E-ROADMAP.md`.
+
+- **Correção de bug (concorrência ao criar PG):** `confirmarCriarPg()` agora espera (`await`) a
+  gravação do novo grupo chegar na nuvem antes de gerar o convite do Coordenador — antes, uma
+  leitura da nuvem logo em seguida podia reverter o nome do grupo localmente e o convite saía com
+  dados de outro Pequeno Grupo (achado de campo). `saveGrupos()` passou a retornar a Promise da
+  gravação.
+- **Correção de bug (senha do Tutor sensível a maiúsculas):** a senha do Painel do Tutor/
+  Coordenador era indexada pelo nome exatamente como digitado; uma variação de capitalização (ex.:
+  teclado do celular) fazia o app pedir senha nova, repetidamente. Nome agora é normalizado
+  (trim + minúsculas) antes de guardar/consultar a senha.
+- **Correção de bug (dados desatualizados ao reabrir pelo atalho):** reabrir o app pelo atalho do
+  celular só atualizava a nuvem se a tela "Grupos" estivesse aberta — Mural e Companheiro de
+  Jornada ficavam com dados velhos até um toque manual em "Atualizar". Agora atualiza sempre que o
+  app volta a ficar visível.
+- **Novo — login do Tutor persistente:** o Painel do Tutor/Coordenador não pede nome/WhatsApp/senha
+  de novo a cada visita no mesmo aparelho; "🚪 Sair" continua disponível para encerrar a sessão.
+- **Novo — editar nome do grupo:** botão "✎ Editar nome do grupo" no Painel do Tutor/Coordenador
+  (achado de campo: nome digitado errado na criação, sem forma de corrigir).
+- **Novo — expiração do Mural:** gratidões e pedidos de oração são apagados 7 dias após a
+  publicação, evitando acúmulo permanente no documento compartilhado da nuvem.
+- **Reorganização — nova página "🏆 Desafios do Discipulado":** reúne Jornada de Conquistas,
+  Missões (Pequeno Grupo + Embaixadores da Esperança) e Obstáculos Espirituais, que antes ficavam
+  espalhados entre Home, Painel do Discípulo e Companheiro de Jornada. As 2 missões semanais dos
+  Embaixadores viraram botões de 15 XP (antes eram só texto no Companheiro). Card duplicado "Minha
+  missão desta semana" removido do Companheiro de Jornada.
+- **Ajuste de texto:** missão de visitar outro Pequeno Grupo reformulada para deixar claro que é
+  uma delegação representando o PG, não a visita de todo o grupo.
+
+---
+
 ## [2026-07-10] — BUG-TUTORES-CONVITES: gravações comuns apagavam a allowlist de Tutores e os convites
 
 Achado durante a homologação real (Grupo CAPELANIA já em uso pelos 4 capelães): pedidos de oração

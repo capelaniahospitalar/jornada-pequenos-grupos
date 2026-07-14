@@ -1,4 +1,4 @@
-# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-07-10)
+# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-07-14)
 
 > Documento para retomar o trabalho em outra máquina/sessão. Cole o conteúdo de volta
 > para o assistente ao recomeçar — a "memória" do assistente **não viaja entre máquinas**;
@@ -74,6 +74,49 @@ ver detalhamento completo no `CHANGELOG.md` (entrada `[2026-07-09]`). Resumo:
 - **Pendência aberta por este achado:** este documento e o `HOMOLOGACAO-RC1.md` não foram mantidos
   atualizados durante trabalho feito fora de uma sessão do assistente — se o usuário fizer mais
   mudanças direto pelo GitHub, avisar no início da próxima sessão para não perder o rastro de novo.
+
+## 📝 Registro retroativo — correções de campo + "Desafios do Discipulado" (2026-07-13/14)
+
+Entre a última atualização deste documento (2026-07-10) e esta (2026-07-14), o usuário fez **9
+commits diretamente** (296 linhas em `index.html`), a maioria através de sessões do assistente que
+geraram mensagens de commit detalhadas (revisado por leitura completa dos diffs em 2026-07-14, sem
+achado que contradiga as mensagens). Nenhum desses commits toca nos itens grandes ainda pendentes do
+roadmap (`C3`-tombstone, `C4`-debounce, homologação de campo da RC1, `PERM-02`, `DB-03`) — são
+correções de bugs de campo e funcionalidades novas, à parte. Resumo:
+
+- **Correção de bug (concorrência):** `confirmarCriarPg()` agora espera (`await`) a gravação do
+  novo Pequeno Grupo chegar na nuvem antes de gerar o convite do Coordenador — antes, o
+  `syncFromFirebase()` seguinte podia ler um instantâneo anterior à criação e reverter o nome do
+  grupo localmente, fazendo o convite sair com dados de outro PG (achado de campo). `saveGrupos()`
+  passou a retornar a Promise de `saveGruposToFirebase()`.
+- **Correção de bug:** senha do Painel do Tutor/Coordenador era indexada pelo nome digitado
+  exatamente como veio (case-sensitive) — uma capitalização diferente do nome (variação de teclado
+  do celular) fazia o app tratar como pessoa nova e pedir senha nova de novo. Agora o nome é
+  normalizado (trim + minúsculas) antes de guardar/consultar.
+- **Correção de bug:** reabrir o app pelo atalho do celular só buscava dados novos da nuvem se a
+  tela "Grupos" estivesse aberta — Mural e Companheiro de Jornada ficavam desatualizados até um
+  toque manual em "Atualizar". Agora a busca acontece sempre que o app volta a ficar visível
+  (`visibilitychange`), independente da tela aberta.
+- **Novo:** login do Painel do Tutor/Coordenador passou a persistir entre visitas
+  (`ST.tutorPanelAuth`) — não pede nome/WhatsApp/senha de novo a cada acesso; "🚪 Sair" continua
+  sendo o jeito de encerrar a sessão manualmente.
+- **Novo:** botão "✎ Editar nome do grupo" no Painel do Tutor/Coordenador (achado de campo: nome
+  digitado errado na criação, sem forma de corrigir depois).
+- **Novo:** gratidões e pedidos de oração do Mural agora expiram e são apagados 7 dias após a
+  publicação (`podarGratidoesExpiradas`) — evita acúmulo permanente no documento compartilhado da
+  nuvem. Poda roda ao carregar grupos, ao receber dados da nuvem e ao publicar um novo post.
+- **Reorganização estrutural — nova página "🏆 Desafios do Discipulado":** "Jornada de
+  Conquistas" e "Missões" saíram da Home; "Obstáculos Espirituais" saiu do Painel do Discípulo;
+  as 2 missões semanais dos Embaixadores (antes só texto no Companheiro de Jornada) viraram botões
+  de 15 XP cada, resetando toda semana. Tudo migrou para a página nova, acessível por um botão
+  próprio na Home. A confirmação mensal de participação nos Embaixadores (40 XP) também migrou para
+  lá. "Minha missão desta semana" (card duplicado dentro do Companheiro de Jornada) foi removido —
+  a mesma informação já vive na página nova.
+- **Ajuste de texto:** missão "Visitar outro Pequeno Grupo em Julho" reformulada para "Enviar
+  delegação representando o PG para visitar outro Pequeno Grupo, e orar por eles."
+- **Pendência aberta por este achado (repetição do padrão de 07-09):** se o usuário fizer mais
+  mudanças direto pelo GitHub fora de uma sessão do assistente, avisar no início da próxima sessão
+  para não perder o rastro de novo.
 
 ## ⭐ STATUS ATUAL — retomar por aqui (2026-07-05)
 
