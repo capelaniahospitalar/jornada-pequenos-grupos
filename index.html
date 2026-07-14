@@ -1559,12 +1559,6 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
   <!-- ═══ BLOCO 2 — Meu Pequeno Grupo ═══ (chip do grupo + progresso do PG, inseridos por renderGruposBtnHome/renderPgProgressHome) -->
   <div id="h-grupo-area"></div>
 
-  <!-- ═══ BLOCO 3 — Minha Formação ═══ -->
-  <div id="h-level-card"></div>
-
-  <!-- ═══ BLOCO 4 — Minha Missão ═══ -->
-  <div id="h-missions"></div>
-
   <!-- ═══ BLOCO 5 — Ferramentas ═══ -->
   <div id="h-ai-area"></div>
 
@@ -1744,6 +1738,23 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
     </div>
   </div>
   <div class="tutor-screen" id="tutorpanel-body"></div>
+</div>
+
+<!-- DESAFIOS DO DISCIPULADO SCREEN -->
+<div id="screen-desafios" class="screen">
+  <div class="study-hdr">
+    <button class="back-btn" onclick="goHome()" aria-label="Voltar">&#8592;</button>
+    <div class="sh-info">
+      <div class="sh-step" style="color:rgba(255,255,255,0.55)">Sua jornada de crescimento</div>
+      <div class="sh-title">Desafios do Discipulado</div>
+    </div>
+  </div>
+  <div class="tutor-screen" id="desafios-body">
+    <div id="h-level-card"></div>
+    <div id="h-missions"></div>
+    <div id="desafios-embaixadores"></div>
+    <div id="desafios-obstaculos"></div>
+  </div>
 </div>
 
 
@@ -3737,7 +3748,6 @@ function openPanel() {
       <div class="panel-title">Crescimento cristão</div>
       ${attrRows}
     </div>
-    ${buildBossesHtml()}
     ${enviarBtns}
     <button class="nav-btn" onclick="goHome()" style="background:transparent;color:var(--blue);border:0.5px solid var(--blue)">Voltar ao início</button>`;
 }
@@ -3811,7 +3821,8 @@ function doObstacleAction(obsId) {
   ST.obstacleActions[obsId] = today;
   ST.xp = (ST.xp || 0) + 5;
   save(ST);
-  openPanel();
+  const el = document.getElementById('desafios-obstaculos');
+  if (el) el.innerHTML = buildBossesHtml();
 }
 
 function buildBossesHtml() {
@@ -3962,7 +3973,76 @@ function confirmarEmbaixadores() {
   eu.progresso = { ...(eu.progresso || {}), updatedAt: Date.now() };
   saveGrupos();
   ST.xp = (ST.xp || 0) + 40; save(ST);
-  renderMissions();
+  renderEmbaixadoresMissoes();
+}
+
+// ── Missões dos Embaixadores de Esperança (classe separada das missões do PG) ──
+// Confirmação mensal de participação (acima) + as 2 missões semanais rotativas
+// (EMBAIXADORES_MISSIONS), que antes só apareciam como texto no Companheiro de
+// Jornada e agora viram botão com XP, uma vez por semana (id inclui a semana ISO).
+function renderEmbaixadoresMissoes() {
+  const el = document.getElementById('desafios-embaixadores');
+  if (!el) return;
+
+  const embMonth = embMonthKey();
+  const embLabel = embMonthLabel(embMonth);
+  const euEmb = getMeuEmbaixadoresParticipante();
+  const embRegistro = euEmb && euEmb.embaixadores ? euEmb.embaixadores[embMonth] : null;
+  const embRow = !euEmb ? '' : (embRegistro && embRegistro.participou ? `
+      <div class="mission-item">
+        <div class="mission-check done">✓</div>
+        <div class="mission-info">
+          <div class="mission-name" style="opacity:.7">🌟 Embaixadores da Esperança — ${embLabel}</div>
+          <div class="mission-meta">✔ Participação registrada em ${embRegistro.data}</div>
+        </div>
+      </div>` : `
+      <div style="background:var(--blue-pale);border-radius:var(--radius-sm);padding:.6rem .75rem;margin:.2rem 0">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:28px;height:28px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:17.5px;flex-shrink:0">🌟</div>
+          <div class="mission-info">
+            <div class="mission-name" style="color:var(--navy)">Embaixadores da Esperança — ${embLabel}</div>
+            <div class="mission-meta">Você participou da ação missionária deste mês?</div>
+          </div>
+        </div>
+        <button onclick="confirmarEmbaixadores()" style="margin-top:.5rem;width:100%;background:var(--teal);color:#fff;border:none;border-radius:var(--radius-sm);padding:.5rem;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--ff-body)">✅ Confirmar participação</button>
+      </div>`);
+
+  const weekKey = getISOWeek();
+  const weekNum = parseInt(weekKey.split('-W')[1], 10) || 1;
+  const total = EMBAIXADORES_MISSIONS.length;
+  const i1 = (weekNum * 7) % total;
+  let i2 = (weekNum * 7 + 11) % total;
+  if (i2 === i1) i2 = (i1 + 1) % total;
+  const done = ST.missionsDone || [];
+
+  const weeklyCard = (idx) => {
+    const m = EMBAIXADORES_MISSIONS[idx];
+    const id = `emb_sem_${weekKey}_${idx}`;
+    const isDone = done.includes(id);
+    return `
+      <div style="background:var(--blue-pale);border-radius:var(--radius-sm);padding:.6rem .75rem;margin:.4rem 0">
+        <div style="font-size:11px;font-weight:700;color:var(--teal);letter-spacing:.5px;text-transform:uppercase;margin-bottom:2px">${m.cat}</div>
+        <div style="font-weight:700;font-size:14.5px;color:var(--navy2);margin-bottom:3px">${m.nome}</div>
+        <div style="font-size:13px;color:var(--text3);line-height:1.45;margin-bottom:.55rem">${m.desc}</div>
+        ${isDone
+          ? `<div style="font-size:14px;color:var(--teal);font-weight:600">✓ Concluída esta semana — +15 XP</div>`
+          : `<button onclick="confirmEmbaixadorMissao('${id}')" style="width:100%;background:var(--teal);color:#fff;border:none;border-radius:var(--radius-sm);padding:.5rem;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--ff-body)">✓ Confirmar que fiz esta missão (+15 XP)</button>`}
+      </div>`;
+  };
+
+  el.innerHTML = `
+    <div class="mission-section">
+      <div class="mission-title">🌟 Missões dos Embaixadores de Esperança</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:.4rem;font-family:var(--ff-body);font-style:italic">"Todo mundo é alguém. E se todo mundo é alguém, todo mundo importa."</div>
+      ${embRow}
+      ${weeklyCard(i1)}
+      ${weeklyCard(i2)}
+    </div>`;
+}
+
+function confirmEmbaixadorMissao(id) {
+  completeMission(id, 15);
+  renderEmbaixadoresMissoes();
 }
 
 function confirmMission(id) {
@@ -4169,39 +4249,14 @@ function renderMissions(){
       </div>`;
   }).join('');
 
-  // ── Embaixadores da Esperança (evento recorrente mensal, sincronizado com o grupo) ──
-  const embMonth = embMonthKey();
-  const embLabel = embMonthLabel(embMonth);
-  const euEmb = getMeuEmbaixadoresParticipante();
-  const embRegistro = euEmb && euEmb.embaixadores ? euEmb.embaixadores[embMonth] : null;
-  const embRow = !euEmb ? '' : (embRegistro && embRegistro.participou ? `
-      <div class="mission-item">
-        <div class="mission-check done">✓</div>
-        <div class="mission-info">
-          <div class="mission-name" style="opacity:.7">🌟 Embaixadores da Esperança — ${embLabel}</div>
-          <div class="mission-meta">✔ Participação registrada em ${embRegistro.data}</div>
-        </div>
-      </div>` : `
-      <div style="background:var(--blue-pale);border-radius:var(--radius-sm);padding:.6rem .75rem;margin:.2rem 0">
-        <div style="display:flex;align-items:center;gap:8px">
-          <div style="width:28px;height:28px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:17.5px;flex-shrink:0">🌟</div>
-          <div class="mission-info">
-            <div class="mission-name" style="color:var(--navy)">Embaixadores da Esperança — ${embLabel}</div>
-            <div class="mission-meta">Você participou da ação missionária deste mês?</div>
-          </div>
-        </div>
-        <button onclick="confirmarEmbaixadores()" style="margin-top:.5rem;width:100%;background:var(--teal);color:#fff;border:none;border-radius:var(--radius-sm);padding:.5rem;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--ff-body)">✅ Confirmar participação</button>
-      </div>`);
-
-  const campSection = (visibleCampanha.length || embRow) ? `
+  const campSection = visibleCampanha.length ? `
     <div style="border-top:0.5px solid var(--border);margin-top:.5rem;padding-top:.5rem">
-      ${embRow}
       ${campRows}
     </div>` : '';
 
   document.getElementById('h-missions').innerHTML = `
     <div class="mission-section">
-      <div class="mission-title">🎯 Missões</div>
+      <div class="mission-title">🎯 Missões do Pequeno Grupo</div>
       ${emptyMsg}
       ${doneToggle}
       ${currentRow}
@@ -4421,6 +4476,19 @@ function getCurrentLevelIdx() {
   return idx;
 }
 
+// ── Desafios do Discipulado: Jornada de Conquistas + Missões + Obstáculos ──
+function openDesafios() {
+  showScreen('desafios');
+  renderDesafios();
+}
+function renderDesafios() {
+  renderLevelCard();
+  renderMissions();
+  renderEmbaixadoresMissoes();
+  const obsEl = document.getElementById('desafios-obstaculos');
+  if (obsEl) obsEl.innerHTML = buildBossesHtml();
+}
+
 function renderLevelCard() {
   // Cada fase é desbloqueada quando todos os estudos dela estão concluídos
   const currentIdx = getCurrentLevelIdx();
@@ -4491,9 +4559,12 @@ function renderShareArea() {
   // BLOCO 5 — Ferramentas: "Meu Progresso" (para todos)
   const prog = document.getElementById('h-progress-area');
   if (prog) prog.innerHTML = `
-    <div style="margin:.75rem 1rem 0">
+    <div style="margin:.75rem 1rem 0;display:flex;flex-direction:column;gap:8px">
       <button onclick="openPanel()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);padding:.8rem;font-size:17.5px;font-weight:500;cursor:pointer;font-family:var(--ff-body)">
         📈 Painel do Discípulo
+      </button>
+      <button onclick="openDesafios()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);padding:.8rem;font-size:17.5px;font-weight:500;cursor:pointer;font-family:var(--ff-body)">
+        🏆 Desafios do Discipulado
       </button>
     </div>`;
 
@@ -4820,10 +4891,6 @@ function renderHome() {
     }
   }
 
-  // Phase 1 — RPG elements
-  renderLevelCard();
-  // Phase 2 — Bosses, Missions, Journal
-  renderMissions();
   // Phase 3 — Share, AI, Panel
   renderShareArea();
   renderAIArea();
@@ -5700,13 +5767,6 @@ function renderCompanionDashboard(el) {
         <button class="${prayBtnClass}" onclick="markPraying()">${prayBtnText}</button>
       </div>
 
-      <!-- Missões dos Embaixadores de Esperança -->
-      <div class="companion-section">
-        <div class="companion-section-title">🌟 Missões dos Embaixadores de Esperança</div>
-        <div style="font-size:12px;color:var(--text3);margin-bottom:.6rem;font-family:var(--ff-body);font-style:italic">"Todo mundo é alguém. E se todo mundo é alguém, todo mundo importa."</div>
-        <div style="line-height:1.4">${getWeekMission()}</div>
-      </div>
-
       <!-- Conversamos esta semana? -->
       <div class="companion-section">
         <div class="companion-section-title">💬 Conversamos esta semana?</div>
@@ -5805,22 +5865,6 @@ const EMBAIXADORES_MISSIONS = [
   { cat:'🌟 Institucional', nome:'O Elo Invisível', desc:'Conecte dois colegas que possam ajudar um ao outro.' },
   { cat:'🌟 Institucional', nome:'Círculo de Esperança', desc:'Convide um colega para participar do próximo Pequeno Grupo.' },
 ];
-
-function getWeekMission() {
-  const weekNum = parseInt(getISOWeek().split('-W')[1]) || 1;
-  const total = EMBAIXADORES_MISSIONS.length;
-  const i1 = (weekNum * 7) % total;
-  let i2 = (weekNum * 7 + 11) % total;
-  if (i2 === i1) i2 = (i1 + 1) % total;
-  const m1 = EMBAIXADORES_MISSIONS[i1];
-  const m2 = EMBAIXADORES_MISSIONS[i2];
-  const card = m => `<div style="margin-bottom:.3rem">
-    <div style="font-size:11px;font-weight:700;color:var(--teal);letter-spacing:.5px;text-transform:uppercase;margin-bottom:2px">${m.cat}</div>
-    <div style="font-weight:700;font-size:14px;color:var(--navy2);margin-bottom:3px">${m.nome}</div>
-    <div style="font-size:13px;color:var(--text3);line-height:1.45">${m.desc}</div>
-  </div>`;
-  return card(m1) + `<div style="border-top:1px solid var(--border);margin:.6rem 0"></div>` + card(m2);
-}
 
 // ── Ações ────────────────────────────────────────────────────────────────
 function markPraying() {
