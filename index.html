@@ -3931,7 +3931,7 @@ const JOURNEY_MISSIONS = [
   { id:'mj_complete',label:'Completar toda a Jornada — 13 estudos concluídos',            icon:'👑', xp:200, unlock:[12], check:()=>ST.done.length>=13 },
   // ── Missões de campanha dos Pequenos Grupos (desbloqueiam pelo mês) ──────
   // unlockFn substitui unlock[] quando presente
-  { id:'pg_visita_jul',   label:'Visitar outro Pequeno Grupo em Julho — cantar e orar juntos',             icon:'🚶', xp:50,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=7, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_visita_jul') },
+  { id:'pg_visita_jul',   label:'Enviar delegação representando o PG para visitar outro Pequeno Grupo, e orar por eles.', icon:'🚶', xp:50,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=7, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_visita_jul') },
   { id:'pg_visita_ago',   label:'Visitar outro Pequeno Grupo em Agosto — cantar e orar juntos',            icon:'🚶', xp:50,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=8, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_visita_ago') },
   { id:'pg_visita_set',   label:'Visitar outro Pequeno Grupo em Setembro — cantar e orar juntos',          icon:'🚶', xp:50,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=9, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_visita_set') },
   { id:'pg_oracao',       label:'Participar da Semana de Oração com Pastor convidado',                     icon:'🙏', xp:60,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=9, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_oracao') },
