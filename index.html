@@ -3430,6 +3430,10 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
   // autenticado no mesmo painel nunca vê essa ação (gerarConvite já barra no backend, isto é só
   // pra não oferecer um botão que sempre falharia).
   const souTutorDesteGrupo = !!g.tutor && g.tutor.trim().toLowerCase() === nome.trim().toLowerCase();
+  // Só o Coordenador deste grupo específico convida Participantes (mesma autoridade já checada
+  // no backend por gerarConvite) — botão vive aqui, dentro do Painel, a pedido do usuário
+  // (2026-07-14; antes ficava na Home, via openShare()).
+  const souCoordenadorDesteGrupo = !!g.coordenador && g.coordenador.trim().toLowerCase() === nome.trim().toLowerCase();
   const progresso = getOrInitPgProgress(grupoNum);
   const metas     = getPgWeekMetas(grupoNum);
   const grpW      = (typeof getPgGroupWeek === 'function') ? getPgGroupWeek(grupoNum) : { oracoes:0, bondades:0, estudosMedia:0 };
@@ -3500,6 +3504,7 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
         <p class="body-text" style="margin:0">Detalhes do Pequeno Grupo e seus participantes.</p>
       </div>
     </div>
+    ${souCoordenadorDesteGrupo ? `<button onclick="iniciarConvidarParticipanteDoPainel(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:#FF6B4A;border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">🔗 Convidar Participante</button>` : ''}
     <button onclick="iniciarEditarNomeGrupo(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">✎ Editar nome do grupo</button>
     <div class="panel-section">
       <div class="panel-title">Progresso semanal do grupo</div>
@@ -3555,6 +3560,32 @@ function confirmarEditarNomeGrupo(grupoNum, nome) {
   g.nome = novoNome;
   saveGrupos();
   renderTutorGrupoDetalhe(grupoNum, nome);
+}
+
+// ── Convidar Participante direto do Painel (Coordenador) — reaproveita gerarECompartilhar()/
+// gerarConvite() como já eram (recebem grupoNum explícito, sem depender de loadMeuGrupo()),
+// só a UI é nova: formulário inline aqui dentro em vez da tela #screen-share da Home (que
+// dependia do vínculo de participante do próprio aparelho). ──────────────────────────────
+function iniciarConvidarParticipanteDoPainel(grupoNum, nome) {
+  const body = document.getElementById('tutorpanel-body');
+  if (!body) return;
+
+  const formHtml = `
+    <div class="panel-section" id="convidar-participante-form">
+      <div class="panel-title">🔗 Convidar Participante</div>
+      <p class="body-text" style="margin:0 0 .6rem">Gere um convite de <strong>uso único</strong>, enviado pelo WhatsApp.</p>
+      <input class="insc-input" id="conv-para-wa" type="tel" placeholder="WhatsApp do convidado (opcional): 21 99999-0000" style="margin-bottom:.6rem">
+      <div style="display:flex;gap:8px">
+        <button class="insc-submit-btn" style="margin:0;flex:1;background:#FF6B4A" onclick="gerarECompartilhar('colaborador', ${grupoNum})">📲 Enviar convite pelo WhatsApp</button>
+        <button onclick="renderTutorGrupoDetalhe(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">Fechar</button>
+      </div>
+      <div id="meus-convites"></div>
+    </div>`;
+
+  const existing = document.getElementById('convidar-participante-form');
+  if (existing) existing.remove();
+  body.insertAdjacentHTML('afterbegin', formHtml);
+  renderMeusConvitesEnviados(grupoNum);
 }
 
 function renderProgramaSemanal() {
@@ -4572,18 +4603,12 @@ function renderShareArea() {
   const lid = document.getElementById('h-lideranca-area');
   if (!lid) return;
   if (!podeGerenciar) { lid.innerHTML = ''; return; }
-  const rotuloConvidar = funcao === 'tutor' ? 'Convidar Coordenador' : 'Convidar Participante';
-  // "Convidar" exige um grupo vinculado (openShare depende de loadMeuGrupo()) — um Tutor sem
-  // vínculo de participante convida por dentro do próprio Painel, não por aqui.
-  const botaoConvidar = souGerenteDoGrupo ? `
-      <button onclick="openShare()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">
-        🔗 ${rotuloConvidar}
-      </button>` : '';
+  // "Convidar Participante/Coordenador" saiu da Home — mora só dentro do Painel do
+  // Tutor/Coordenador agora (renderTutorGrupoDetalhe), pedido do usuário em 2026-07-14.
   // O Painel é uma tela ÚNICA compartilhada (openTutorPanel) — rótulo combinado, não por papel.
   lid.innerHTML = `
     <div class="sec-label">Liderança do Pequeno Grupo</div>
     <div style="margin:0 1rem;display:flex;flex-direction:column;gap:8px">
-      ${botaoConvidar}
       <button onclick="openTutorPanel()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);padding:.8rem;font-size:17.5px;font-weight:500;cursor:pointer;font-family:var(--ff-body)">
         🧑‍🏫 Painel do Tutor/Coordenador
       </button>
@@ -8453,7 +8478,7 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:4px">
             <span>${meuGrupo.papel === 'tutor' ? '👨‍🏫 Você é o Tutor deste grupo' : meuGrupo.papel === 'coordenador' ? '🤝 Você é o Coordenador deste grupo' : (meuGrupo.tipo === 'colaborador' ? `🏥 ${meuGrupo.departamento}` : meuGrupo.tipo === 'amigo' ? '🤝 Amigo dos Adventistas' : meuGrupo.tipo === 'membro' ? '⛪ Membro IASD' : '🌿 Participante')}</span>
           </div>
-          <span style="font-size:13px;color:var(--text3);margin-top:.3rem;display:block">Para convidar amigos, use o botão "Convidar amigo" na tela inicial — o link já virá com o seu grupo.</span>
+          <span style="font-size:13px;color:var(--text3);margin-top:.3rem;display:block">Para convidar novos participantes, o Coordenador do grupo encontra o botão "Convidar Participante" dentro do Painel do Tutor/Coordenador.</span>
         </div>
       </div>
       <button class="insc-submit-btn" style="margin-top:.75rem" onclick="startJourney()">🌿 Iniciar minha Jornada →</button>
