@@ -3290,6 +3290,7 @@ function renderTutorGruposList(nome) {
     </div>
     ${cards}
     <button onclick="abrirRelatoriosMensais('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">📊 Relatórios Mensais</button>
+    <button onclick="renderRankingPgs('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">🏆 Índice de Maturidade Discipular</button>
     ${souTutorDeAlgum ? `<button onclick="renderCriarPgForm('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body)">➕ Criar outro Pequeno Grupo</button>` : ''}
     <button onclick="renderTutorResetPassScreen('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">🔑 Trocar minha senha</button>
     <button onclick="tutorLogout()" style="width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">🚪 Sair</button>`;
@@ -9135,6 +9136,10 @@ function atualizarPgIMD(grupoNum) {
 // com outro, os dois ficam na MESMA posição (nenhum vencedor inventado).
 const PG_RANKING_TIEBREAK = ['totalScore', 'communionScore', 'missionScore', 'faithfulnessScore', 'relationshipScore', 'growthScore'];
 
+// Prefixo do nome temporário de um PG que ainda não foi batizado ("Grupo 5"). Isolado numa
+// constante pra poder virar "PG 5"/"Pequeno Grupo 5"/etc. sem mexer no algoritmo.
+const PG_DEFAULT_NAME = 'Grupo';
+
 function compararPgsParaRanking(a, b) {
   for (const campo of PG_RANKING_TIEBREAK) {
     if (b[campo] !== a[campo]) return b[campo] - a[campo];
@@ -9147,16 +9152,18 @@ function compararPgsParaRanking(a, b) {
 // sempre recalculado na hora (getPgIMD), não depende de nada persistido antes.
 // Retorna a lista já ordenada, com rank/percentile/trend atribuídos. Empate real = mesma
 // posição: ranking "1,2,2,4" (padrão de classificação esportiva), nunca "1,2,3,4" forçado.
-// PG sem nome ainda definido é identificado como "Grupo N" (mesma convenção já usada em
-// outras telas, ex.: sanitize(g.nome || 'Grupo ' + g.num)) — não é excluído do ranking.
+// PG sem nome ainda definido é identificado como "${PG_DEFAULT_NAME} N" (mesma convenção já
+// usada em outras telas, ex.: sanitize(g.nome || 'Grupo ' + g.num)) — não é excluído do ranking.
 function classificarPgs() {
   const gruposFormados = PEQUENOS_GRUPOS.filter(g => g.nome || (g.participantes && g.participantes.length));
   const calculatedAt = new Date().toISOString();
   const entradas = gruposFormados.map(g => {
     const imd = getPgIMD(g.num);
+    const participantesSemDup = (g.participantes || []).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
     return {
       grupoNum: g.num,
-      grupo: g.nome || ('Grupo ' + g.num),
+      grupo: g.nome || (PG_DEFAULT_NAME + ' ' + g.num),
+      totalParticipantes: participantesSemDup.length,
       totalScore: imd.totalScore,
       communionScore: imd.communionScore,
       missionScore: imd.missionScore,
@@ -9184,6 +9191,9 @@ function classificarPgs() {
 // Calcula e persiste pgRanking em cada grupo (g.pgRanking) — cria o campo se não existir,
 // ou só atualiza os valores se já existir. Um único saveGrupos() no final (não 50 gravações
 // separadas). Ainda não é chamada de nenhuma tela; existe pronta para o Painel do Tutor.
+// displayName é um INSTANTÂNEO do nome no momento do cálculo (não uma referência viva) —
+// preserva "como o grupo se chamava naquela data" pra histórico/relatórios futuros, mesmo
+// que o PG seja renomeado depois. Quem quiser o nome atual continua lendo g.nome direto.
 function atualizarPgRanking() {
   const entradas = classificarPgs();
   entradas.forEach(entrada => {
@@ -9192,6 +9202,7 @@ function atualizarPgRanking() {
     g.pgRanking = {
       ...(g.pgRanking || {}),
       rank: entrada.rank,
+      displayName: entrada.grupo,
       totalScore: entrada.totalScore,
       trend: entrada.trend,
       percentile: entrada.percentile,
@@ -9200,6 +9211,63 @@ function atualizarPgRanking() {
   });
   saveGrupos();
   return entradas;
+}
+
+// ══════════════════════════════════════
+//  RC3.4A — PAINEL DE RANKING DOS PEQUENOS GRUPOS (infraestrutura, sem gamificação)
+// ══════════════════════════════════════
+// Só para Tutor/Coordenador — vive dentro do mesmo Painel do Tutor/Coordenador
+// (renderTutorGruposList), que já checa isso na entrada (openTutorPanel); participante
+// nunca chega nesta tela. Sem medalha animada, barra, gráfico ou nível visual — só os
+// números que o motor do RC3.3 já calcula. Lista TODOS os PGs, não só o Top 10.
+
+function medalhaRank(rank) {
+  if (rank === 1) return '🥇 ';
+  if (rank === 2) return '🥈 ';
+  if (rank === 3) return '🥉 ';
+  return '';
+}
+
+// Recebe a lista já pronta de classificarPgs() — não recalcula nada, só desenha.
+function renderPgRankingCards(entradas) {
+  if (!entradas.length) {
+    return `<div class="content-card"><p class="body-text">Nenhum Pequeno Grupo com dados suficientes ainda.</p></div>`;
+  }
+  return entradas.map(e => `
+    <div class="panel-section" style="margin-bottom:.5rem">
+      <div style="font-size:13px;color:var(--text3);font-family:var(--ff-body);margin-bottom:2px">${medalhaRank(e.rank)}${e.rank}º lugar</div>
+      <div style="font-size:16px;font-weight:700;color:var(--navy2);font-family:var(--ff-body);margin-bottom:.4rem">${sanitize(e.grupo)}</div>
+      <div class="panel-stat"><span>IMD</span><strong>${e.totalScore}</strong></div>
+      <div class="panel-stat"><span>Percentil</span><strong>${e.percentile}%</strong></div>
+      <div class="panel-stat"><span>Participantes</span><strong>${e.totalParticipantes}</strong></div>
+    </div>`).join('');
+}
+
+// RC3.4A.1 — Comando (grava) e consulta (lê) separados: abrir o painel NUNCA grava no
+// Firebase. atualizarPgIMD()/atualizarPgRanking() só devem rodar quando o dado de um PG
+// realmente mudar (evento — encontro registrado, missão concluída, etc.), numa RC futura.
+// Aqui a tela só lê: classificarPgs() recalcula em memória (sem persistir) e a interface
+// só desenha — sem cache, mas também sem escrita.
+function formatarDataHoraBR(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function renderRankingPgs(nome) {
+  const entradas = classificarPgs();
+  const nomeEsc = nome.replace(/'/g,"\\'");
+  const atualizadoEm = entradas[0] ? formatarDataHoraBR(entradas[0].calculatedAt) : formatarDataHoraBR(new Date().toISOString());
+
+  document.getElementById('tutorpanel-body').innerHTML = `
+    <div class="content-card">
+      <div class="phase-tag tag-content">🏆 Índice de Maturidade Discipular dos Pequenos Grupos</div>
+      <p class="body-text">O ranking é calculado com base nas dimensões de Comunhão, Relacionamento, Missão, Crescimento e Fidelidade, incentivando o desenvolvimento integral dos Pequenos Grupos.</p>
+      <div class="panel-stat" style="margin-top:.6rem"><span>Atualizado em</span><strong>${atualizadoEm}</strong></div>
+      <div class="panel-stat"><span>Total de PGs classificados</span><strong>${entradas.length}</strong></div>
+    </div>
+    ${renderPgRankingCards(entradas)}
+    <button onclick="renderTutorGruposList('${nomeEsc}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Voltar aos meus grupos</button>`;
+  resetScroll();
 }
 
 function getISOWeekPg() {
