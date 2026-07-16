@@ -8134,6 +8134,7 @@ function applyGruposData(salvo) {
     PEQUENOS_GRUPOS[idx].reunioesMes = filtrarReunioesMes(g.reunioesMes || {});
     PEQUENOS_GRUPOS[idx].pgProgress = g.pgProgress || null;
     PEQUENOS_GRUPOS[idx].pgNivel = g.pgNivel || null;
+    PEQUENOS_GRUPOS[idx].pgIMD = g.pgIMD || null;
   });
 }
 
@@ -8248,6 +8249,7 @@ async function trySaveGrupos(cfg, baseUpdateTime) {
     horaReuniao: g.horaReuniao, participantes: g.participantes,
     gratidoes: g.gratidoes || [],
     reunioesMes: g.reunioesMes || {},
+    pgIMD: g.pgIMD || null,
   }));
   return fbWriteGrupos(cfg, payload, TUTORS.length ? TUTORS : undefined, baseUpdateTime);
 }
@@ -8908,30 +8910,215 @@ function getPgGroupWeek(grupoNum) {
 }
 
 // ══════════════════════════════════════
-//  RC3.1 — MODELO DE PONTUAÇÃO DO PEQUENO GRUPO
+//  RC3.1/RC3.2/RC3.2.1 — ÍNDICE DE MATURIDADE DISCIPULAR (IMD) DO PEQUENO GRUPO
 // ══════════════════════════════════════
-// Infraestrutura apenas: ainda sem ranking, telas, medalhas ou níveis (isso vem no RC3.2+).
-// pgScore é calculado sob demanda a partir dos dados já existentes — nunca persistido nem
-// sincronizado — pra nunca ficar desatualizado e não exigir mudança nas regras do Firestore.
-// Usa MÉDIA por participante (não soma do XP do grupo), pra não favorecer grupos maiores.
-// As demais dimensões ficam zeradas, prontas para o RC3.2 alimentar cada uma com dados do app.
-function getPgScore(grupoNum) {
-  const pgScore = {
+// Infraestrutura apenas: ainda sem ranking, classificação, medalhas, níveis ou qualquer
+// tela nova (isso é assunto de uma próxima RC). O cálculo é 100% desacoplado da interface —
+// nenhuma função de renderização chama nada deste bloco.
+//
+// Nome do objeto: pgIMD (não "pgScore") — deixou de ser um placar solto e passou a
+// representar um índice composto de maturidade discipular do grupo.
+//
+// PRINCÍPIO GERAL: só entra no cálculo o que já é dado real e sincronizado no app hoje.
+// Onde a RC3.2 pediu uma dimensão mas o app ainda não rastreia aquele dado específico
+// (Diário Espiritual por participante, leitura bíblica, histórico de gratidão/pedidos de
+// oração — o mural expira em 7 dias e não serve de histórico mensal), o ponto fica marcado
+// com "EXTENSÃO:" no comentário, e a dimensão usa só o que sobra de dado real, em vez de
+// inventar um número. Isso evita que o índice reflita suposição em vez do discipulado
+// efetivamente vivido.
+//
+// GOVERNANÇA — RC3.2-A (Auditoria de Persistência, ainda não executada): pgProgress e
+// pgNivel (ver funções logo abaixo, loadPgProgress/loadPgNivel) parecem não estar sendo
+// incluídos no payload real de gravação no Firebase. Combinado com o usuário: não corrigir
+// agora, só deixar registrado — auditar se pgNivel, pgProgress, badges, campanhas, streak e
+// desbloqueios estão de fato persistindo, sem alterar comportamento, antes do RC3.3.
+
+// Pesos das dimensões do IMD — únicos números de mais alto nível "ajustáveis" do modelo;
+// somam 1.0. Mexer aqui muda o cálculo sem tocar em nenhuma outra parte do código.
+const PG_IMD_WEIGHTS = {
+  communion: 0.30,
+  relationship: 0.20,
+  mission: 0.25,
+  growth: 0.15,
+  faithfulness: 0.10,
+};
+
+// Sub-pesos internos de cada dimensão — mesmo princípio do PG_IMD_WEIGHTS, um nível mais
+// fundo, pra nenhum ajuste futuro exigir caçar número solto no meio de uma função.
+const PG_IMD_SUBWEIGHTS = {
+  // Os 13 temas (estudos) pesam mais que a oração semanal — representam quase toda a
+  // formação espiritual do ciclo (ajuste pedido na revisão do RC3.2).
+  communion: { estudos: 0.70, oracao: 0.30 },
+  mission: { embaixadores: 0.50, campanhas: 0.50 },
+  growth: { streak: 0.50, missoes: 0.50 },
+  faithfulness: { presenca: 0.50, regularidade: 0.50 },
+};
+
+// Teto de dias de sequência considerado no Crescimento — mesmo limiar do badge "streak7"
+// hoje, isolado aqui pra poder subir (14/21/30...) sem procurar pelo código inteiro.
+const MAX_STREAK_DAYS = 7;
+
+// Converte um valor 0..limite em percentual 0..100, sem passar de 100 (mesmo se o valor
+// bruto ultrapassar o limite) — usado por toda dimensão que compara "quanto foi feito" com
+// "quanto era esperado".
+function pgImdPercent(valor, limite) {
+  if (!limite) return 0;
+  return Math.max(0, Math.min(100, Math.round((valor / limite) * 100)));
+}
+
+// 1) COMUNHÃO — média dos participantes: estudos concluídos (os 13 temas do ciclo,
+// STUDIES.length) com peso maior, e percentual do pedido semanal de oração já registrado
+// (meta do grupo, getPgWeekMetas) com peso menor — ver PG_IMD_SUBWEIGHTS.communion.
+// EXTENSÃO: Diário Espiritual e leitura bíblica não são rastreados por participante no
+// app hoje — entram quando existir esse dado.
+function calcularComunhaoScore(grupoNum, participantes) {
+  if (!participantes.length) return 0;
+  const estudosPct = pgImdPercent(
+    participantes.reduce((s, p) => s + (p.progresso?.estudosConcluidos || 0), 0) / participantes.length, STUDIES.length);
+  const metas = getPgWeekMetas();
+  const semana = getPgGroupWeek(grupoNum);
+  const oracaoPct = pgImdPercent(semana.oracoes, metas.oracoes.meta);
+  const sw = PG_IMD_SUBWEIGHTS.communion;
+  return Math.round(estudosPct * sw.estudos + oracaoPct * sw.oracao);
+}
+
+// 2) RELACIONAMENTO — percentual do pedido semanal de atos de bondade já registrado (meta
+// do grupo) — é o sinal de "interação comunitária" mais robusto que já existe hoje.
+// EXTENSÃO: mural de gratidão/pedidos de oração tem os dois tipos (tipo:'gratidao' /
+// tipo:'oracao'), mas os posts expiram em 7 dias (podarGratidoesExpiradas) e não formam um
+// histórico mensal confiável — entra quando houver um registro que não expire.
+function calcularRelacionamentoScore(grupoNum) {
+  const metas = getPgWeekMetas();
+  const semana = getPgGroupWeek(grupoNum);
+  return pgImdPercent(semana.bondades, metas.bondades.meta);
+}
+
+// 3) MISSÃO — média entre participação nos Embaixadores da Esperança neste mês e conclusão
+// das campanhas do PG já desbloqueadas (PG_CAMPANHAS, mesma regra de desbloqueio e meta que
+// o painel do Tutor já usa) — ver PG_IMD_SUBWEIGHTS.mission. Se nenhuma campanha estiver
+// desbloqueada ainda, usa só Embaixadores.
+function calcularMissaoScore(participantes) {
+  const monthKey = embMonthKey();
+  const embaixadoresPct = participantes.length
+    ? pgImdPercent(participantes.filter(p => p.embaixadores?.[monthKey]?.participou).length, participantes.length)
+    : 0;
+  const g = PEQUENOS_GRUPOS.find(x => x.num === PG_IMD_CTX.grupoNum);
+  const campanhasDesbloqueadas = PG_CAMPANHAS.filter(c => (new Date().getMonth() + 1) >= c.mesInicio);
+  if (!campanhasDesbloqueadas.length) return embaixadoresPct;
+  const campanhasProgresso = (g && g.campanhas) || {};
+  const concluidas = campanhasDesbloqueadas.filter(c => {
+    const p = campanhasProgresso[c.id];
+    if (!p) return false;
+    if (c.tipo === 'visita') return !!p.feita;
+    if (c.tipo === 'presenca') return p.total > 0 && (p.atingidos / p.total * 100) >= (c.metaPct || 0);
+    return false;
+  });
+  const campanhasPct = pgImdPercent(concluidas.length, campanhasDesbloqueadas.length);
+  const sw = PG_IMD_SUBWEIGHTS.mission;
+  return Math.round(embaixadoresPct * sw.embaixadores + campanhasPct * sw.campanhas);
+}
+
+// 4) CRESCIMENTO — média entre constância (sequência de dias ativa, teto em MAX_STREAK_DAYS)
+// e progresso nas missões pessoais da Jornada (missoesConcluidas já sincronizado, sobre o
+// total de missões manuais existentes) — ver PG_IMD_SUBWEIGHTS.growth.
+// EXTENSÃO FUTURA: XP médio, evolução de níveis (badges nivel1..nivel5) e Diário Espiritual
+// (ST.journal, hoje só local) ainda não entram aqui — quando esses dados existirem por
+// participante no grupo sincronizado, é só somar mais um sub-peso em PG_IMD_SUBWEIGHTS.growth.
+function calcularCrescimentoScore(participantes) {
+  if (!participantes.length) return 0;
+  const streakPct = pgImdPercent(
+    participantes.reduce((s, p) => s + Math.min(p.progresso?.streak || 0, MAX_STREAK_DAYS), 0) / participantes.length, MAX_STREAK_DAYS);
+  const totalMissoesManuais = JOURNEY_MISSIONS.filter(m => m.manual).length;
+  const missoesPct = pgImdPercent(
+    participantes.reduce((s, p) => s + (p.progresso?.missoesConcluidas || 0), 0) / participantes.length, totalMissoesManuais);
+  const sw = PG_IMD_SUBWEIGHTS.growth;
+  return Math.round(streakPct * sw.streak + missoesPct * sw.missoes);
+}
+
+// 5) FIDELIDADE — média entre presença física nos encontros já registrados no mês (mesmo
+// cálculo do relatório "Frequência do Pequeno Grupo") e regularidade: quantos encontros
+// foram registrados neste mês em relação a quantas vezes o dia de reunião cadastrado
+// (g.diaReuniao) realmente caiu no mês — não é um número inventado, é contado no calendário.
+// Considerada a métrica mais sólida do modelo até agora (mede constância) — mantida como
+// estava na revisão do RC3.2, só com o sub-peso nomeado (PG_IMD_SUBWEIGHTS.faithfulness).
+function calcularFidelidadeScore(g) {
+  const monthKey = embMonthKey();
+  const encontros = (g.reunioesMes || {})[monthKey]?.encontros || [];
+  const somaPresentes = encontros.reduce((s, e) => s + e.presentes, 0);
+  const somaTotal = encontros.reduce((s, e) => s + e.total, 0);
+  const presencaPct = somaTotal ? pgImdPercent(somaPresentes, somaTotal) : 0;
+  const sw = PG_IMD_SUBWEIGHTS.faithfulness;
+  if (!g.diaReuniao) return presencaPct;
+  const [ano, mes] = monthKey.split('-').map(Number);
+  const diasSemana = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+  const idxDiaReuniao = diasSemana.indexOf(g.diaReuniao);
+  let ocorrenciasEsperadas = 0;
+  if (idxDiaReuniao >= 0) {
+    const ultimoDia = new Date(ano, mes, 0).getDate();
+    for (let d = 1; d <= ultimoDia; d++) {
+      if (new Date(ano, mes - 1, d).getDay() === idxDiaReuniao) ocorrenciasEsperadas++;
+    }
+  }
+  const regularidadePct = ocorrenciasEsperadas ? pgImdPercent(encontros.length, ocorrenciasEsperadas) : presencaPct;
+  return Math.round(presencaPct * sw.presenca + regularidadePct * sw.regularidade);
+}
+
+// Contexto simples pra funções auxiliares que precisam do grupoNum sem repetir o parâmetro
+// em toda a cadeia de chamadas internas do cálculo.
+const PG_IMD_CTX = { grupoNum: null };
+
+// Calcula o pgIMD inteiro (não persiste — ver atualizarPgIMD). Usa MÉDIA por participante
+// (nunca soma), pra não favorecer PGs maiores.
+function getPgIMD(grupoNum) {
+  const pgIMD = {
     averageMemberXP: 0,
     communionScore: 0,
     relationshipScore: 0,
     missionScore: 0,
+    growthScore: 0,
     faithfulnessScore: 0,
     totalScore: 0,
+    calculatedAt: '',
+    schemaVersion: 1,
   };
   const g = (typeof PEQUENOS_GRUPOS !== 'undefined') ? PEQUENOS_GRUPOS.find(x => x.num === grupoNum) : null;
-  if (!g || !g.participantes) return pgScore;
+  if (!g || !g.participantes) return pgIMD;
   const participantesSemDup = g.participantes.filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
+
   if (participantesSemDup.length) {
     const somaXP = participantesSemDup.reduce((soma, p) => soma + (p.progresso?.xp || 0), 0);
-    pgScore.averageMemberXP = Math.round(somaXP / participantesSemDup.length);
+    pgIMD.averageMemberXP = Math.round(somaXP / participantesSemDup.length);
   }
-  return pgScore;
+
+  PG_IMD_CTX.grupoNum = grupoNum;
+  pgIMD.communionScore = calcularComunhaoScore(grupoNum, participantesSemDup);
+  pgIMD.relationshipScore = calcularRelacionamentoScore(grupoNum);
+  pgIMD.missionScore = calcularMissaoScore(participantesSemDup);
+  pgIMD.growthScore = calcularCrescimentoScore(participantesSemDup);
+  pgIMD.faithfulnessScore = calcularFidelidadeScore(g);
+
+  pgIMD.totalScore = Math.round(
+    pgIMD.communionScore * PG_IMD_WEIGHTS.communion +
+    pgIMD.relationshipScore * PG_IMD_WEIGHTS.relationship +
+    pgIMD.missionScore * PG_IMD_WEIGHTS.mission +
+    pgIMD.growthScore * PG_IMD_WEIGHTS.growth +
+    pgIMD.faithfulnessScore * PG_IMD_WEIGHTS.faithfulness
+  );
+  pgIMD.calculatedAt = new Date().toISOString();
+  return pgIMD;
+}
+
+// Calcula e persiste no mesmo documento do grupo (g.pgIMD), do mesmo jeito que já acontece
+// com pgProgress/pgNivel — cria o campo se não existir, ou só atualiza os valores se já
+// existir. Ainda não é chamada de nenhuma tela; existe pronta para a próxima RC
+// (ranking/dashboard) ler e/ou disparar essa atualização.
+function atualizarPgIMD(grupoNum) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return null;
+  const novoScore = getPgIMD(grupoNum);
+  g.pgIMD = { ...(g.pgIMD || {}), ...novoScore };
+  saveGrupos();
+  return g.pgIMD;
 }
 
 function getISOWeekPg() {
