@@ -8907,6 +8907,33 @@ function getPgGroupWeek(grupoNum) {
   return { estudos, oracoes, bondades, estudosMedia: Math.min(13, estudosMedia), membros };
 }
 
+// ══════════════════════════════════════
+//  RC3.1 — MODELO DE PONTUAÇÃO DO PEQUENO GRUPO
+// ══════════════════════════════════════
+// Infraestrutura apenas: ainda sem ranking, telas, medalhas ou níveis (isso vem no RC3.2+).
+// pgScore é calculado sob demanda a partir dos dados já existentes — nunca persistido nem
+// sincronizado — pra nunca ficar desatualizado e não exigir mudança nas regras do Firestore.
+// Usa MÉDIA por participante (não soma do XP do grupo), pra não favorecer grupos maiores.
+// As demais dimensões ficam zeradas, prontas para o RC3.2 alimentar cada uma com dados do app.
+function getPgScore(grupoNum) {
+  const pgScore = {
+    averageMemberXP: 0,
+    communionScore: 0,
+    relationshipScore: 0,
+    missionScore: 0,
+    faithfulnessScore: 0,
+    totalScore: 0,
+  };
+  const g = (typeof PEQUENOS_GRUPOS !== 'undefined') ? PEQUENOS_GRUPOS.find(x => x.num === grupoNum) : null;
+  if (!g || !g.participantes) return pgScore;
+  const participantesSemDup = g.participantes.filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
+  if (participantesSemDup.length) {
+    const somaXP = participantesSemDup.reduce((soma, p) => soma + (p.progresso?.xp || 0), 0);
+    pgScore.averageMemberXP = Math.round(somaXP / participantesSemDup.length);
+  }
+  return pgScore;
+}
+
 function getISOWeekPg() {
   const now = new Date();
   const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
