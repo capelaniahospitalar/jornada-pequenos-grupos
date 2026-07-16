@@ -3428,10 +3428,6 @@ function gerarRelatorioMensal(nome, grupoNumParam, monthKeyParam) {
       </div>`;
 
   const participantesSemDup = (g.participantes || []).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
-  const linhas = participantesSemDup.map(p => {
-    const participou = !!(p.embaixadores && p.embaixadores[monthKey] && p.embaixadores[monthKey].participou);
-    return `<tr><td style="padding:.35rem 0;border-bottom:0.5px solid var(--border)">${sanitize(p.nome)}</td><td style="padding:.35rem 0;border-bottom:0.5px solid var(--border);text-align:center">${participou ? '✔' : '✖'}</td></tr>`;
-  }).join('');
   const total = participantesSemDup.length;
   const participaram = participantesSemDup.filter(p => p.embaixadores && p.embaixadores[monthKey] && p.embaixadores[monthKey].participou).length;
   const pct = total ? Math.round(participaram / total * 100) : 0;
@@ -3447,11 +3443,7 @@ function gerarRelatorioMensal(nome, grupoNumParam, monthKeyParam) {
     </div>
     <div class="panel-section">
       <div class="panel-title">Embaixadores da Esperança (${embMonthLabel(monthKey)})</div>
-      <table style="width:100%;border-collapse:collapse;font-size:14.5px;font-family:var(--ff-body)">
-        <thead><tr><th style="text-align:left;padding:.3rem 0;border-bottom:1px solid var(--border);color:var(--text3);font-size:13px">Participante</th><th style="text-align:center;padding:.3rem 0;border-bottom:1px solid var(--border);color:var(--text3);font-size:13px">Participou</th></tr></thead>
-        <tbody>${linhas || '<tr><td colspan="2" style="padding:.5rem 0;color:var(--text3)">Nenhum participante inscrito.</td></tr>'}</tbody>
-      </table>
-      <div class="panel-stat" style="margin-top:.6rem"><span>Participantes</span><strong>${total}</strong></div>
+      <div class="panel-stat"><span>Participantes</span><strong>${total}</strong></div>
       <div class="panel-stat"><span>Participaram</span><strong>${participaram}</strong></div>
       ${renderMeterHtml('Percentual de participação', total ? pct : null)}
     </div>
@@ -3476,10 +3468,6 @@ function montarTextoRelatorioMensal(grupoNum, monthKey) {
   const total = participantesSemDup.length;
   const participaram = participantesSemDup.filter(p => p.embaixadores && p.embaixadores[monthKey] && p.embaixadores[monthKey].participou).length;
   const pct = total ? Math.round(participaram / total * 100) : 0;
-  const linhasTxt = participantesSemDup.map(p => {
-    const ok = !!(p.embaixadores && p.embaixadores[monthKey] && p.embaixadores[monthKey].participou);
-    return `${ok ? '✔' : '✖'} ${p.nome}`;
-  }).join('\n');
 
   return `📊 *Relatório Mensal — ${monthLabel}*\n`
     + `*${g.nome || 'Grupo ' + grupoNum}*\n`
@@ -3487,7 +3475,6 @@ function montarTextoRelatorioMensal(grupoNum, monthKey) {
     + `*Frequência do Pequeno Grupo*\n`
     + `Presença no mês: ${pctPresenca != null ? pctPresenca + '%' : 'Não informado'} (${encontros.length} encontro(s) registrado(s))\n\n`
     + `*Embaixadores da Esperança*\n`
-    + (linhasTxt || 'Nenhum participante inscrito.') + '\n\n'
     + `Participantes: ${total}\n`
     + `Participaram: ${participaram}\n`
     + `Percentual: ${pct}%`;
