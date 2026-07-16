@@ -3323,36 +3323,56 @@ function abrirRelatoriosMensais(nome) {
   resetScroll();
 }
 
-function marcarFrequenciaPg(grupoNum, monthKey, aconteceu, nome) {
+// A resposta só é liberada depois que o mês termina (ex.: julho só pode ser
+// respondido a partir de 1º de agosto) — antes disso ainda não dá pra saber o total.
+function mesEncerrado(monthKey) {
+  return monthKey < embMonthKey();
+}
+function proximoMesLabel(monthKey) {
+  const [y, m] = monthKey.split('-').map(Number);
+  return MESES_PT[new Date(y, m, 1).getMonth()];
+}
+function formatVezes(vezes) {
+  return vezes >= 4 ? '4+' : String(vezes);
+}
+
+function marcarFrequenciaPg(grupoNum, monthKey, vezes, nome) {
+  if (!mesEncerrado(monthKey)) return;
   loadGrupos();
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
   if (!g) return;
   g.reunioesMes = {
     ...(g.reunioesMes || {}),
-    [monthKey]: { aconteceu, marcadoPor: nome, data: new Date().toLocaleDateString('pt-BR') },
+    [monthKey]: { vezes, marcadoPor: nome, data: new Date().toLocaleDateString('pt-BR') },
   };
   saveGrupos();
   gerarRelatorioMensal(nome, grupoNum, monthKey);
 }
 
-function gerarRelatorioMensal(nome, grupoNumParam, monthKeyParam) {
+function gerarRelatorioMensal(nome, grupoNumParam, monthKeyParam, editando) {
   loadGrupos();
   const grupoNum = grupoNumParam != null ? grupoNumParam : parseInt(document.getElementById('rel-grupo').value, 10);
   const monthKey = monthKeyParam || document.getElementById('rel-mes').value;
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
   if (!g) return;
   const monthLabel = embMonthLabel(monthKey);
-  const freq = (g.reunioesMes || {})[monthKey];
+  // Registros antigos (de antes desta mudança) guardavam só aconteceu (Sim/Não), sem
+  // número de vezes — tratados como "ainda não respondido" pelo novo formato.
+  const freqRaw = (g.reunioesMes || {})[monthKey];
+  const freq = (freqRaw && freqRaw.vezes != null) ? freqRaw : null;
   const nomeEsc = nome.replace(/'/g,"\\'");
 
-  const freqSection = freq ? `
-      <div class="panel-stat"><span>O PG se reuniu neste mês?</span><strong>${freq.aconteceu ? '✔ Sim' : '✖ Não'}</strong></div>
-      <button onclick="marcarFrequenciaPg(${grupoNum}, '${monthKey}', ${!freq.aconteceu}, '${nomeEsc}')" style="margin-top:.4rem;font-size:13px;background:none;border:none;color:var(--text3);cursor:pointer;font-family:var(--ff-body);padding:0">✎ Alterar resposta</button>` : `
-      <p class="body-text" style="margin:0 0 .5rem">O Pequeno Grupo se reuniu neste mês?</p>
-      <div style="display:flex;gap:8px">
-        <button onclick="marcarFrequenciaPg(${grupoNum}, '${monthKey}', true, '${nomeEsc}')" style="flex:1;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.7rem;font-size:15px;font-weight:600;color:#fff;cursor:pointer;font-family:var(--ff-body)">✔ Sim</button>
-        <button onclick="marcarFrequenciaPg(${grupoNum}, '${monthKey}', false, '${nomeEsc}')" style="flex:1;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">✖ Não</button>
-      </div>`;
+  const freqBotoes = [0,1,2,3,4].map(v =>
+    `<button onclick="marcarFrequenciaPg(${grupoNum}, '${monthKey}', ${v}, '${nomeEsc}')" style="flex:1;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.65rem 0;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">${v === 4 ? '4+' : v}</button>`
+  ).join('');
+
+  const freqSection = (freq && !editando) ? `
+      <div class="panel-stat"><span>Quantas vezes o PG se reuniu este mês?</span><strong>${formatVezes(freq.vezes)}</strong></div>
+      ${mesEncerrado(monthKey) ? `<button onclick="gerarRelatorioMensal('${nomeEsc}', ${grupoNum}, '${monthKey}', true)" style="margin-top:.4rem;font-size:13px;background:none;border:none;color:var(--text3);cursor:pointer;font-family:var(--ff-body);padding:0">✎ Alterar resposta</button>` : ''}` :
+    mesEncerrado(monthKey) ? `
+      <p class="body-text" style="margin:0 0 .5rem">Quantas vezes o Pequeno Grupo se reuniu este mês?</p>
+      <div style="display:flex;gap:6px">${freqBotoes}</div>` : `
+      <p class="body-text" style="margin:0;color:var(--text3)">Este mês ainda não terminou. A resposta poderá ser registrada a partir de 1º de ${proximoMesLabel(monthKey)}.</p>`;
 
   const participantesSemDup = (g.participantes || []).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
   const linhas = participantesSemDup.map(p => {
@@ -3395,7 +3415,8 @@ function montarTextoRelatorioMensal(grupoNum, monthKey) {
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
   if (!g) return '';
   const monthLabel = embMonthLabel(monthKey);
-  const freq = (g.reunioesMes || {})[monthKey];
+  const freqRaw = (g.reunioesMes || {})[monthKey];
+  const freq = (freqRaw && freqRaw.vezes != null) ? freqRaw : null;
   const participantesSemDup = (g.participantes || []).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
   const total = participantesSemDup.length;
   const participaram = participantesSemDup.filter(p => p.embaixadores && p.embaixadores[monthKey] && p.embaixadores[monthKey].participou).length;
@@ -3409,7 +3430,7 @@ function montarTextoRelatorioMensal(grupoNum, monthKey) {
     + `*${g.nome || 'Grupo ' + grupoNum}*\n`
     + `Tutor: ${g.tutor || '—'} · Coordenador: ${g.coordenador || '—'}\n\n`
     + `*Frequência do Pequeno Grupo*\n`
-    + `O PG se reuniu neste mês? ${freq ? (freq.aconteceu ? '✔ Sim' : '✖ Não') : 'Não informado'}\n\n`
+    + `Quantas vezes o PG se reuniu este mês? ${freq ? formatVezes(freq.vezes) : 'Não informado'}\n\n`
     + `*Embaixadores da Esperança*\n`
     + (linhasTxt || 'Nenhum participante inscrito.') + '\n\n'
     + `Participantes: ${total}\n`
@@ -7048,9 +7069,20 @@ const PEQUENOS_GRUPOS = Array.from({length:50}, (_, i) => ({
   horaReuniao: null,  // horário da reunião (HH:MM)
   participantes: [],
   gratidoes: [],
-  reunioesMes: {},    // frequência do PG por mês: {'2026-07': {aconteceu, marcadoPor, data}}
+  reunioesMes: {},    // frequência do PG por mês: {'2026-07': {vezes, marcadoPor, data}}
   maxParticipantes: null, // null = ilimitado
 }));
+
+// A frequência do PG só passou a valer de fato a partir de julho/2026 — meses
+// anteriores eram teste e são descartados sempre que os dados são carregados/mesclados.
+const REUNIOES_MES_INICIO = '2026-07';
+function filtrarReunioesMes(reunioesMes) {
+  const out = {};
+  Object.keys(reunioesMes || {}).forEach(mk => {
+    if (mk >= REUNIOES_MES_INICIO) out[mk] = reunioesMes[mk];
+  });
+  return out;
+}
 
 // ── Storage dos grupos ──────────────────────────────────────────────────
 const GRUPOS_KEY = 'jdpg_grupos_v1';
@@ -7079,7 +7111,7 @@ function loadGrupos() {
           PEQUENOS_GRUPOS[idx].horaReuniao = g.horaReuniao ?? null;
           PEQUENOS_GRUPOS[idx].participantes = g.participantes || [];
           PEQUENOS_GRUPOS[idx].gratidoes = podarGratidoesExpiradas(g.gratidoes || []);
-          PEQUENOS_GRUPOS[idx].reunioesMes = g.reunioesMes || {};
+          PEQUENOS_GRUPOS[idx].reunioesMes = filtrarReunioesMes(g.reunioesMes || {});
         }
       });
     }
@@ -7999,7 +8031,7 @@ function applyGruposData(salvo) {
     const partic = g.participantes || [];
     PEQUENOS_GRUPOS[idx].participantes = partic.filter((p, i, arr) => arr.findIndex(x => (x.nome||'').trim().toLowerCase() === (p.nome||'').trim().toLowerCase()) === i);
     PEQUENOS_GRUPOS[idx].gratidoes = podarGratidoesExpiradas(g.gratidoes || []);
-    PEQUENOS_GRUPOS[idx].reunioesMes = g.reunioesMes || {};
+    PEQUENOS_GRUPOS[idx].reunioesMes = filtrarReunioesMes(g.reunioesMes || {});
     PEQUENOS_GRUPOS[idx].pgProgress = g.pgProgress || null;
     PEQUENOS_GRUPOS[idx].pgNivel = g.pgNivel || null;
   });
@@ -8037,7 +8069,7 @@ function mergeGruposData(remoteList, localGroups) {
     });
     // Une reunioesMes por chave de mês (mesma lógica de gratidoes) — evita perder o mês que
     // só um dos dois lados ainda gravou, em vez de um lado descartar o mapa inteiro do outro.
-    const reunioesMerged = { ...(rg.reunioesMes || {}), ...(lg.reunioesMes || {}) };
+    const reunioesMerged = filtrarReunioesMes({ ...(rg.reunioesMes || {}), ...(lg.reunioesMes || {}) });
     return { ...rg, participantes: merged, gratidoes: gratMerged, reunioesMes: reunioesMerged,
       nome: lg.nome ?? rg.nome, tutor: lg.tutor ?? rg.tutor,
       coordenador: lg.coordenador ?? rg.coordenador,
