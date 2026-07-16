@@ -3963,8 +3963,8 @@ const JOURNEY_MISSIONS = [
   // ── Missões de campanha dos Pequenos Grupos (desbloqueiam pelo mês) ──────
   // unlockFn substitui unlock[] quando presente
   { id:'pg_visita_jul',   label:'Enviar delegação representando o PG para visitar outro Pequeno Grupo, e orar por eles.', icon:'🚶', xp:50,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=7, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_visita_jul') },
-  { id:'pg_visita_ago',   label:'Visitar outro Pequeno Grupo em Agosto — cantar e orar juntos',            icon:'🚶', xp:50,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=8, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_visita_ago') },
-  { id:'pg_visita_set',   label:'Visitar outro Pequeno Grupo em Setembro — cantar e orar juntos',          icon:'🚶', xp:50,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=9, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_visita_set') },
+  { id:'pg_visita_ago',   label:'Enviar delegação representando o PG para visitar outro Pequeno Grupo em Agosto, e orar por eles.', icon:'🚶', xp:50,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=8, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_visita_ago') },
+  { id:'pg_visita_set',   label:'Enviar delegação representando o PG para visitar outro Pequeno Grupo em Setembro, e orar por eles.', icon:'🚶', xp:50,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=9, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_visita_set') },
   { id:'pg_oracao',       label:'Participar da Semana de Oração com Pastor convidado',                     icon:'🙏', xp:60,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=9, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_oracao') },
 ];
 
@@ -8886,7 +8886,7 @@ const PG_CAMPANHAS = [
     titulo: 'Visita entre PGs — Julho',
     icon: '🚶',
     periodo: 'Julho',
-    desc: 'Visitar outro Pequeno Grupo do hospital, cantar uma música e fazer uma oração juntos.',
+    desc: 'Enviar delegação representando o PG para visitar outro Pequeno Grupo, e orar por eles.',
     tipo: 'visita',
     mesInicio: 7,
     cor: '#0E7B6C',
@@ -8897,7 +8897,7 @@ const PG_CAMPANHAS = [
     titulo: 'Visita entre PGs — Agosto',
     icon: '🚶',
     periodo: 'Agosto',
-    desc: 'Visitar outro Pequeno Grupo do hospital, cantar uma música e fazer uma oração juntos.',
+    desc: 'Enviar delegação representando o PG para visitar outro Pequeno Grupo, e orar por eles.',
     tipo: 'visita',
     mesInicio: 8,
     cor: '#0E7B6C',
@@ -8908,7 +8908,7 @@ const PG_CAMPANHAS = [
     titulo: 'Visita entre PGs — Setembro',
     icon: '🚶',
     periodo: 'Setembro',
-    desc: 'Visitar outro Pequeno Grupo do hospital, cantar uma música e fazer uma oração juntos.',
+    desc: 'Enviar delegação representando o PG para visitar outro Pequeno Grupo, e orar por eles.',
     tipo: 'visita',
     mesInicio: 9,
     cor: '#0E7B6C',
@@ -9019,8 +9019,8 @@ function renderCampanhasTutor(grupoNum, tutorNome) {
       const pgVisitado = p.pgVisitado || '';
 
       statusHtml = feita
-        ? `<div style="font-size:14px;color:#0E7B6C;margin:.4rem 0">✅ Visita realizada — ${pgVisitado || 'PG visitado'}</div>`
-        : `<div style="font-size:13px;color:var(--text3);margin:.4rem 0">Visita ainda não registrada.</div>`;
+        ? `<div style="font-size:14px;color:#0E7B6C;margin:.4rem 0">✅ Delegação enviada — visitou ${pgVisitado || 'PG'}</div>`
+        : `<div style="font-size:13px;color:var(--text3);margin:.4rem 0">Delegação ainda não enviada.</div>`;
 
       inputHtml = feita ? `
         <button onclick="desfazerVisita(${grupoNum},'${c.id}','${tutorNome}')"
@@ -9028,13 +9028,13 @@ function renderCampanhasTutor(grupoNum, tutorNome) {
           ↩ Desfazer registro
         </button>` : `
         <div style="margin-top:.6rem">
-          <label style="font-size:12px;color:var(--text3);display:block;margin-bottom:2px">Qual PG foi visitado?</label>
+          <label style="font-size:12px;color:var(--text3);display:block;margin-bottom:2px">Qual PG a delegação visitou?</label>
           <input type="text" id="camp-pg-${c.id}" value="${pgVisitado}"
             placeholder="ex: PG 5 — UTI, PG 12 — Recepção"
             style="width:100%;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.5rem .7rem;font-size:15px;font-family:var(--ff-body);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:.4rem">
           <button onclick="salvarCampanhaVisita(${grupoNum},'${c.id}','${tutorNome}')"
             style="width:100%;background:var(--teal);color:#fff;border:none;border-radius:var(--radius-sm);padding:.6rem;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--ff-body)">
-            ✓ Confirmar visita realizada
+            ✓ Confirmar delegação enviada
           </button>
         </div>`;
     }
