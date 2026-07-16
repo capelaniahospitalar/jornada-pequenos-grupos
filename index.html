@@ -8135,6 +8135,7 @@ function applyGruposData(salvo) {
     PEQUENOS_GRUPOS[idx].pgProgress = g.pgProgress || null;
     PEQUENOS_GRUPOS[idx].pgNivel = g.pgNivel || null;
     PEQUENOS_GRUPOS[idx].pgIMD = g.pgIMD || null;
+    PEQUENOS_GRUPOS[idx].pgRanking = g.pgRanking || null;
   });
 }
 
@@ -8250,6 +8251,7 @@ async function trySaveGrupos(cfg, baseUpdateTime) {
     gratidoes: g.gratidoes || [],
     reunioesMes: g.reunioesMes || {},
     pgIMD: g.pgIMD || null,
+    pgRanking: g.pgRanking || null,
   }));
   return fbWriteGrupos(cfg, payload, TUTORS.length ? TUTORS : undefined, baseUpdateTime);
 }
@@ -9119,6 +9121,85 @@ function atualizarPgIMD(grupoNum) {
   g.pgIMD = { ...(g.pgIMD || {}), ...novoScore };
   saveGrupos();
   return g.pgIMD;
+}
+
+// ══════════════════════════════════════
+//  RC3.3 — MOTOR DE CLASSIFICAÇÃO DOS PEQUENOS GRUPOS
+// ══════════════════════════════════════
+// Só o algoritmo que decide ordem/posição/empate — sem tela, ranking visual, medalha,
+// gráfico ou animação (isso é o Painel do Tutor, numa próxima RC). pgRanking é um objeto
+// SEPARADO do pgIMD: pgIMD mede o discipulado; pgRanking mede a posição relativa entre os
+// PGs — um não sabe calcular o outro.
+
+// Ordem dos critérios de desempate — nunca sorteio. Se um PG empatar em TODOS os critérios
+// com outro, os dois ficam na MESMA posição (nenhum vencedor inventado).
+const PG_RANKING_TIEBREAK = ['totalScore', 'communionScore', 'missionScore', 'faithfulnessScore', 'relationshipScore', 'growthScore'];
+
+function compararPgsParaRanking(a, b) {
+  for (const campo of PG_RANKING_TIEBREAK) {
+    if (b[campo] !== a[campo]) return b[campo] - a[campo];
+  }
+  return 0;
+}
+
+// Calcula a classificação de todos os PGs formados (com nome OU participantes — mesmo
+// critério de "tem dado" já usado em prepareSaveGrupos) a partir do pgIMD de cada um —
+// sempre recalculado na hora (getPgIMD), não depende de nada persistido antes.
+// Retorna a lista já ordenada, com rank/percentile/trend atribuídos. Empate real = mesma
+// posição: ranking "1,2,2,4" (padrão de classificação esportiva), nunca "1,2,3,4" forçado.
+// PG sem nome ainda definido é identificado como "Grupo N" (mesma convenção já usada em
+// outras telas, ex.: sanitize(g.nome || 'Grupo ' + g.num)) — não é excluído do ranking.
+function classificarPgs() {
+  const gruposFormados = PEQUENOS_GRUPOS.filter(g => g.nome || (g.participantes && g.participantes.length));
+  const calculatedAt = new Date().toISOString();
+  const entradas = gruposFormados.map(g => {
+    const imd = getPgIMD(g.num);
+    return {
+      grupoNum: g.num,
+      grupo: g.nome || ('Grupo ' + g.num),
+      totalScore: imd.totalScore,
+      communionScore: imd.communionScore,
+      missionScore: imd.missionScore,
+      faithfulnessScore: imd.faithfulnessScore,
+      relationshipScore: imd.relationshipScore,
+      growthScore: imd.growthScore,
+    };
+  });
+  entradas.sort(compararPgsParaRanking);
+
+  const total = entradas.length;
+  let rankAtual = 1;
+  entradas.forEach((entrada, i) => {
+    if (i > 0 && compararPgsParaRanking(entradas[i - 1], entrada) !== 0) rankAtual = i + 1;
+    entrada.rank = rankAtual;
+    // percentual de PGs que este grupo supera ou empata — EXTENSÃO: comparar com uma
+    // classificação anterior salva pra virar "up"/"down" quando houver histórico.
+    entrada.percentile = total ? Math.max(0, Math.min(100, Math.round(((total - rankAtual) / total) * 100))) : 0;
+    entrada.trend = 'stable';
+    entrada.calculatedAt = calculatedAt;
+  });
+  return entradas;
+}
+
+// Calcula e persiste pgRanking em cada grupo (g.pgRanking) — cria o campo se não existir,
+// ou só atualiza os valores se já existir. Um único saveGrupos() no final (não 50 gravações
+// separadas). Ainda não é chamada de nenhuma tela; existe pronta para o Painel do Tutor.
+function atualizarPgRanking() {
+  const entradas = classificarPgs();
+  entradas.forEach(entrada => {
+    const g = PEQUENOS_GRUPOS.find(x => x.num === entrada.grupoNum);
+    if (!g) return;
+    g.pgRanking = {
+      ...(g.pgRanking || {}),
+      rank: entrada.rank,
+      totalScore: entrada.totalScore,
+      trend: entrada.trend,
+      percentile: entrada.percentile,
+      calculatedAt: entrada.calculatedAt,
+    };
+  });
+  saveGrupos();
+  return entradas;
 }
 
 function getISOWeekPg() {
