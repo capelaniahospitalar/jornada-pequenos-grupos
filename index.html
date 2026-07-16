@@ -3498,6 +3498,20 @@ function enviarRelatorioWhatsApp(grupoNum, monthKey) {
   window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
 }
 
+// ── Lembrete do encontro por WhatsApp (mesmo padrão: sem número fixo — abre o
+// seletor de contato/grupo do próprio WhatsApp para o Tutor/Coordenador escolher) ──
+function montarTextoLembretePg(grupoNum) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return '';
+  const quando = g.diaReuniao ? `amanhã, ${g.diaReuniao}${g.horaReuniao ? ' às ' + g.horaReuniao : ''}` : 'amanhã';
+  return `Olá, pessoal do ${g.nome || 'Pequeno Grupo'}! 🙏 Lembrete: nosso encontro é ${quando}. Contamos com a presença de vocês!`;
+}
+
+function enviarLembretePgWhatsApp(grupoNum) {
+  const texto = montarTextoLembretePg(grupoNum);
+  window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
+}
+
 // ── Detalhe de um PG: participantes individuais ─────────────────────────
 function renderTutorGrupoDetalhe(grupoNum, nome) {
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
@@ -3572,6 +3586,21 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
     : '<div style="font-size:15px;color:var(--text3);padding:.5rem 0">Nenhum participante inscrito ainda.</div>';
 
   const pennantDetalhe = generatePennantSvg(grupoNum, g.nome || 'Grupo ' + grupoNum, {width:80, height:110});
+
+  // ── Lembrete do encontro por WhatsApp ───────────────────────────────────
+  // Sem service worker/servidor pra avisar sozinho (ver decisão de 2026-07-16) — o
+  // Tutor/Coordenador dispara manualmente; o painel só destaca na véspera do dia
+  // de reunião cadastrado (g.diaReuniao) pra não deixar passar.
+  const DIAS_SEMANA_LEMBRETE = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+  const reuniaoInfo = g.diaReuniao ? `${g.diaReuniao}${g.horaReuniao ? ' às ' + g.horaReuniao : ''}` : null;
+  const vesperaDoEncontro = !!g.diaReuniao && DIAS_SEMANA_LEMBRETE[(new Date().getDay() + 1) % 7] === g.diaReuniao;
+  const lembreteSection = reuniaoInfo ? `
+    <div class="panel-section" style="${vesperaDoEncontro ? 'background:#FBE9C6;border-color:#B8860B55' : ''}">
+      ${vesperaDoEncontro ? `<div style="font-size:14px;font-weight:700;color:#8A5A00;margin-bottom:.4rem;font-family:var(--ff-body)">📅 Amanhã tem encontro do PG!</div>` : ''}
+      <div class="panel-stat"><span>🗓️ Reunião</span><strong>${reuniaoInfo}</strong></div>
+      <button onclick="enviarLembretePgWhatsApp(${grupoNum})" style="margin-top:.5rem;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:#25D366;border:none;border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:15.5px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body)">📣 Enviar lembrete por WhatsApp</button>
+    </div>` : '';
+
   document.getElementById('tutorpanel-body').innerHTML = `
     <div class="content-card" style="display:flex;align-items:center;gap:14px">
       <div style="width:56px;height:78px;flex-shrink:0">${pennantDetalhe}</div>
@@ -3580,6 +3609,7 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
         <p class="body-text" style="margin:0">Detalhes do Pequeno Grupo e seus participantes.</p>
       </div>
     </div>
+    ${lembreteSection}
     ${souCoordenadorDesteGrupo ? `<button onclick="iniciarConvidarParticipanteDoPainel(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:#FF6B4A;border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">🔗 Convidar Participante</button>` : ''}
     <button onclick="iniciarEditarNomeGrupo(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">✎ Editar nome do grupo</button>
     <div class="panel-section">
