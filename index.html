@@ -3323,56 +3323,109 @@ function abrirRelatoriosMensais(nome) {
   resetScroll();
 }
 
-// A resposta só é liberada depois que o mês termina (ex.: julho só pode ser
-// respondido a partir de 1º de agosto) — antes disso ainda não dá pra saber o total.
-function mesEncerrado(monthKey) {
-  return monthKey < embMonthKey();
-}
-function proximoMesLabel(monthKey) {
+// Limites de data válidos para registrar um encontro dentro de um mês: não deixa
+// registrar no futuro nem fora do mês do relatório que está sendo visualizado.
+function limitesEncontroMes(monthKey) {
   const [y, m] = monthKey.split('-').map(Number);
-  return MESES_PT[new Date(y, m, 1).getMonth()];
+  const inicio = monthKey + '-01';
+  const fimMes = new Date(y, m, 0).toISOString().slice(0, 10);
+  const hoje = new Date().toISOString().slice(0, 10);
+  return { min: inicio, max: fimMes < hoje ? fimMes : hoje };
 }
-function formatVezes(vezes) {
-  return vezes >= 4 ? '4+' : String(vezes);
+function formatarDataBR(iso) {
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
 }
 
-function marcarFrequenciaPg(grupoNum, monthKey, vezes, nome) {
-  if (!mesEncerrado(monthKey)) return;
+// Medidor "meta vs. realizado" — a meta da Capelania é sempre 100% (independente
+// do mínimo que a Adventist Health/ADV-E possa exigir), então a barra cheia já
+// representa a meta; o preenchimento mostra o quanto foi realmente alcançado.
+function renderMeterHtml(label, pct) {
+  const p = pct == null ? 0 : Math.max(0, Math.min(100, pct));
+  const valorTxt = pct == null ? '—' : pct + '%';
+  return `
+    <div style="margin:.5rem 0">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+        <span style="font-size:13px;color:var(--text2);font-family:var(--ff-body)">${label}</span>
+        <span style="font-size:16px;font-weight:700;color:var(--teal);font-family:var(--ff-body)">${valorTxt}</span>
+      </div>
+      <div style="height:14px;border-radius:99px;background:#D5EDE9;overflow:hidden">
+        <div style="height:100%;width:${p}%;border-radius:99px;background:var(--teal);transition:width .4s"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:2px;font-family:var(--ff-body)">Meta: 100%</div>
+    </div>`;
+}
+
+function registrarEncontroPg(grupoNum, monthKey, nome) {
+  const dataEl = document.getElementById('freq-data-' + monthKey);
+  const presentesEl = document.getElementById('freq-presentes-' + monthKey);
+  const data = dataEl ? dataEl.value : '';
+  const { min, max } = limitesEncontroMes(monthKey);
+  if (!data || data < min || data > max) return;
+  let presentes = parseInt(presentesEl ? presentesEl.value : '', 10);
+  if (isNaN(presentes)) return;
   loadGrupos();
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
   if (!g) return;
+  const total = (g.participantes || []).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i).length;
+  presentes = Math.max(0, Math.min(presentes, total));
+  const encontro = { id: uuid(), data, presentes, total, marcadoPor: nome, ts: Date.now() };
+  const mesAtual = (g.reunioesMes || {})[monthKey] || { encontros: [] };
   g.reunioesMes = {
     ...(g.reunioesMes || {}),
-    [monthKey]: { vezes, marcadoPor: nome, data: new Date().toLocaleDateString('pt-BR') },
+    [monthKey]: { encontros: [...(mesAtual.encontros || []), encontro] },
   };
   saveGrupos();
   gerarRelatorioMensal(nome, grupoNum, monthKey);
 }
 
-function gerarRelatorioMensal(nome, grupoNumParam, monthKeyParam, editando) {
+function removerEncontroPg(grupoNum, monthKey, encontroId, nome) {
+  loadGrupos();
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return;
+  const mesAtual = (g.reunioesMes || {})[monthKey];
+  if (!mesAtual) return;
+  g.reunioesMes = {
+    ...(g.reunioesMes || {}),
+    [monthKey]: { encontros: (mesAtual.encontros || []).filter(e => e.id !== encontroId) },
+  };
+  saveGrupos();
+  gerarRelatorioMensal(nome, grupoNum, monthKey);
+}
+
+function gerarRelatorioMensal(nome, grupoNumParam, monthKeyParam) {
   loadGrupos();
   const grupoNum = grupoNumParam != null ? grupoNumParam : parseInt(document.getElementById('rel-grupo').value, 10);
   const monthKey = monthKeyParam || document.getElementById('rel-mes').value;
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
   if (!g) return;
   const monthLabel = embMonthLabel(monthKey);
-  // Registros antigos (de antes desta mudança) guardavam só aconteceu (Sim/Não), sem
-  // número de vezes — tratados como "ainda não respondido" pelo novo formato.
-  const freqRaw = (g.reunioesMes || {})[monthKey];
-  const freq = (freqRaw && freqRaw.vezes != null) ? freqRaw : null;
   const nomeEsc = nome.replace(/'/g,"\\'");
 
-  const freqBotoes = [0,1,2,3,4].map(v =>
-    `<button onclick="marcarFrequenciaPg(${grupoNum}, '${monthKey}', ${v}, '${nomeEsc}')" style="flex:1;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.65rem 0;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">${v === 4 ? '4+' : v}</button>`
-  ).join('');
+  const encontros = ((g.reunioesMes || {})[monthKey]?.encontros || []).slice().sort((a, b) => a.data.localeCompare(b.data));
+  const somaPresentes = encontros.reduce((s, e) => s + e.presentes, 0);
+  const somaTotal = encontros.reduce((s, e) => s + e.total, 0);
+  const pctPresenca = somaTotal ? Math.round(somaPresentes / somaTotal * 100) : null;
+  const totalParticipantesAtual = (g.participantes || []).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i).length;
+  const { min: dataMin, max: dataMax } = limitesEncontroMes(monthKey);
 
-  const freqSection = (freq && !editando) ? `
-      <div class="panel-stat"><span>Quantas vezes o PG se reuniu este mês?</span><strong>${formatVezes(freq.vezes)}</strong></div>
-      ${mesEncerrado(monthKey) ? `<button onclick="gerarRelatorioMensal('${nomeEsc}', ${grupoNum}, '${monthKey}', true)" style="margin-top:.4rem;font-size:13px;background:none;border:none;color:var(--text3);cursor:pointer;font-family:var(--ff-body);padding:0">✎ Alterar resposta</button>` : ''}` :
-    mesEncerrado(monthKey) ? `
-      <p class="body-text" style="margin:0 0 .5rem">Quantas vezes o Pequeno Grupo se reuniu este mês?</p>
-      <div style="display:flex;gap:6px">${freqBotoes}</div>` : `
-      <p class="body-text" style="margin:0;color:var(--text3)">Este mês ainda não terminou. A resposta poderá ser registrada a partir de 1º de ${proximoMesLabel(monthKey)}.</p>`;
+  const listaEncontrosHtml = encontros.length ? encontros.map(e => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem 0;border-bottom:0.5px solid var(--border)">
+        <span style="font-size:14px;color:var(--text2);font-family:var(--ff-body)">${formatarDataBR(e.data)} — ${e.presentes}/${e.total} presentes</span>
+        <button onclick="removerEncontroPg(${grupoNum}, '${monthKey}', '${e.id}', '${nomeEsc}')" style="background:none;border:none;color:var(--text3);font-size:14px;cursor:pointer;font-family:var(--ff-body)">✕</button>
+      </div>`).join('') : `<p class="body-text" style="margin:0;color:var(--text3)">Nenhum encontro registrado ainda neste mês.</p>`;
+
+  const freqSection = `
+      ${renderMeterHtml('Presença no mês', pctPresenca)}
+      <div style="font-size:12px;color:var(--text3);margin:-.2rem 0 .5rem;font-family:var(--ff-body)">${encontros.length} encontro(s) registrado(s)</div>
+      ${listaEncontrosHtml}
+      <div style="margin-top:.6rem;padding-top:.6rem;border-top:0.5px solid var(--border)">
+        <label style="display:block;font-size:12px;color:var(--text3);margin-bottom:2px">Data do encontro</label>
+        <input type="date" id="freq-data-${monthKey}" value="${dataMax}" min="${dataMin}" max="${dataMax}" style="width:100%;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.5rem .7rem;font-size:15px;font-family:var(--ff-body);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:.4rem">
+        <label style="display:block;font-size:12px;color:var(--text3);margin-bottom:2px">Quantos participantes vieram? (de ${totalParticipantesAtual})</label>
+        <input type="number" min="0" max="${totalParticipantesAtual}" id="freq-presentes-${monthKey}" placeholder="ex: 6" style="width:100%;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.5rem .7rem;font-size:15px;font-family:var(--ff-body);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:.4rem">
+        <button onclick="registrarEncontroPg(${grupoNum}, '${monthKey}', '${nomeEsc}')" style="width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.65rem;font-size:15px;font-weight:600;color:#fff;cursor:pointer;font-family:var(--ff-body)">+ Registrar encontro</button>
+      </div>`;
 
   const participantesSemDup = (g.participantes || []).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
   const linhas = participantesSemDup.map(p => {
@@ -3400,7 +3453,7 @@ function gerarRelatorioMensal(nome, grupoNumParam, monthKeyParam, editando) {
       </table>
       <div class="panel-stat" style="margin-top:.6rem"><span>Participantes</span><strong>${total}</strong></div>
       <div class="panel-stat"><span>Participaram</span><strong>${participaram}</strong></div>
-      <div class="panel-stat"><span>Percentual</span><strong>${pct}%</strong></div>
+      ${renderMeterHtml('Percentual de participação', total ? pct : null)}
     </div>
     <button onclick="enviarRelatorioWhatsApp(${grupoNum}, '${monthKey}')" style="margin-top:.5rem;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:#25D366;color:#fff;border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;cursor:pointer;font-family:var(--ff-body)">📤 Enviar por WhatsApp</button>
     <button onclick="abrirRelatoriosMensais('${nomeEsc}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Escolher outro mês/grupo</button>
@@ -3415,8 +3468,10 @@ function montarTextoRelatorioMensal(grupoNum, monthKey) {
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
   if (!g) return '';
   const monthLabel = embMonthLabel(monthKey);
-  const freqRaw = (g.reunioesMes || {})[monthKey];
-  const freq = (freqRaw && freqRaw.vezes != null) ? freqRaw : null;
+  const encontros = (g.reunioesMes || {})[monthKey]?.encontros || [];
+  const somaPresentes = encontros.reduce((s, e) => s + e.presentes, 0);
+  const somaTotal = encontros.reduce((s, e) => s + e.total, 0);
+  const pctPresenca = somaTotal ? Math.round(somaPresentes / somaTotal * 100) : null;
   const participantesSemDup = (g.participantes || []).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
   const total = participantesSemDup.length;
   const participaram = participantesSemDup.filter(p => p.embaixadores && p.embaixadores[monthKey] && p.embaixadores[monthKey].participou).length;
@@ -3430,7 +3485,7 @@ function montarTextoRelatorioMensal(grupoNum, monthKey) {
     + `*${g.nome || 'Grupo ' + grupoNum}*\n`
     + `Tutor: ${g.tutor || '—'} · Coordenador: ${g.coordenador || '—'}\n\n`
     + `*Frequência do Pequeno Grupo*\n`
-    + `Quantas vezes o PG se reuniu este mês? ${freq ? formatVezes(freq.vezes) : 'Não informado'}\n\n`
+    + `Presença no mês: ${pctPresenca != null ? pctPresenca + '%' : 'Não informado'} (${encontros.length} encontro(s) registrado(s))\n\n`
     + `*Embaixadores da Esperança*\n`
     + (linhasTxt || 'Nenhum participante inscrito.') + '\n\n'
     + `Participantes: ${total}\n`
@@ -7069,7 +7124,7 @@ const PEQUENOS_GRUPOS = Array.from({length:50}, (_, i) => ({
   horaReuniao: null,  // horário da reunião (HH:MM)
   participantes: [],
   gratidoes: [],
-  reunioesMes: {},    // frequência do PG por mês: {'2026-07': {vezes, marcadoPor, data}}
+  reunioesMes: {},    // frequência do PG por mês: {'2026-07': {encontros: [{id, data, presentes, total, marcadoPor, ts}]}}
   maxParticipantes: null, // null = ilimitado
 }));
 
@@ -8067,10 +8122,20 @@ function mergeGruposData(remoteList, localGroups) {
     localGrat.forEach(lgr => {
       if (!gratMerged.find(rgr => gratKey(rgr) === gratKey(lgr))) gratMerged.push(lgr);
     });
-    // Une reunioesMes por chave de mês (mesma lógica de gratidoes) — evita perder o mês que
-    // só um dos dois lados ainda gravou, em vez de um lado descartar o mapa inteiro do outro.
-    const reunioesMerged = filtrarReunioesMes({ ...(rg.reunioesMes || {}), ...(lg.reunioesMes || {}) });
-    return { ...rg, participantes: merged, gratidoes: gratMerged, reunioesMes: reunioesMerged,
+    // Une reunioesMes por mês E por encontro dentro do mês (mesma lógica de gratidoes,
+    // deduplicando por id) — evita perder um encontro registrado só de um lado.
+    const mesesReunioes = new Set([...Object.keys(rg.reunioesMes || {}), ...Object.keys(lg.reunioesMes || {})]);
+    const reunioesMerged = {};
+    mesesReunioes.forEach(mk => {
+      const remotoEncontros = (rg.reunioesMes && rg.reunioesMes[mk] && rg.reunioesMes[mk].encontros) || [];
+      const localEncontros  = (lg.reunioesMes && lg.reunioesMes[mk] && lg.reunioesMes[mk].encontros) || [];
+      const encontrosMerged = [...remotoEncontros];
+      localEncontros.forEach(le => {
+        if (!encontrosMerged.find(re => re.id === le.id)) encontrosMerged.push(le);
+      });
+      reunioesMerged[mk] = { encontros: encontrosMerged };
+    });
+    return { ...rg, participantes: merged, gratidoes: gratMerged, reunioesMes: filtrarReunioesMes(reunioesMerged),
       nome: lg.nome ?? rg.nome, tutor: lg.tutor ?? rg.tutor,
       coordenador: lg.coordenador ?? rg.coordenador,
       diaReuniao: lg.diaReuniao ?? rg.diaReuniao,
