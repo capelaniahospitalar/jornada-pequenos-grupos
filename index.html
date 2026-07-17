@@ -5508,13 +5508,19 @@ const COMPANION_KEY = 'jdpg_companion_v1';
 // Estado do companheiro (persistido)
 let CP = {
   companionIdx: null,       // índice no pool de companheiros do grupo
-  prayedToday: false,
-  prayedDate: null,
-  contactedThisWeek: null,  // true | false | null
-  contactedWeek: null,      // número da semana ISO
   myPrayerRequest: '',
   myPrayerDate: null,
+  // Orar/contato são por companheiro (uma pessoa pode ter até 2, num trio) —
+  // chave = cpKeyFor(nome, ts). Ver perCompanionState().
+  perCompanion: {},
 };
+function cpKeyFor(nome, ts) { return (ts != null) ? String(ts) : ('nome:' + nome); }
+function perCompanionState(nome, ts) {
+  if (!CP.perCompanion) CP.perCompanion = {};
+  const k = cpKeyFor(nome, ts);
+  if (!CP.perCompanion[k]) CP.perCompanion[k] = { prayedToday: false, prayedDate: null, contactedThisWeek: null, contactedWeek: null };
+  return CP.perCompanion[k];
+}
 
 // COMPANION_POOL é montado dinamicamente a partir dos participantes REAIS
 // do mesmo Pequeno Grupo do usuário — nunca contém pessoas fictícias.
@@ -5616,7 +5622,7 @@ function renderCompanionScreen() {
 
   loadGrupos();
   const eu = cpMyParticipant();
-  if (eu && eu.compParceiro) {
+  if (eu && cpParceiros(eu).length > 0) {
     renderCompanionDashboard(el);
   } else {
     renderCompanionSelector(el);
@@ -5661,6 +5667,8 @@ function renderCompanionSelector(el) {
     </div>` : '';
 
   // Lista de membros para convidar
+  const existeTrio = (g.participantes || []).some(x => cpParceiros(x).length >= 2);
+  const grupoImpar = cpGrupoImpar(g);
   let listaHtml;
   if (!outros.length) {
     listaHtml = `<p style="font-size:15px;color:var(--text3);text-align:center;padding:1rem 0;font-family:var(--ff-body);line-height:1.6">
@@ -5670,16 +5678,23 @@ function renderCompanionSelector(el) {
   } else {
     listaHtml = outros.map((p, i) => {
       const icon = COMPANION_ICONS[i % COMPANION_ICONS.length];
+      const pParceiros = cpParceiros(p);
       const meConvidou = convitesRecebidos.some(c => (c.deTs && p.ts && c.deTs === p.ts) || c.de === p.nome);
       const euConvidei = (p.compConvites || []).some(c => (c.deTs && mg.ts && c.deTs === mg.ts) || c.de === mg.nome);
       const btnBase = 'width:100%;border:none;border-radius:8px;padding:.6rem .8rem;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--ff-body)';
       let acao;
-      if (p.compParceiro) {
+      if (pParceiros.length >= 2) {
+        acao = `<span class="cp-lvl" style="display:block;text-align:center;color:var(--text3)">já tem companheiros</span>`;
+      } else if (pParceiros.length === 1 && !grupoImpar) {
         acao = `<span class="cp-lvl" style="display:block;text-align:center;color:var(--text3)">já tem companheiro</span>`;
+      } else if (pParceiros.length === 1 && existeTrio) {
+        acao = `<span class="cp-lvl" style="display:block;text-align:center;color:var(--text3)">este Pequeno Grupo já tem um trio formado</span>`;
       } else if (meConvidou) {
         acao = `<button onclick="acceptCompanion('${escAttr(p.nome)}', ${p.ts || 'null'})" style="${btnBase};background:var(--teal);color:#fff">Aceitar</button>`;
       } else if (euConvidei) {
         acao = `<span class="cp-lvl" style="display:block;text-align:center;color:var(--gold)">convite enviado ⏳</span>`;
+      } else if (pParceiros.length === 1) {
+        acao = `<button onclick="inviteCompanion('${escAttr(p.nome)}', ${p.ts || 'null'})" style="${btnBase};background:var(--purple);color:#fff">Convidar para formar um trio</button>`;
       } else {
         acao = `<button onclick="inviteCompanion('${escAttr(p.nome)}', ${p.ts || 'null'})" style="${btnBase};background:var(--purple);color:#fff">Convidar como Companheiro de Jornada</button>`;
       }
@@ -5722,10 +5737,19 @@ function cpMyGroup() {
   if (!mg || typeof PEQUENOS_GRUPOS === 'undefined') return null;
   return PEQUENOS_GRUPOS.find(x => x.num === mg.grupoNum) || null;
 }
+// Trio (3 companheiros) só é oferecido quando o Pequeno Grupo tem número ÍMPAR de
+// participantes — com número par, todo mundo forma duplas e ninguém sobra.
+function cpGrupoImpar(g) { return !!g && ((g.participantes || []).length % 2) === 1; }
 function cpFindParticipant(g, nome, ts) {
   if (!g || !g.participantes) return null;
   return (ts && g.participantes.find(p => p.ts === ts)) ||
          g.participantes.find(p => p.nome === nome) || null;
+}
+// compParceiro guarda uma LISTA de até 2 companheiros (trio = pessoa que sobrou
+// numa dupla se junta a ela). Dados antigos gravaram um objeto único — normalizamos aqui.
+function cpParceiros(p) {
+  if (!p || !p.compParceiro) return [];
+  return Array.isArray(p.compParceiro) ? p.compParceiro : [p.compParceiro];
 }
 function cpMyParticipant() {
   const mg = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
@@ -5753,8 +5777,14 @@ async function inviteCompanion(nome, ts) {
   const eu = cpMyParticipant();
   const alvo = cpFindParticipant(g, nome, ts);
   if (!eu || !alvo) { showCompanionToast('Não foi possível enviar o convite.'); return; }
-  if (eu.compParceiro)   { showCompanionToast('Você já tem um companheiro.'); renderCompanionScreen(); return; }
-  if (alvo.compParceiro) { showCompanionToast(nome.split(' ')[0] + ' já tem um companheiro.'); renderCompanionScreen(); return; }
+  const euParceiros = cpParceiros(eu), alvoParceiros = cpParceiros(alvo);
+  if (euParceiros.length >= 2)   { showCompanionToast('Você já tem o máximo de companheiros.'); renderCompanionScreen(); return; }
+  if (alvoParceiros.length >= 2) { showCompanionToast(nome.split(' ')[0] + ' já tem o máximo de companheiros.'); renderCompanionScreen(); return; }
+  if (alvoParceiros.length === 1) {
+    if (!cpGrupoImpar(g)) { showCompanionToast(nome.split(' ')[0] + ' já tem um companheiro.'); renderCompanionScreen(); return; }
+    const existeTrio = (g.participantes || []).some(x => cpParceiros(x).length >= 2);
+    if (existeTrio) { showCompanionToast('Este Pequeno Grupo já tem um trio de companheiros formado.'); renderCompanionScreen(); return; }
+  }
   if (!alvo.compConvites) alvo.compConvites = [];
   const jaConvidou = alvo.compConvites.some(c => (mg.ts && c.deTs === mg.ts) || c.de === mg.nome);
   if (!jaConvidou) alvo.compConvites.push({ de: mg.nome, deTs: mg.ts || null, ts: Date.now() });
@@ -5771,13 +5801,44 @@ async function acceptCompanion(deNome, deTs) {
   const eu = cpMyParticipant();
   const outro = cpFindParticipant(g, deNome, deTs);
   if (!eu || !outro) { showCompanionToast('Convite não encontrado.'); renderCompanionScreen(); return; }
-  if (outro.compParceiro) {
-    showCompanionToast(deNome.split(' ')[0] + ' já escolheu outro companheiro.');
+  const euParceiros = cpParceiros(eu), outroParceiros = cpParceiros(outro);
+  if (outroParceiros.length >= 2 || euParceiros.length >= 2) {
+    showCompanionToast(deNome.split(' ')[0] + ' já tem o máximo de companheiros.');
     eu.compConvites = (eu.compConvites || []).filter(c => !((deTs && c.deTs === deTs) || c.de === deNome));
     saveGrupos(); renderCompanionScreen(); return;
   }
-  eu.compParceiro    = { nome: outro.nome, ts: outro.ts || null };
-  outro.compParceiro = { nome: eu.nome,    ts: eu.ts    || null };
+  if (euParceiros.length === 1 && outroParceiros.length === 1) {
+    showCompanionToast('Vocês dois já têm companheiros diferentes — não é possível unir duas duplas.');
+    eu.compConvites = (eu.compConvites || []).filter(c => !((deTs && c.deTs === deTs) || c.de === deNome));
+    saveGrupos(); renderCompanionScreen(); return;
+  }
+  const formaTrio = euParceiros.length === 1 || outroParceiros.length === 1;
+  if (formaTrio) {
+    if (!cpGrupoImpar(g)) {
+      showCompanionToast('Este Pequeno Grupo tem número par de participantes — não é possível formar um trio.');
+      eu.compConvites = (eu.compConvites || []).filter(c => !((deTs && c.deTs === deTs) || c.de === deNome));
+      saveGrupos(); renderCompanionScreen(); return;
+    }
+    const existeTrioEmOutroLugar = (g.participantes || []).some(x =>
+      cpParceiros(x).length >= 2 && x !== eu && x !== outro);
+    if (existeTrioEmOutroLugar) {
+      showCompanionToast('Este Pequeno Grupo já tem um trio de companheiros formado.');
+      eu.compConvites = (eu.compConvites || []).filter(c => !((deTs && c.deTs === deTs) || c.de === deNome));
+      saveGrupos(); renderCompanionScreen(); return;
+    }
+  }
+  // Terceira pessoa do trio (parceiro pré-existente de quem já tinha companheiro)
+  const terceiro = euParceiros.length === 1 ? cpFindParticipant(g, euParceiros[0].nome, euParceiros[0].ts)
+                  : outroParceiros.length === 1 ? cpFindParticipant(g, outroParceiros[0].nome, outroParceiros[0].ts)
+                  : null;
+  eu.compParceiro    = [...euParceiros,    { nome: outro.nome, ts: outro.ts || null }];
+  outro.compParceiro = [...outroParceiros, { nome: eu.nome,    ts: eu.ts    || null }];
+  if (terceiro) {
+    // Liga a terceira pessoa a quem acabou de entrar no trio (o outro lado já está ligado acima)
+    const alvoTrio = euParceiros.length === 1 ? outro : eu;
+    terceiro.compParceiro = [...cpParceiros(terceiro), { nome: alvoTrio.nome, ts: alvoTrio.ts || null }];
+    alvoTrio.compParceiro = [...cpParceiros(alvoTrio), { nome: terceiro.nome, ts: terceiro.ts || null }];
+  }
   // Remove convites pendentes envolvendo qualquer um dos dois (em todo o grupo)
   (g.participantes || []).forEach(p => {
     if (p.compConvites && p.compConvites.length) {
@@ -5804,71 +5865,48 @@ async function declineCompanion(deNome, deTs) {
   renderCompanionScreen();
 }
 
-async function removeCompanion() {
-  if (!confirm('Deseja encerrar a parceria de companheiros de jornada?')) return;
+async function removeCompanion(nome, ts) {
+  if (!confirm('Deseja encerrar a parceria com ' + nome.split(' ')[0] + '?')) return;
   loadGrupos();
   try { if (typeof syncFromFirebase === 'function') await syncFromFirebase(); } catch {}
   const g = cpMyGroup(); const eu = cpMyParticipant();
-  if (eu && eu.compParceiro) {
-    const parc = cpFindParticipant(g, eu.compParceiro.nome, eu.compParceiro.ts);
-    if (parc) parc.compParceiro = null;
-    eu.compParceiro = null;
+  if (eu) {
+    const parc = cpFindParticipant(g, nome, ts);
+    eu.compParceiro = cpParceiros(eu).filter(c => !((ts && c.ts === ts) || c.nome === nome));
+    if (parc) parc.compParceiro = cpParceiros(parc).filter(c => !((eu.ts && c.ts === eu.ts) || c.nome === eu.nome));
     saveGrupos();
   }
-  CP.prayedToday = false; CP.contactedThisWeek = null; saveCP();
-  showCompanionToast('Parceria encerrada. Você pode convidar outra pessoa.');
+  if (CP.perCompanion) delete CP.perCompanion[cpKeyFor(nome, ts)];
+  saveCP();
+  showCompanionToast('Parceria com ' + nome.split(' ')[0] + ' encerrada.');
   renderCompanionScreen();
 }
 
 // ── Dashboard do companheiro ─────────────────────────────────────────────
-function renderCompanionDashboard(el) {
-  const g  = cpMyGroup();
-  const eu = cpMyParticipant();
-  if (!eu || !eu.compParceiro) { renderCompanionSelector(el); return; }
-  const parcPart = cpFindParticipant(g, eu.compParceiro.nome, eu.compParceiro.ts);
-  if (!parcPart) { renderCompanionSelector(el); return; }
-  const p = cpDisplay(parcPart, 0);
+function renderCompanionCard(parcPart, i) {
+  const p = cpDisplay(parcPart, i);
+  const st = perCompanionState(p.name, p.ts);
 
   // Verificar reset semanal do contato
   const curWeek = getISOWeek();
-  if (CP.contactedWeek !== curWeek) {
-    CP.contactedThisWeek = null;
-    CP.contactedWeek = curWeek;
-    saveCP();
-  }
+  if (st.contactedWeek !== curWeek) { st.contactedThisWeek = null; st.contactedWeek = curWeek; }
 
   // Verificar reset diário do "orando"
   const today = new Date().toDateString();
-  if (CP.prayedDate !== today) {
-    CP.prayedToday = false;
-    CP.prayedDate  = today;
-    saveCP();
-  }
+  if (st.prayedDate !== today) { st.prayedToday = false; st.prayedDate = today; }
 
-  const myLevel = (() => {
-    const done = ST.done.length;
-    if (done >= 10) return 'Comprometido';
-    if (done >= 6)  return 'Discípulo';
-    if (done >= 3)  return 'Aprendiz';
-    return 'Buscador';
-  })();
-
-  const prayBtnClass = CP.prayedToday ? 'praying-btn prayed' : 'praying-btn';
-  const prayBtnText  = CP.prayedToday ? '🙏 Você está orando por ' + sanitize(p.name.split(' ')[0]) + '!' : '🙏 Estou orando';
+  const prayBtnClass = st.prayedToday ? 'praying-btn prayed' : 'praying-btn';
+  const prayBtnText  = st.prayedToday ? '🙏 Você está orando por ' + sanitize(p.name.split(' ')[0]) + '!' : '🙏 Estou orando';
 
   const prayerSection = p.prayerRequest
     ? `<div class="prayer-request-box">"${sanitize(p.prayerRequest)}"</div>`
     : `<p class="prayer-empty">Nenhum pedido de oração esta semana.</p>`;
 
-  const missionTag = p.missionDone
-    ? `<span class="mission-done-tag">✔ Concluída</span>`
-    : `<span class="mission-progress-tag">⏳ Em andamento</span>`;
+  const contactSim = st.contactedThisWeek === true  ? 'selected' : '';
+  const contactNao = st.contactedThisWeek === false ? 'selected' : '';
+  const nomeAttr = escAttr(p.name);
 
-  const contactSim = CP.contactedThisWeek === true  ? 'selected' : '';
-  const contactNao = CP.contactedThisWeek === false ? 'selected' : '';
-
-  el.innerHTML = `
-    <!-- Card do companheiro -->
+  return `
     <div class="companion-card">
       <div class="companion-card-hdr">
         <div class="companion-avatar">${p.icon}</div>
@@ -5886,22 +5924,22 @@ function renderCompanionDashboard(el) {
       <div class="companion-section">
         <div class="companion-section-title">🙏 Pedido de oração desta semana</div>
         ${prayerSection}
-        <button class="${prayBtnClass}" onclick="markPraying()">${prayBtnText}</button>
+        <button class="${prayBtnClass}" onclick="markPraying('${nomeAttr}', ${p.ts || 'null'})">${prayBtnText}</button>
       </div>
 
       <!-- Conversamos esta semana? -->
       <div class="companion-section">
         <div class="companion-section-title">💬 Conversamos esta semana?</div>
         <div class="contact-check-row">
-          <div class="contact-opt ${contactSim}" onclick="setContact(true)">
+          <div class="contact-opt ${contactSim}" onclick="setContact('${nomeAttr}', ${p.ts || 'null'}, true)">
             <div class="co-radio"></div> Sim ✓
           </div>
-          <div class="contact-opt ${contactNao}" onclick="setContact(false)">
+          <div class="contact-opt ${contactNao}" onclick="setContact('${nomeAttr}', ${p.ts || 'null'}, false)">
             <div class="co-radio"></div> Ainda não
           </div>
         </div>
-        ${CP.contactedThisWeek === true ? '<p style="font-size:13px;color:var(--teal);margin-top:.5rem;font-family:var(--ff-body)">✓ Ótimo! Manter o contato fortalece a jornada de ambos.</p>' : ''}
-        ${CP.contactedThisWeek === false ? '<p style="font-size:13px;color:var(--text3);margin-top:.5rem;font-family:var(--ff-body)">Que tal enviar uma mensagem ainda hoje?</p>' : ''}
+        ${st.contactedThisWeek === true ? '<p style="font-size:13px;color:var(--teal);margin-top:.5rem;font-family:var(--ff-body)">✓ Ótimo! Manter o contato fortalece a jornada de ambos.</p>' : ''}
+        ${st.contactedThisWeek === false ? '<p style="font-size:13px;color:var(--text3);margin-top:.5rem;font-family:var(--ff-body)">Que tal enviar uma mensagem ainda hoje?</p>' : ''}
       </div>
 
       <!-- Atributos fortalecidos -->
@@ -5914,10 +5952,33 @@ function renderCompanionDashboard(el) {
         </div>
       </div>
     </div>
+    <div style="text-align:center;margin:.6rem 0 1.25rem">
+      <button onclick="removeCompanion('${nomeAttr}', ${p.ts || 'null'})" style="background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.5rem 1.25rem;font-size:14px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">
+        🔄 Encerrar parceria com ${sanitize(p.name.split(' ')[0])}
+      </button>
+    </div>`;
+}
+
+function renderCompanionDashboard(el) {
+  const g  = cpMyGroup();
+  const eu = cpMyParticipant();
+  const parceiros = eu ? cpParceiros(eu) : [];
+  if (!eu || !parceiros.length) { renderCompanionSelector(el); return; }
+  const partes = parceiros.map(c => cpFindParticipant(g, c.nome, c.ts)).filter(Boolean);
+  if (!partes.length) { renderCompanionSelector(el); return; }
+
+  const cardsHtml = partes.map((pt, i) => renderCompanionCard(pt, i)).join('');
+  const primeirosNomes = partes.map(pt => pt.nome.split(' ')[0]);
+  const composerLbl = primeirosNomes.length > 1
+    ? `✏️ Meu pedido de oração para ${primeirosNomes.join(' e ')}`
+    : `✏️ Meu pedido de oração para ${primeirosNomes[0]}`;
+
+  el.innerHTML = `
+    ${cardsHtml}
 
     <!-- Meu pedido de oração -->
     <div class="prayer-composer">
-      <div class="prayer-composer-hdr">✏️ Meu pedido de oração para ${sanitize(p.name.split(' ')[0])}</div>
+      <div class="prayer-composer-hdr">${composerLbl}</div>
       <div class="prayer-composer-body">
         ${CP.myPrayerRequest
           ? `<div class="prayer-request-box" style="margin-bottom:.65rem">"${CP.myPrayerRequest}"</div>
@@ -5930,13 +5991,6 @@ function renderCompanionDashboard(el) {
              </div>`
         }
       </div>
-    </div>
-
-    <!-- Trocar companheiro -->
-    <div style="text-align:center;margin-top:1.25rem;padding:0 1rem">
-      <button onclick="removeCompanion()" style="background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.5rem 1.25rem;font-size:14px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">
-        🔄 Trocar companheiro
-      </button>
     </div>`;
 }
 
@@ -5977,11 +6031,12 @@ const EMBAIXADORES_MISSIONS = [
 ];
 
 // ── Ações ────────────────────────────────────────────────────────────────
-function markPraying() {
-  CP.prayedToday = !CP.prayedToday;
-  CP.prayedDate  = new Date().toDateString();
+function markPraying(nome, ts) {
+  const st = perCompanionState(nome, ts);
+  st.prayedToday = !st.prayedToday;
+  st.prayedDate  = new Date().toDateString();
   saveCP();
-  if (CP.prayedToday) {
+  if (st.prayedToday) {
     showCompanionToast('🙏 Que Deus honre essa oração!');
     if (ST) { ST.xp = (ST.xp||0) + 5; save(ST); }
     if (typeof bumpPgProgress === 'function') bumpPgProgress('oracoes', 1);
@@ -5989,9 +6044,10 @@ function markPraying() {
   renderCompanionScreen();
 }
 
-function setContact(val) {
-  CP.contactedThisWeek = val;
-  CP.contactedWeek = getISOWeek();
+function setContact(nome, ts, val) {
+  const st = perCompanionState(nome, ts);
+  st.contactedThisWeek = val;
+  st.contactedWeek = getISOWeek();
   saveCP();
   if (val) {
     showCompanionToast('💬 Ótimo! O contato semanal fortalece a jornada.');
@@ -6060,18 +6116,15 @@ function buildCompanionBtnHtml() {
   loadGrupos();
   const eu = (typeof cpMyParticipant === 'function') ? cpMyParticipant() : null;
   const g  = (typeof cpMyGroup === 'function') ? cpMyGroup() : null;
-  let p = null;
-  if (eu && eu.compParceiro) {
-    const parc = cpFindParticipant(g, eu.compParceiro.nome, eu.compParceiro.ts);
-    if (parc) p = cpDisplay(parc, 0);
-  }
+  const parceiros = (eu ? cpParceiros(eu) : []).map(c => cpFindParticipant(g, c.nome, c.ts)).filter(Boolean).map((pt, i) => cpDisplay(pt, i));
   const pendentes = (eu && eu.compConvites) ? eu.compConvites.length : 0;
-  return p
-    ? `<button onclick="openCompanion('panel')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);padding:.8rem;font-size:17.5px;font-weight:500;cursor:pointer;font-family:var(--ff-body);margin-bottom:.75rem">
-        ${p.icon} ${sanitize(p.name.split(' ')[0])} — Companheiro de Jornada · 🔥 ${p.streak} dias
-      </button>`
-    : `<button onclick="openCompanion('panel')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);padding:.8rem;font-size:17.5px;font-weight:500;cursor:pointer;font-family:var(--ff-body);margin-bottom:.75rem">
-        ${pendentes ? `📨 ${pendentes} convite${pendentes>1?'s':''} de companheiro — toque para responder` : '🤝 Escolher Companheiro de Jornada'}
+  const label = parceiros.length === 1
+    ? `${parceiros[0].icon} ${sanitize(parceiros[0].name.split(' ')[0])} — Companheiro de Jornada · 🔥 ${parceiros[0].streak} dias`
+    : parceiros.length > 1
+      ? `${parceiros.map(p => p.icon + ' ' + sanitize(p.name.split(' ')[0])).join(' e ')} — Companheiros de Jornada`
+      : (pendentes ? `📨 ${pendentes} convite${pendentes>1?'s':''} de companheiro — toque para responder` : '🤝 Escolher Companheiro de Jornada');
+  return `<button onclick="openCompanion('panel')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);padding:.8rem;font-size:17.5px;font-weight:500;cursor:pointer;font-family:var(--ff-body);margin-bottom:.75rem">
+        ${label}
       </button>`;
 }
 
