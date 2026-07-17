@@ -3624,6 +3624,7 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
     ${lembreteSection}
     ${souCoordenadorDesteGrupo ? `<button onclick="iniciarConvidarParticipanteDoPainel(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:#FF6B4A;border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">🔗 Convidar Participante</button>` : ''}
     <button onclick="iniciarEditarNomeGrupo(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">✎ Editar nome do grupo</button>
+    <button onclick="iniciarEditarReuniaoPainel(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">🗓️ Editar dia e horário</button>
     <div class="panel-section">
       <div class="panel-title">Progresso semanal do grupo</div>
       <div class="panel-stat"><span>🙏 Pedidos de oração</span><strong>${grpW.oracoes}/${metas.oracoes.meta}</strong></div>
@@ -3637,6 +3638,8 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
     </div>
     ${renderProgramaSemanal()}
     ${!g.coordenador && souTutorDesteGrupo ? `<button onclick="gerarConvidarCoordenadorAutoEExibir('${nome.replace(/'/g,"\\'")}', ${grupoNum})" style="margin-top:.5rem;width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body)">🤝 Convidar Coordenador</button>` : ''}
+    ${souCoordenadorDesteGrupo ? `<button onclick="sairDaFuncaoCoordenador(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">🚪 Sair da função de Coordenador</button>` : ''}
+    ${souTutorDesteGrupo ? `<button onclick="iniciarTrocarTutor(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">🔄 Trocar Tutor</button>` : ''}
     <button onclick="renderTutorGruposList('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Voltar aos meus grupos</button>
 `;
 
@@ -3678,6 +3681,102 @@ function confirmarEditarNomeGrupo(grupoNum, nome) {
   g.nome = novoNome;
   saveGrupos();
   renderTutorGrupoDetalhe(grupoNum, nome);
+}
+
+// ── Editar dia e horário de reunião (Painel do Tutor/Coordenador) ──────────
+function iniciarEditarReuniaoPainel(grupoNum, nome) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  const body = document.getElementById('tutorpanel-body');
+  if (!g || !body) return;
+
+  const dias = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+  const diasOpts = dias.map(d => `<option value="${d}" ${g.diaReuniao===d?'selected':''}>${d}</option>`).join('');
+
+  const formHtml = `
+    <div class="panel-section" id="editar-reuniao-painel-form">
+      <div class="panel-title">🗓️ Editar dia e horário de reunião</div>
+      <div class="insc-field-row">
+        <div class="insc-field">
+          <label>Dia da semana</label>
+          <select class="insc-input" id="edit-reuniao-dia">
+            <option value="">Selecione…</option>
+            ${diasOpts}
+          </select>
+        </div>
+        <div class="insc-field">
+          <label>Horário</label>
+          <input class="insc-input" id="edit-reuniao-hora" type="time" value="${g.horaReuniao || ''}">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:.6rem">
+        <button class="insc-submit-btn" style="margin:0;flex:1" onclick="confirmarEditarReuniaoPainel(${grupoNum}, '${nome.replace(/'/g,"\\'")}')">✓ Salvar</button>
+        <button onclick="renderTutorGrupoDetalhe(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">Cancelar</button>
+      </div>
+    </div>`;
+
+  const existing = document.getElementById('editar-reuniao-painel-form');
+  if (existing) existing.remove();
+  body.insertAdjacentHTML('afterbegin', formHtml);
+}
+
+function confirmarEditarReuniaoPainel(grupoNum, nome) {
+  const dia = document.getElementById('edit-reuniao-dia')?.value || '';
+  const hora = document.getElementById('edit-reuniao-hora')?.value || '';
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return;
+  g.diaReuniao = dia || null;
+  g.horaReuniao = hora || null;
+  saveGrupos();
+  renderTutorGrupoDetalhe(grupoNum, nome);
+}
+
+// ── Coordenador pede para sair da função (libera a vaga p/ o Tutor convidar substituto) ──
+function sairDaFuncaoCoordenador(grupoNum, nome) {
+  if (!confirm('Tem certeza que deseja sair da função de Coordenador deste Pequeno Grupo? O Tutor poderá convidar um substituto.')) return;
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return;
+  g.coordenador = null;
+  const meuGrupo = loadMeuGrupo();
+  const p = (g.participantes || []).find(x => meuGrupo && x.ts === meuGrupo.ts) ||
+            (g.participantes || []).find(x => x.nome.trim().toLowerCase() === nome.trim().toLowerCase());
+  if (p) p.tipo = 'colaborador';
+  saveGrupos();
+  renderTutorGrupoDetalhe(grupoNum, nome);
+}
+
+// ── Trocar Tutor entre os autorizados na allowlist (sem digitação livre — ver BLOCKER-01) ──
+function iniciarTrocarTutor(grupoNum, nome) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  const body = document.getElementById('tutorpanel-body');
+  if (!g || !body) return;
+
+  const outros = (TUTORS || []).filter(t => (t.name || '').trim().toLowerCase() !== nome.trim().toLowerCase());
+  const listaHtml = outros.length
+    ? outros.map(t => `
+        <button onclick="confirmarTrocarTutor(${grupoNum}, '${(t.name||'').replace(/'/g,"\\'")}', '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem;text-align:left">👨‍🏫 ${sanitize(t.name)}</button>`).join('')
+    : `<p class="body-text">Não há outros Tutores cadastrados na lista de autorizados.</p>`;
+
+  const formHtml = `
+    <div class="panel-section" id="trocar-tutor-form">
+      <div class="panel-title">🔄 Trocar Tutor</div>
+      <p class="body-text" style="margin:0 0 .6rem">Escolha quem assume a tutoria deste Pequeno Grupo. Você deixará de ser o Tutor.</p>
+      ${listaHtml}
+      <button onclick="renderTutorGrupoDetalhe(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">Cancelar</button>
+    </div>`;
+
+  const existing = document.getElementById('trocar-tutor-form');
+  if (existing) existing.remove();
+  body.insertAdjacentHTML('afterbegin', formHtml);
+}
+
+function confirmarTrocarTutor(grupoNum, novoTutorNome, nomeAtual) {
+  if (!confirm('Transferir a tutoria deste Pequeno Grupo para ' + novoTutorNome.split(' ')[0] + '?')) return;
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return;
+  g.tutor = novoTutorNome;
+  saveGrupos();
+  // O Tutor que confirmou deixou de ser Tutor deste grupo — volta para a lista dele.
+  renderTutorGruposList(nomeAtual);
 }
 
 // ── Convidar Participante direto do Painel (Coordenador) — reaproveita gerarECompartilhar()/
