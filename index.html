@@ -7820,14 +7820,14 @@ async function renderTelaConvite(inviteId) {
         <div style="font-size:18px;color:#fff;font-weight:600;font-family:var(--ff-body)">${sanitize(inv.grupoNome || ('Grupo ' + inv.grupoNum))}</div>
       </div>
     </div>
+    <button onclick="instalarApp()"
+      style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:rgba(14,123,108,0.14);border:1px solid rgba(14,123,108,0.5);border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:600;color:#7FE0C4;cursor:pointer;font-family:var(--ff-body);margin-bottom:.6rem">
+      📲 Instalar app na tela inicial
+    </button>
     <div id="conv-erro" style="color:#FF9980;font-size:14px;font-family:var(--ff-body);margin:.25rem 0 .5rem;min-height:18px"></div>
     <button id="conv-entrar-btn" onclick="confirmarEntradaConvite('${inv.inviteId}')"
       style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:var(--gold);border:none;border-radius:var(--radius-sm);padding:1rem;font-size:18px;font-weight:700;color:#0D2137;cursor:pointer;font-family:var(--ff-body);box-shadow:0 4px 16px rgba(255,215,0,0.25)">
       Entrar na Jornada →
-    </button>
-    <button onclick="instalarApp()"
-      style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:transparent;border:1px solid #FF9980;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:600;color:#FF9980;cursor:pointer;font-family:var(--ff-body);margin-top:.6rem">
-      📲 Instalar app na tela inicial
     </button>
   </div>`;
 }
