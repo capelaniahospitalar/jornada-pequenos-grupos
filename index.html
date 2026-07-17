@@ -3920,7 +3920,7 @@ function buildEstudosRealizadosHtml() {
     </div>`).join('');
   return `
     <div class="panel-section">
-      <button onclick="toggleSection(this)" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text2);font-size:15px;font-weight:600;font-family:var(--ff-body);cursor:pointer;display:flex;align-items:center;gap:6px;padding:.6rem .75rem;width:100%;text-align:left">
+      <button onclick="toggleSection(this)" style="background:var(--teal-light);border:1px solid var(--teal);border-radius:var(--radius-sm);color:var(--teal);font-size:17px;font-weight:600;font-family:var(--ff-body);cursor:pointer;display:flex;align-items:center;gap:6px;padding:.6rem .75rem;width:100%;text-align:left">
         <span class="toggle-arrow" style="display:inline-block;transition:transform .2s">▸</span>
         ${ST.done.length} estudo(s) realizado(s) — toque para ver
       </button>
@@ -4293,8 +4293,7 @@ function checkAutoMissions(){
 }
 
 function toggleSection(btn) {
-  const sibling = btn.parentElement.nextElementSibling;
-  const content = sibling.classList.contains('toggle-content') ? sibling : sibling.querySelector('.toggle-content');
+  const content = btn.nextElementSibling;
   const arrow = btn.querySelector('.toggle-arrow');
   const open = content.style.display === 'block';
   content.style.display = open ? 'none' : 'block';
@@ -7827,7 +7826,7 @@ async function renderTelaConvite(inviteId) {
       Entrar na Jornada →
     </button>
     <button onclick="instalarApp()"
-      style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:transparent;border:1px solid rgba(255,255,255,0.3);border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:15px;font-weight:600;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-top:.6rem">
+      style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:transparent;border:1px solid #FF9980;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:600;color:#FF9980;cursor:pointer;font-family:var(--ff-body);margin-top:.6rem">
       📲 Instalar app na tela inicial
     </button>
   </div>`;
