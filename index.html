@@ -1339,7 +1339,8 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 }
 .pg-progress-hdr{
   background:linear-gradient(135deg,#0E7B6C,#16A085);
-  padding:.7rem 1rem;display:flex;align-items:center;gap:8px
+  padding:.7rem 1rem;display:flex;align-items:center;gap:8px;
+  border:none;cursor:pointer;width:100%;text-align:left;font:inherit
 }
 .pg-progress-ico{font-size:20px;flex-shrink:0}
 .pg-progress-title{flex:1;min-width:0}
@@ -9102,23 +9103,10 @@ function renderGruposBtnHome() {
     div.style.cssText = 'margin:.75rem 1rem 0';
     cont.appendChild(div);
   }
-  const meuGrupo = loadMeuGrupo();
-  div.innerHTML = meuGrupo
-    ? (() => {
-        const pennant = generatePennantSvg(meuGrupo.grupoNum, meuGrupo.grupoNome, {width:52, height:72});
-        return `<button onclick="openInscricao(${meuGrupo.grupoNum})" style="display:flex;align-items:center;gap:10px;width:100%;background:var(--card);border:0.5px solid rgba(14,123,108,.35);border-radius:var(--radius-sm);padding:.65rem 1rem;cursor:pointer;font-family:var(--ff-body)">
-          <div style="width:36px;height:50px;flex-shrink:0">${pennant}</div>
-          <div style="flex:1;text-align:left">
-            <div style="font-weight:600;font-size:15px;color:var(--teal)">Grupo ${meuGrupo.grupoNum} — ${meuGrupo.grupoNome}</div>
-            <div style="font-size:13px;color:var(--text3)">${meuGrupo.tipo === 'colaborador' ? '🏥 ' + meuGrupo.departamento : meuGrupo.tipo === 'amigo' ? '🤝 Amigo dos Adventistas' : meuGrupo.tipo === 'membro' ? '⛪ Membro IASD' : '🌿 Participante'} · ${meuGrupo.dataInscricao || ''}</div>
-          </div>
-          <span style="color:var(--text3);font-size:18px">›</span>
-        </button>`;
-      })()
-    // Hoje é impossível chegar na Home sem grupo: ST.welcomeDone só é marcado junto com o
-    // grupo (confirmarEntradaConvite/recuperarIdentidade), e sair de um grupo (cancelarInscricao)
-    // ficou inalcançável junto com a tela antiga de autocadastro (BLOCKER-001).
-    : '';
+  // O card do grupo (flâmula + nome + dados) foi consolidado dentro do conteúdo expansível do
+  // botão único "Progresso — <PG>" (ver renderPgProgressHome) — este div vira só o ponto de
+  // ancoragem onde aquele botão é inserido logo em seguida (anchor.after em renderPgProgressHome).
+  div.innerHTML = '';
 
   // UX-01: o card "Mural de Gratidão" foi removido daqui — consolidado no único card
   // "Painel da Comunidade" (renderComunidadeBtnHome). O chip do grupo acima é preservado.
@@ -9969,23 +9957,40 @@ function renderPgProgressHome() {
       </div>
     </div>`;
 
+  // Card do grupo (flâmula + nome + dados) — antes era um botão separado na Home
+  // (#grupos-home-btn), agora vive dentro do conteúdo expansível deste botão único.
+  const pennant = generatePennantSvg(meuGrupo.grupoNum, meuGrupo.grupoNome, {width:52, height:72});
+  const grupoInfoHtml = `
+    <button onclick="openInscricao(${meuGrupo.grupoNum})" style="display:flex;align-items:center;gap:10px;width:100%;background:var(--card);border:none;border-bottom:0.5px solid var(--border);padding:.65rem 1rem;cursor:pointer;font-family:var(--ff-body)">
+      <div style="width:36px;height:50px;flex-shrink:0">${pennant}</div>
+      <div style="flex:1;text-align:left">
+        <div style="font-weight:600;font-size:15px;color:var(--teal)">Grupo ${meuGrupo.grupoNum} — ${meuGrupo.grupoNome}</div>
+        <div style="font-size:13px;color:var(--text3)">${meuGrupo.tipo === 'colaborador' ? '🏥 ' + meuGrupo.departamento : meuGrupo.tipo === 'amigo' ? '🤝 Amigo dos Adventistas' : meuGrupo.tipo === 'membro' ? '⛪ Membro IASD' : '🌿 Participante'} · ${meuGrupo.dataInscricao || ''}</div>
+      </div>
+      <span style="color:var(--text3);font-size:18px">›</span>
+    </button>`;
+
   const div = document.createElement('div');
   div.id = 'pg-progress-card';
   div.className = 'pg-progress-card';
   div.innerHTML = `
-    <div class="pg-progress-hdr">
+    <button class="pg-progress-hdr" onclick="toggleSection(this)">
       <span class="pg-progress-ico">🛡️</span>
       <div class="pg-progress-title">
         <div class="pg-progress-name">Progresso — ${meuGrupo.grupoNome}</div>
-        <div class="pg-progress-sub">Meta semanal do seu Pequeno Grupo</div>
+        <div class="pg-progress-sub">Toque para ver a meta semanal e o nível do grupo</div>
       </div>
       <div class="pg-progress-members">👥 ${totalParticipantes}</div>
+      <span class="toggle-arrow" style="color:#fff;font-size:14px;display:inline-block;transition:transform .2s;flex-shrink:0">▸</span>
+    </button>
+    <div class="toggle-content" style="display:none">
+      ${grupoInfoHtml}
+      <div class="pg-progress-body">
+        ${goalsHtml}
+        ${weekBanner}
+      </div>
+      ${nivelHtml}
     </div>
-    <div class="pg-progress-body">
-      ${goalsHtml}
-      ${weekBanner}
-    </div>
-    ${nivelHtml}
     `;
 
   anchor.after(div);
