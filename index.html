@@ -4032,31 +4032,69 @@ function buildEstudosRealizadosHtml() {
 //  PHASE 2 — BOSSES, MISSIONS, JOURNAL
 // ══════════════════════════════════════
 
+// Lista única de Obstáculos Espirituais — unifica o conjunto que já estava em uso
+// (desbloqueio progressivo por estudo, ação diária) com o conteúdo mais completo de uma
+// versão anterior nunca ligada a nenhum botão da interface (versículo + referência).
+// "Desânimo" e "Medo do Futuro" referenciavam estudos 15/16, que não existem (a Jornada
+// tem 13) — nunca podiam chegar a 100%; corrigido aqui para os estudos válidos que sobraram.
 const OBSTACLES = [
+  { id:'cuidado_corpo', label:'Cuidado com a Saúde', icon:'💪', alwaysUnlocked:true, isArqVida:true, color:'#27AE60',
+    desc:'O corpo é o templo do Espírito Santo, mas costuma ser o que menos cuidamos — sono, alimentação, descanso e exercício sempre ficam para depois.',
+    versiculo:'Vocês não sabem que o corpo de vocês é santuário do Espírito Santo que habita em vocês?',
+    versiculoRef:'1 Coríntios 6.19 — NVT',
+    action:'Acesse a Jornada Arquitetura da Vida, faça o teste Q8RN e avalie seus gráficos de saúde.' },
   { id:'falta_oracao',  label:'Falta de Oração',  icon:'🙈', studies:[2],     color:'#1A5276',
+    desc:'A oração ficou para depois. O problema não é falta de tempo — é falta de prioridade. E a distância de Deus cresce no silêncio.',
+    versiculo:'Orem sem parar.',
+    versiculoRef:'1 Tessalonicenses 5.17 — NVT',
     action:'Reserve 5 minutos agora para orar, mesmo que em silêncio. Fale com Deus como falaria com um amigo.' },
   { id:'ressentimento', label:'Ressentimento',    icon:'😤', studies:[3],     color:'#C0392B',
+    desc:'Você carrega mágoa de alguém. Talvez com razão. Mas o ressentimento é como tomar veneno esperando que o outro adoeça.',
+    versiculo:'Perdoem uns aos outros, assim como Deus os perdoou em Cristo.',
+    versiculoRef:'Efésios 4.32 — NVT',
     action:'Pense em alguém que te magoou. Em oração, escolha perdoar essa pessoa hoje — mesmo que o sentimento ainda doa.' },
   { id:'isolamento',    label:'Isolamento',       icon:'🚪', studies:[4,5],   color:'#16A085',
+    desc:'Você tem se afastado das pessoas, do grupo, da comunidade. Talvez por dor, por vergonha ou por hábito. Mas ninguém cresce sozinho.',
+    versiculo:'Não deixemos de nos reunir, como é costume de alguns.',
+    versiculoRef:'Hebreus 10.25 — NVT',
     action:'Envie uma mensagem a alguém da sua comunidade de fé hoje — um "oi, pensei em você" já é um passo.' },
-  { id:'desanimo',      label:'Desânimo',         icon:'😔', studies:[6,15],  color:'#7F8C8D',
+  { id:'desanimo',      label:'Desânimo',         icon:'😔', studies:[6],  color:'#7F8C8D',
+    desc:'A energia espiritual está baixa. Você sente que não está avançando, que suas orações não chegam a lugar nenhum.',
+    versiculo:'Ele dá força aos cansados e vigor aos que estão sem energia.',
+    versiculoRef:'Isaías 40.29 — NVT',
     action:'Escreva 3 coisas pelas quais você é grato hoje, mesmo em meio às dificuldades.' },
   { id:'sedentarismo',  label:'Sedentarismo Espiritual', icon:'🛋️', studies:[7], color:'#117A65',
+    desc:'A fé existe — mas ficou confortável. Você parou de avançar, de se desafiar, de crescer. A zona de conforto pode ser uma armadilha silenciosa.',
+    versiculo:'Esforce-se para apresentar-se aprovado diante de Deus.',
+    versiculoRef:'2 Timóteo 2.15 — NVT',
     action:'Faça uma caminhada curta hoje e use o tempo para conversar com Deus sobre sua saúde física e espiritual.' },
   { id:'materialismo',  label:'Materialismo',     icon:'💰', studies:[8,13],  color:'#F39C12',
+    desc:'As coisas materiais estão ocupando um espaço que deveria ser de Deus. Não é pecado ter — é pecado quando as coisas te têm.',
+    versiculo:'Onde estiver o seu tesouro, aí também estará o seu coração.',
+    versiculoRef:'Mateus 6.21 — NVT',
     action:'Identifique algo que você possui e que poderia compartilhar ou doar esta semana.' },
-  { id:'medo',          label:'Medo do Futuro',   icon:'😨', studies:[9,16],  color:'#8E44AD',
+  { id:'medo',          label:'Medo do Futuro',   icon:'😨', studies:[9],  color:'#8E44AD',
+    desc:'A incerteza do amanhã paralisa você. Você passa mais tempo se preocupando com o que pode acontecer do que vivendo o que está acontecendo agora.',
+    versiculo:'Não fique preocupado com o dia de amanhã, pois o amanhã trará suas próprias preocupações.',
+    versiculoRef:'Mateus 6.34 — NVT',
     action:'Escreva uma preocupação sua e, ao lado, uma promessa bíblica que fala sobre ela. Entregue isso a Deus em oração.' },
   { id:'ansiedade',     label:'Ansiedade',        icon:'😰', studies:[11,12], color:'#2980B9',
+    desc:'Seu sistema interno está em alerta constante. A ansiedade drena energia e rouba o presente — antes dos problemas chegarem e depois de eles passarem.',
+    versiculo:'Não fiquem ansiosos por nada, mas em tudo, por meio de oração, apresentem seus pedidos a Deus.',
+    versiculoRef:'Filipenses 4.6 — NVT',
     action:'Quando a ansiedade vier hoje, pare e respire fundo 3 vezes lembrando: "Jesus está comigo agora."' },
 ];
 
 function getObstacleProgress(obs) {
+  // Cuidado do Corpo não tem estudo associado — vencido na primeira confirmação da missão
+  // semanal "Arquitetura da Vida" (arqvida_sem_*), independente de qual semana foi.
+  if (obs.isArqVida) return (ST.missionsDone || []).some(id => id.startsWith('arqvida_sem_')) ? 100 : 0;
   const done = obs.studies.filter(n => ST.done.includes(n-1)).length;
   return Math.round((done / obs.studies.length) * 100);
 }
 
 function isObstacleUnlocked(obs) {
+  if (obs.alwaysUnlocked) return true;
   // Um obstáculo é revelado quando o usuário alcança o primeiro estudo relacionado a ele
   const firstStudyIdx = Math.min(...obs.studies) - 1; // converter para índice 0-based
   return ST.done.length >= firstStudyIdx;
@@ -4081,7 +4119,19 @@ function doObstacleAction(obsId) {
 function buildBossesHtml() {
   const unlocked = OBSTACLES.filter(isObstacleUnlocked);
 
-  if (unlocked.length === 0) return '';
+  // Antes desta seção existir simplesmente sumia da tela sem explicação — quem ainda não
+  // tinha concluído o Estudo 1 (limiar de desbloqueio mais baixo entre os obstáculos) achava
+  // que o recurso estava quebrado ou não existia (achado de campo, relatado por usuário).
+  if (unlocked.length === 0) return `
+    <div class="boss-section">
+      <div class="boss-title">⚔️ Obstáculos Espirituais</div>
+      <div class="mission-item" style="opacity:.5">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🔒</div>
+        <div class="mission-info">
+          <div class="mission-name" style="color:var(--text3);font-size:16px">Desbloqueia ao concluir o Estudo 1</div>
+        </div>
+      </div>
+    </div>`;
 
   // Obstáculos já vencidos (100%)
   const defeatedList = unlocked.filter(o => getObstacleProgress(o) >= 100);
@@ -4102,6 +4152,17 @@ function buildBossesHtml() {
   if (current) {
     const pct = getObstacleProgress(current);
     const doneToday = isObstacleActionDoneToday(current.id);
+    const versiculoHtml = current.versiculo
+      ? `<div style="font-size:12.5px;font-style:italic;color:var(--text3);margin:.35rem 0 0;padding-left:2px">"${current.versiculo}" — ${current.versiculoRef}</div>`
+      : '';
+    // Cuidado do Corpo não usa o botão genérico de "marcar como feito" (+5 XP) — ele só é
+    // vencido pela missão semanal Arquitetura da Vida (ver getObstacleProgress).
+    const actionButtons = current.isArqVida
+      ? `<button class="boss-action-btn" style="margin-bottom:.4rem;background:var(--navy)" onclick="window.open('https://www.capelaniahospitalarsilvestre.com/', '_blank')">🔗 Acessar Arquitetura da Vida</button>
+         <button class="boss-action-btn" onclick="confirmArquiteturaVidaMissao('arqvida_sem_' + getISOWeek())">✓ Já fiz o teste Q8RN e avaliei os gráficos</button>`
+      : `<button class="boss-action-btn ${doneToday?'boss-action-done':''}" onclick="doObstacleAction('${current.id}')" ${doneToday?'disabled':''}>
+          ${doneToday ? '✓ Feito hoje' : 'Marcar como feito (+5 XP)'}
+        </button>`;
     currentCard = `<div class="boss-card" style="margin-top:${defeatedRows ? '.5rem' : '0'}">
       <div class="boss-row">
         <div class="boss-icon">${current.icon}</div>
@@ -4113,9 +4174,8 @@ function buildBossesHtml() {
       </div>
       <div class="boss-action-row">
         <div class="boss-action-text">💡 ${current.action}</div>
-        <button class="boss-action-btn ${doneToday?'boss-action-done':''}" onclick="doObstacleAction('${current.id}')" ${doneToday?'disabled':''}>
-          ${doneToday ? '✓ Feito hoje' : 'Marcar como feito (+5 XP)'}
-        </button>
+        ${versiculoHtml}
+        <div style="margin-top:.5rem">${actionButtons}</div>
       </div>
     </div>`;
   }
@@ -4324,6 +4384,10 @@ function renderArquiteturaVidaMissao() {
 function confirmArquiteturaVidaMissao(id) {
   completeMission(id, 75);
   renderArquiteturaVidaMissao();
+  // Vence o obstáculo "Cuidado do Corpo" (ver getObstacleProgress) — atualiza a seção de
+  // Obstáculos também, já que essa confirmação pode ter vindo do card de lá, não só da missão.
+  const el = document.getElementById('desafios-obstaculos');
+  if (el) el.innerHTML = buildBossesHtml();
 }
 
 function confirmMission(id) {
