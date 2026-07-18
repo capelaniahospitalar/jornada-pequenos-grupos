@@ -1,8 +1,35 @@
-# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-07-14)
+# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-07-18)
 
 > Documento para retomar o trabalho em outra máquina/sessão. Cole o conteúdo de volta
 > para o assistente ao recomeçar — a "memória" do assistente **não viaja entre máquinas**;
 > só este arquivo (via GitHub) viaja. **Nenhuma alteração de código sem aprovação do desenho.**
+
+## 📝 Registro retroativo — Ranqueamento entre PGs, Registro de Encontros, Lembrete ao PG, Trio (2026-07-16/17)
+
+Entre a última atualização deste documento (2026-07-14) e esta (2026-07-18), o usuário fez **18
+commits diretamente** pelo outro computador, sem passar por sessão do assistente — este documento
+ficou parado 4 dias sem refletir esse trabalho (repetição do padrão já visto em 07-09 e 07-13/14).
+Registrado por leitura completa dos 18 diffs em 2026-07-18; nenhum teste em preview/produção feito
+por este assistente nesta revisão. Detalhamento completo no `CHANGELOG.md` (entrada
+`[2026-07-16/17]`); resumo aqui:
+
+- **Novo — Ranqueamento Saudável entre PGs:** já homologado e documentado à parte, em detalhe
+  arquitetural, no novo `ARCHITECTURE.md` (`v3.4a.1-homologado`) — índice de maturidade discipular
+  (`pgIMD`, 5 dimensões) + motor de classificação (`classificarPgs()`), somente leitura, exclusivo
+  Tutor/Coordenador. Consultar `ARCHITECTURE.md` para arquitetura; não duplicado aqui.
+- **Mudança de regra — Registro de encontros do PG:** a pergunta Sim/Não de frequência mensal foi
+  substituída por registro individual de cada encontro (data + presentes), com medidor visual
+  "meta vs. realizado" no relatório. `reunioesMes` mudou de formato de novo (era `{aconteceu}`,
+  passou por `{vezes}`, agora é `{encontros: [...]}`) — terceira mudança de formato deste campo em
+  menos de uma semana; qualquer relatório ou export que dependa do formato antigo precisa ser
+  conferido antes de reusar.
+- **Novo:** lembrete de reunião por WhatsApp por participante (Painel do Tutor/Coordenador); aviso
+  de LGPD/participação voluntária no Painel do Discípulo; opção de trio (3 pessoas) no Companheiro
+  de Jornada quando o PG tem número ímpar; edição de dia/horário de reunião, saída da função de
+  Coordenador e troca de Tutor direto do Painel.
+- **Pendência aberta por este achado (repetição do padrão de 07-09 e 07-13/14):** se o usuário
+  fizer mais mudanças direto pelo GitHub fora de uma sessão do assistente, avisar no início da
+  próxima sessão para não perder o rastro de novo — já é o terceiro lote seguido nesse padrão.
 
 ## 🚨 BUG-TUTORES-CONVITES — RESOLVIDO (2026-07-10)
 

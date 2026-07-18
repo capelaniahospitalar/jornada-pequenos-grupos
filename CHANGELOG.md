@@ -1,5 +1,64 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-16/17] — Ranqueamento Saudável entre PGs, Registro de Encontros, Lembrete ao PG, Trio no Companheiro de Jornada
+
+Feito diretamente pelo usuário (18 commits, fora do processo usual de Mapa de Impacto →
+aprovação → implementação); registrado retroativamente neste `CHANGELOG.md` e no
+`ESTADO-E-ROADMAP.md` em 2026-07-18, por leitura completa dos 18 diffs (o bloco de Ranqueamento
+já tinha documentação própria, homologada, em `ARCHITECTURE.md`).
+
+- **Novo — Ranqueamento Saudável entre PGs (Painel do Tutor/Coordenador, somente leitura):**
+  bloco maior do lote (5 commits, 16/07 entre 16h11 e 17h18). Introduz um Índice de Maturidade
+  Discipular (`pgIMD`) por grupo — 5 dimensões (Comunhão, Relacionamento, Missão, Crescimento,
+  Fidelidade) calculadas só a partir de dado real já existente no app — e um motor de
+  classificação (`classificarPgs()`) que ordena os PGs por esse índice, com critério de desempate
+  fixo (nunca sorteio) e ranking no padrão esportivo (`1, 2, 2, 4`). Exclusivo para Tutor/
+  Coordenador; participante não vê. Documentação arquitetural completa (motivação, camadas,
+  decisões, invariantes, roadmap dos próximos épicos) em `ARCHITECTURE.md` (novo arquivo,
+  versão `v3.4a.1-homologado`) — ver esse documento para detalhe técnico; aqui só o resumo.
+- **Mudança de regra — Registro de encontros do PG substitui a pergunta Sim/Não:** a versão
+  original desta rodada trocou "o PG se reuniu esse mês?" por um contador (0/1/2/3/4+), mas
+  ainda no mesmo dia foi substituída de novo por um registro por encontro individual (data +
+  quantos participantes vieram), com lista dos encontros do mês e opção de remover um registro
+  errado. O relatório mensal passou a mostrar um medidor visual (barra "meta vs. realizado", meta
+  sempre 100%) em vez de só o número, tanto para presença quanto para participação nos
+  Embaixadores da Esperança. A tabela linha-a-linha de quem participou dos Embaixadores foi
+  removida do relatório (ficou só a contagem) — link entre esse ajuste e o de cima: os dois
+  mexem na tela de Relatórios Mensais no mesmo lote. `filtrarReunioesMes()` descarta qualquer
+  registro anterior a julho/2026 (dado de teste), aplicado tanto ao carregar quanto ao mesclar
+  dados vindos da nuvem.
+- **Novo — Lembrete de reunião por WhatsApp (Painel do Tutor/Coordenador):** a tela de detalhe de
+  cada PG passou a mostrar o dia/horário cadastrado da reunião, com destaque amarelo na véspera
+  ("📅 Amanhã tem encontro do PG!"). A versão final envia um lembrete individual por participante
+  (usa o WhatsApp que a pessoa já informou ao entrar no PG, marca "✓ Enviado" ao tocar) — descartou
+  a primeira versão, que abria um único link genérico do WhatsApp sem contato fixo.
+- **Novo — LGPD e participação voluntária:** aviso fixo no Painel do Discípulo (abaixo de
+  "Crescimento cristão") explicando que os dados (nome, progresso espiritual, WhatsApp) só são
+  usados para o funcionamento do PG/Capelania, em conformidade com a LGPD, e que a participação é
+  voluntária — participar do PG implica aceitar essas condições.
+- **Novo — Trio no Companheiro de Jornada:** quando o PG tem número ÍMPAR de participantes, a
+  pessoa que sobraria sozinha agora pode se juntar a uma dupla já formada, virando um trio (nunca
+  mais que isso, e nunca quando o grupo tem número par). `compParceiro` passou de objeto único
+  para lista (até 2), com normalização para dados antigos gravados no formato de objeto único;
+  orar/contato semanal passaram a ser rastreados por companheiro (`CP.perCompanion`), não mais um
+  estado único por pessoa.
+- **Novo — Painel do Tutor/Coordenador, gestão da liderança do PG:** editar dia/horário de
+  reunião direto do painel (antes só existia no cadastro inicial); Coordenador pode sair da
+  função (libera a vaga para o Tutor convidar substituto); Tutor pode transferir a tutoria para
+  outro nome já autorizado na allowlist (sem digitação livre).
+- **Ajustes de texto e visual:** enunciado da missão de visita entre PGs revisado de novo (mesma
+  linha do lote de 07-13/14, agora incluindo agosto/setembro); botão "🔄 Atualizar" da Home maior;
+  botão "Painel do Tutor/Coordenador" com gradiente teal em vez de navy; botões "estudos
+  anteriores" e "instalar app" recoloridos e reposicionados na tela de convite; corrigido bug em
+  `toggleSection()` que dependia da posição exata do elemento seguinte no HTML.
+- **Não verificado nesta revisão retroativa:** nenhum destes pontos foi testado ao vivo nem no
+  preview por este assistente (revisão só por leitura de diff, sem execução) — diferente das
+  entradas anteriores deste changelog, que tiveram passo de teste em preview. Se surgir algum
+  comportamento inesperado num desses fluxos, comparar primeiro com o diff real antes de assumir
+  bug de outra causa.
+
+---
+
 ## [2026-07-13/14] — Correções de campo + nova página "Desafios do Discipulado"
 
 Feito diretamente pelo usuário (9 commits, a maioria via sessões do assistente com mensagens de
