@@ -4354,7 +4354,11 @@ function renderEmbaixadoresMissoes() {
 }
 
 function confirmEmbaixadorMissao(id) {
+  const jaFeita = (ST.missionsDone || []).includes(id);
   completeMission(id, 15);
+  // Engajamento semanal recorrente, alimenta o IMD (ver calcularCrescimentoScore) — só na
+  // primeira confirmação desta missão, completeMission() é idempotente mas isso não é.
+  if (!jaFeita && typeof bumpPgProgress === 'function') bumpPgProgress('engajamento', 1);
   renderEmbaixadoresMissoes();
 }
 
@@ -4382,9 +4386,13 @@ function renderArquiteturaVidaMissao() {
 }
 
 function confirmArquiteturaVidaMissao(id) {
+  const jaFeita = (ST.missionsDone || []).includes(id);
   completeMission(id, 75);
+  // Engajamento semanal recorrente, alimenta o IMD (ver calcularCrescimentoScore) — só na
+  // primeira confirmação desta missão, completeMission() é idempotente mas isso não é.
+  if (!jaFeita && typeof bumpPgProgress === 'function') bumpPgProgress('engajamento', 1);
   renderArquiteturaVidaMissao();
-  // Vence o obstáculo "Cuidado do Corpo" (ver getObstacleProgress) — atualiza a seção de
+  // Vence o obstáculo "Cuidado com a Saúde" (ver getObstacleProgress) — atualiza a seção de
   // Obstáculos também, já que essa confirmação pode ter vindo do card de lá, não só da missão.
   const el = document.getElementById('desafios-obstaculos');
   if (el) el.innerHTML = buildBossesHtml();
@@ -9127,12 +9135,17 @@ function renderGruposBtnHome() {
 //  PROGRESSO DO MEU PEQUENO GRUPO (específico)
 // ══════════════════════════════════════
 
-// Metas semanais — simples e alcançáveis para um grupo de 3–8 pessoas
+// Metas semanais — simples e alcançáveis para um grupo de 3–8 pessoas.
+// gratidao/engajamento entraram só para alimentar o IMD (ver PG_IMD_SUBWEIGHTS) — não fazem
+// parte do critério de "semana completa" do nível do grupo (ver PG_SEMANA_COMPLETA_TIPOS),
+// pra não tornar mais difícil algo que os grupos já vinham conquistando.
 function getPgWeekMetas() {
   return {
-    estudos:   { meta: 1,  label: 'Estudo da semana',            icon:'📖', color:'#1E5F8C' },
-    oracoes:   { meta: 5,  label: 'Pedidos de oração registrados', icon:'🙏', color:'#5C3D8F' },
-    bondades:  { meta: 3,  label: 'Atos de bondade registrados',  icon:'❤️', color:'#C0392B' },
+    estudos:     { meta: 1,  label: 'Estudo da semana',              icon:'📖', color:'#1E5F8C' },
+    oracoes:     { meta: 5,  label: 'Pedidos de oração registrados', icon:'🙏', color:'#5C3D8F' },
+    bondades:    { meta: 3,  label: 'Atos de bondade registrados',   icon:'❤️', color:'#C0392B' },
+    gratidao:    { meta: 3,  label: 'Gratidões compartilhadas',      icon:'🌿', color:'#0E7B6C' },
+    engajamento: { meta: 2,  label: 'Missões semanais concluídas',   icon:'⚡', color:'#D4A017' },
   };
 }
 
@@ -9140,21 +9153,23 @@ function getPgWeekMetas() {
 function getPgGroupWeek(grupoNum) {
   const g = (typeof PEQUENOS_GRUPOS !== 'undefined') ? PEQUENOS_GRUPOS.find(x => x.num === grupoNum) : null;
   const wk = (typeof getISOWeekPg === 'function') ? getISOWeekPg() : null;
-  let estudos = 0, oracoes = 0, bondades = 0, estudosSomados = 0, membros = 0;
+  let estudos = 0, oracoes = 0, bondades = 0, gratidao = 0, engajamento = 0, estudosSomados = 0, membros = 0;
   if (g && g.participantes) {
     g.participantes.forEach(p => {
       membros++;
       const pr = p.progresso || {};
       if (pr.contrib && pr.contrib.weekKey === wk) {
-        estudos  += pr.contrib.estudos  || 0;
-        oracoes  += pr.contrib.oracoes  || 0;
-        bondades += pr.contrib.bondades || 0;
+        estudos     += pr.contrib.estudos     || 0;
+        oracoes     += pr.contrib.oracoes     || 0;
+        bondades    += pr.contrib.bondades    || 0;
+        gratidao    += pr.contrib.gratidao    || 0;
+        engajamento += pr.contrib.engajamento || 0;
       }
       estudosSomados += pr.estudosConcluidos || 0;
     });
   }
   const estudosMedia = membros ? Math.round(estudosSomados / membros) : 0;
-  return { estudos, oracoes, bondades, estudosMedia: Math.min(13, estudosMedia), membros };
+  return { estudos, oracoes, bondades, gratidao, engajamento, estudosMedia: Math.min(13, estudosMedia), membros };
 }
 
 // ══════════════════════════════════════
@@ -9197,8 +9212,14 @@ const PG_IMD_SUBWEIGHTS = {
   // Os 13 temas (estudos) pesam mais que a oração semanal — representam quase toda a
   // formação espiritual do ciclo (ajuste pedido na revisão do RC3.2).
   communion: { estudos: 0.70, oracao: 0.30 },
+  // Gratidão entrou dividindo peso com os atos de bondade — os dois medem a mesma coisa
+  // (interação comunitária), só por canais diferentes (missão manual vs. post no Mural).
+  relationship: { bondades: 0.50, gratidao: 0.50 },
   mission: { embaixadores: 0.50, campanhas: 0.50 },
-  growth: { streak: 0.50, missoes: 0.50 },
+  // "engajamento" = missões semanais recorrentes (Embaixadores semanal + Arquitetura da Vida)
+  // — sinal de interação CONTÍNUA, ao lado da constância (streak) e das missões de marco da
+  // Jornada, que são conquistas pontuais e não recorrem toda semana.
+  growth: { streak: 0.40, missoes: 0.30, engajamento: 0.30 },
   faithfulness: { presenca: 0.50, regularidade: 0.50 },
 };
 
@@ -9230,15 +9251,17 @@ function calcularComunhaoScore(grupoNum, participantes) {
   return Math.round(estudosPct * sw.estudos + oracaoPct * sw.oracao);
 }
 
-// 2) RELACIONAMENTO — percentual do pedido semanal de atos de bondade já registrado (meta
-// do grupo) — é o sinal de "interação comunitária" mais robusto que já existe hoje.
-// EXTENSÃO: mural de gratidão/pedidos de oração tem os dois tipos (tipo:'gratidao' /
-// tipo:'oracao'), mas os posts expiram em 7 dias (podarGratidoesExpiradas) e não formam um
-// histórico mensal confiável — entra quando houver um registro que não expire.
+// 2) RELACIONAMENTO — média entre atos de bondade e gratidões compartilhadas no Mural, os dois
+// como percentual da meta semanal do grupo (getPgWeekMetas) — ver PG_IMD_SUBWEIGHTS.relationship.
+// Pedidos de oração do Mural entram em Comunhão junto com o resto da oração (ver
+// calcularComunhaoScore), não aqui — só a gratidão mede "interação comunitária" nesta dimensão.
 function calcularRelacionamentoScore(grupoNum) {
   const metas = getPgWeekMetas();
   const semana = getPgGroupWeek(grupoNum);
-  return pgImdPercent(semana.bondades, metas.bondades.meta);
+  const bondadesPct = pgImdPercent(semana.bondades, metas.bondades.meta);
+  const gratidaoPct = pgImdPercent(semana.gratidao, metas.gratidao.meta);
+  const sw = PG_IMD_SUBWEIGHTS.relationship;
+  return Math.round(bondadesPct * sw.bondades + gratidaoPct * sw.gratidao);
 }
 
 // 3) MISSÃO — média entre participação nos Embaixadores da Esperança neste mês e conclusão
@@ -9266,21 +9289,25 @@ function calcularMissaoScore(participantes) {
   return Math.round(embaixadoresPct * sw.embaixadores + campanhasPct * sw.campanhas);
 }
 
-// 4) CRESCIMENTO — média entre constância (sequência de dias ativa, teto em MAX_STREAK_DAYS)
-// e progresso nas missões pessoais da Jornada (missoesConcluidas já sincronizado, sobre o
-// total de missões manuais existentes) — ver PG_IMD_SUBWEIGHTS.growth.
+// 4) CRESCIMENTO — média entre constância (sequência de dias ativa, teto em MAX_STREAK_DAYS),
+// progresso nas missões pessoais da Jornada (missoesConcluidas já sincronizado, sobre o total
+// de missões manuais existentes) e engajamento semanal recorrente (Embaixadores semanal +
+// Arquitetura da Vida, como percentual da meta do grupo) — ver PG_IMD_SUBWEIGHTS.growth.
 // EXTENSÃO FUTURA: XP médio, evolução de níveis (badges nivel1..nivel5) e Diário Espiritual
 // (ST.journal, hoje só local) ainda não entram aqui — quando esses dados existirem por
 // participante no grupo sincronizado, é só somar mais um sub-peso em PG_IMD_SUBWEIGHTS.growth.
-function calcularCrescimentoScore(participantes) {
+function calcularCrescimentoScore(grupoNum, participantes) {
   if (!participantes.length) return 0;
   const streakPct = pgImdPercent(
     participantes.reduce((s, p) => s + Math.min(p.progresso?.streak || 0, MAX_STREAK_DAYS), 0) / participantes.length, MAX_STREAK_DAYS);
   const totalMissoesManuais = JOURNEY_MISSIONS.filter(m => m.manual).length;
   const missoesPct = pgImdPercent(
     participantes.reduce((s, p) => s + (p.progresso?.missoesConcluidas || 0), 0) / participantes.length, totalMissoesManuais);
+  const metas = getPgWeekMetas();
+  const semana = getPgGroupWeek(grupoNum);
+  const engajamentoPct = pgImdPercent(semana.engajamento, metas.engajamento.meta);
   const sw = PG_IMD_SUBWEIGHTS.growth;
-  return Math.round(streakPct * sw.streak + missoesPct * sw.missoes);
+  return Math.round(streakPct * sw.streak + missoesPct * sw.missoes + engajamentoPct * sw.engajamento);
 }
 
 // 5) FIDELIDADE — média entre presença física nos encontros já registrados no mês (mesmo
@@ -9342,7 +9369,7 @@ function getPgIMD(grupoNum) {
   pgIMD.communionScore = calcularComunhaoScore(grupoNum, participantesSemDup);
   pgIMD.relationshipScore = calcularRelacionamentoScore(grupoNum);
   pgIMD.missionScore = calcularMissaoScore(participantesSemDup);
-  pgIMD.growthScore = calcularCrescimentoScore(participantesSemDup);
+  pgIMD.growthScore = calcularCrescimentoScore(grupoNum, participantesSemDup);
   pgIMD.faithfulnessScore = calcularFidelidadeScore(g);
 
   pgIMD.totalScore = Math.round(
@@ -9385,6 +9412,16 @@ const PG_RANKING_TIEBREAK = ['totalScore', 'communionScore', 'missionScore', 'fa
 // constante pra poder virar "PG 5"/"Pequeno Grupo 5"/etc. sem mexer no algoritmo.
 const PG_DEFAULT_NAME = 'Grupo';
 
+// Nomes de PGs usados só para testes/homologação (QA) — nunca reais, nunca devem aparecer no
+// ranking. Comparação por nome normalizado (trim + minúsculas) pra sobreviver a pequenas
+// variações de digitação; qualquer nome contendo "teste qa" também é pego, de propósito.
+const PG_RANKING_EXCLUDE_NAMES = ['pg teste qa', 'grupo teste qa'];
+function isPgDeTeste(nome) {
+  const n = (nome || '').trim().toLowerCase();
+  if (!n) return false;
+  return PG_RANKING_EXCLUDE_NAMES.includes(n) || n.includes('teste qa');
+}
+
 function compararPgsParaRanking(a, b) {
   for (const campo of PG_RANKING_TIEBREAK) {
     if (b[campo] !== a[campo]) return b[campo] - a[campo];
@@ -9400,7 +9437,8 @@ function compararPgsParaRanking(a, b) {
 // PG sem nome ainda definido é identificado como "${PG_DEFAULT_NAME} N" (mesma convenção já
 // usada em outras telas, ex.: sanitize(g.nome || 'Grupo ' + g.num)) — não é excluído do ranking.
 function classificarPgs() {
-  const gruposFormados = PEQUENOS_GRUPOS.filter(g => g.nome || (g.participantes && g.participantes.length));
+  const gruposFormados = PEQUENOS_GRUPOS.filter(g =>
+    (g.nome || (g.participantes && g.participantes.length)) && !isPgDeTeste(g.nome));
   const calculatedAt = new Date().toISOString();
   const entradas = gruposFormados.map(g => {
     const imd = getPgIMD(g.num);
@@ -9543,10 +9581,16 @@ function getOrInitPgProgress(grupoNum) {
   let data = loadPgProgress(grupoNum);
   const weekKey = getISOWeekPg();
   if (!data || data.weekKey !== weekKey) {
-    data = { grupoNum, weekKey, estudos: 0, oracoes: 0, bondades: 0 };
+    data = { grupoNum, weekKey, estudos: 0, oracoes: 0, bondades: 0, gratidao: 0, engajamento: 0 };
   }
   return data;
 }
+
+// Tipos que valem para o pgProgress "clássico" (Semente→Comunhão Plena) — fixo, não usa mais
+// Object.keys(metas) porque a lista de metas cresceu (gratidao/engajamento entraram só para o
+// IMD); manter esses 3 preserva exatamente o que já valia pros grupos subirem de nível.
+const PG_SEMANA_COMPLETA_TIPOS = ['estudos', 'oracoes', 'bondades'];
+const PG_CONTRIB_TIPOS = ['estudos', 'oracoes', 'bondades', 'gratidao', 'engajamento'];
 
 // Incrementa o progresso do grupo quando o usuário completa uma ação
 function bumpPgProgress(tipo, qty = 1) {
@@ -9554,14 +9598,14 @@ function bumpPgProgress(tipo, qty = 1) {
   if (!meuGrupo) return;
   const grupoNum = meuGrupo.grupoNum;
   // Contribuição individual desta semana — gravada no meu registro (sincroniza e SOMA no grupo)
-  if (tipo === 'estudos' || tipo === 'oracoes' || tipo === 'bondades') {
+  if (PG_CONTRIB_TIPOS.includes(tipo)) {
     loadGrupos();
     const gMe = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
     const eu = gMe ? findMeuParticipante(gMe) : null;
     if (eu) {
       const wk = getISOWeekPg();
       const c = (eu.progresso && eu.progresso.contrib && eu.progresso.contrib.weekKey === wk)
-        ? eu.progresso.contrib : { weekKey: wk, estudos: 0, oracoes: 0, bondades: 0 };
+        ? eu.progresso.contrib : { weekKey: wk, estudos: 0, oracoes: 0, bondades: 0, gratidao: 0, engajamento: 0 };
       c[tipo] = (c[tipo] || 0) + qty;
       eu.progresso = { ...(eu.progresso || {}), contrib: c, updatedAt: Date.now() };
       saveGrupos();
@@ -9572,9 +9616,9 @@ function bumpPgProgress(tipo, qty = 1) {
     const metas = getPgWeekMetas();
     data[tipo] = Math.min(metas[tipo].meta, data[tipo] + qty);
     savePgProgress(grupoNum, data);
-    // Semana completa = METAS DO GRUPO atingidas (somando todos os participantes)
+    // Semana completa = as 3 metas originais do grupo atingidas (somando todos os participantes)
     const grp = getPgGroupWeek(grupoNum);
-    const allDone = Object.keys(metas).every(k => (grp[k] || 0) >= metas[k].meta);
+    const allDone = PG_SEMANA_COMPLETA_TIPOS.every(k => (grp[k] || 0) >= metas[k].meta);
     if (allDone) checkPgSemanaCompleta(grupoNum, data.weekKey);
   }
 }
@@ -10112,6 +10156,9 @@ function enviarGratidao() {
     ts: Date.now(),
   });
   saveGrupos();
+  // Alimenta o IMD do grupo (ver calcularComunhaoScore/calcularRelacionamentoScore) — pedido
+  // de oração conta como oração, gratidão como gratidão, cada publicação uma contribuição.
+  if (typeof bumpPgProgress === 'function') bumpPgProgress(gratTipo === 'oracao' ? 'oracoes' : 'gratidao', 1);
   renderComunidade();
 }
 
