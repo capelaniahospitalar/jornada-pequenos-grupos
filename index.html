@@ -4039,11 +4039,11 @@ function buildEstudosRealizadosHtml() {
 // "Desânimo" e "Medo do Futuro" referenciavam estudos 15/16, que não existem (a Jornada
 // tem 13) — nunca podiam chegar a 100%; corrigido aqui para os estudos válidos que sobraram.
 const OBSTACLES = [
-  { id:'cuidado_corpo', label:'Cuidado com a Saúde', icon:'💪', alwaysUnlocked:true, isArqVida:true, color:'#27AE60',
-    desc:'O corpo é o templo do Espírito Santo, mas costuma ser o que menos cuidamos — sono, alimentação, descanso e exercício sempre ficam para depois.',
-    versiculo:'Vocês não sabem que o corpo de vocês é santuário do Espírito Santo que habita em vocês?',
-    versiculoRef:'1 Coríntios 6.19 — NVT',
-    action:'Acesse a Jornada Arquitetura da Vida, faça o teste Q8RN e avalie seus gráficos de saúde.' },
+  // Sem ação própria de propósito — a ação vive só no card da missão semanal "Arquitetura da
+  // Vida" (ver confirmArquiteturaVidaMissao). Este obstáculo só aparece aqui DEPOIS de vencido
+  // (ver isObstacleUnlocked), direto na lista de vencidos, pra não duplicar o mesmo botão de
+  // ação em dois lugares da tela ao mesmo tempo.
+  { id:'cuidado_corpo', label:'Cuidado com a Saúde', icon:'💪', isArqVida:true },
   { id:'falta_oracao',  label:'Falta de Oração',  icon:'🙈', studies:[2],     color:'#1A5276',
     desc:'A oração ficou para depois. O problema não é falta de tempo — é falta de prioridade. E a distância de Deus cresce no silêncio.',
     versiculo:'Orem sem parar.',
@@ -4095,6 +4095,9 @@ function getObstacleProgress(obs) {
 }
 
 function isObstacleUnlocked(obs) {
+  // Cuidado com a Saúde não tem estado "em progresso" nesta lista — só aparece depois de
+  // vencido na missão Arquitetura da Vida, direto entre os vencidos (ver buildBossesHtml).
+  if (obs.isArqVida) return getObstacleProgress(obs) >= 100;
   if (obs.alwaysUnlocked) return true;
   // Um obstáculo é revelado quando o usuário alcança o primeiro estudo relacionado a ele
   const firstStudyIdx = Math.min(...obs.studies) - 1; // converter para índice 0-based
@@ -4156,12 +4159,9 @@ function buildBossesHtml() {
     const versiculoHtml = current.versiculo
       ? `<div style="font-size:12.5px;font-style:italic;color:var(--text3);margin:.35rem 0 0;padding-left:2px">"${current.versiculo}" — ${current.versiculoRef}</div>`
       : '';
-    // Cuidado do Corpo não usa o botão genérico de "marcar como feito" (+5 XP) — ele só é
-    // vencido pela missão semanal Arquitetura da Vida (ver getObstacleProgress).
-    const actionButtons = current.isArqVida
-      ? `<button class="boss-action-btn" style="margin-bottom:.4rem;background:var(--navy)" onclick="window.open('https://www.capelaniahospitalarsilvestre.com/', '_blank')">🔗 Acessar Arquitetura da Vida</button>
-         <button class="boss-action-btn" onclick="confirmArquiteturaVidaMissao('arqvida_sem_' + getISOWeek())">✓ Já fiz o teste Q8RN e avaliei os gráficos</button>`
-      : `<button class="boss-action-btn ${doneToday?'boss-action-done':''}" onclick="doObstacleAction('${current.id}')" ${doneToday?'disabled':''}>
+    // Cuidado com a Saúde nunca chega aqui "atual" (ver isObstacleUnlocked) — só entra na
+    // lista já vencido, então este botão sempre é o genérico dos demais obstáculos.
+    const actionButtons = `<button class="boss-action-btn ${doneToday?'boss-action-done':''}" onclick="doObstacleAction('${current.id}')" ${doneToday?'disabled':''}>
           ${doneToday ? '✓ Feito hoje' : 'Marcar como feito (+5 XP)'}
         </button>`;
     currentCard = `<div class="boss-card" style="margin-top:${defeatedRows ? '.5rem' : '0'}">
