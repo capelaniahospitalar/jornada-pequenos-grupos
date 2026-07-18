@@ -1753,6 +1753,7 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
     <div id="h-level-card"></div>
     <div id="h-missions"></div>
     <div id="desafios-embaixadores"></div>
+    <div id="desafios-arquitetura-vida"></div>
     <div id="desafios-obstaculos"></div>
   </div>
 </div>
@@ -4297,6 +4298,34 @@ function confirmEmbaixadorMissao(id) {
   renderEmbaixadoresMissoes();
 }
 
+// ── Missão semanal: Arquitetura da Vida (teste Q8RN no site externo da Capelania) ──
+// Autodeclarada, como as demais missões manuais — o app não tem como verificar que a
+// pessoa de fato fez o teste no site externo. id inclui a semana ISO, mesmo padrão das
+// missões semanais dos Embaixadores (reseta toda semana).
+function renderArquiteturaVidaMissao() {
+  const el = document.getElementById('desafios-arquitetura-vida');
+  if (!el) return;
+  const weekKey = getISOWeek();
+  const id = `arqvida_sem_${weekKey}`;
+  const isDone = (ST.missionsDone || []).includes(id);
+  el.innerHTML = `
+    <div class="mission-section">
+      <div class="mission-title">🧭 Arquitetura da Vida</div>
+      <div style="background:var(--blue-pale);border-radius:var(--radius-sm);padding:.6rem .75rem;margin:.2rem 0">
+        <div style="font-size:13px;color:var(--text3);line-height:1.45;margin-bottom:.55rem">Acesse a Jornada Arquitetura da Vida, faça o teste Q8RN e avalie seus gráficos.</div>
+        <button onclick="window.open('https://www.capelaniahospitalarsilvestre.com/', '_blank')" style="width:100%;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);padding:.55rem;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">🔗 Acessar Arquitetura da Vida</button>
+        ${isDone
+          ? `<div style="font-size:14px;color:var(--teal);font-weight:600">✓ Concluída esta semana — +75 XP</div>`
+          : `<button onclick="confirmArquiteturaVidaMissao('${id}')" style="width:100%;background:var(--teal);color:#fff;border:none;border-radius:var(--radius-sm);padding:.5rem;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--ff-body)">✓ Confirmar que fiz o teste Q8RN e avaliei os gráficos (+75 XP)</button>`}
+      </div>
+    </div>`;
+}
+
+function confirmArquiteturaVidaMissao(id) {
+  completeMission(id, 75);
+  renderArquiteturaVidaMissao();
+}
+
 function confirmMission(id) {
   completeMission(id, JOURNEY_MISSIONS.find(m => m.id === id)?.xp || 0);
   renderMissions();
@@ -4724,6 +4753,7 @@ function renderDesafios() {
   renderLevelCard();
   renderMissions();
   renderEmbaixadoresMissoes();
+  renderArquiteturaVidaMissao();
   const obsEl = document.getElementById('desafios-obstaculos');
   if (obsEl) obsEl.innerHTML = buildBossesHtml();
 }
