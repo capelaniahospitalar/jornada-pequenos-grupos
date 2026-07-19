@@ -1,5 +1,25 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-19] — Correção: tela do Companheiro de Jornada abrindo em branco
+
+**Relato do usuário:** ao acessar o app, a tela "Companheiro de Jornada" abria (título aparecia)
+mas o conteúdo ficava completamente em branco, sem nenhuma mensagem — reproduzido com uma captura
+de tela do próprio usuário (console sem erros).
+
+**Causa:** em `renderCompanionSelector()` (`index.html`, função declarada perto da linha 5835),
+havia uma checagem de segurança (`if (!mg || !g || !eu)`) para o caso do app não conseguir achar o
+registro do participante dentro dos dados do grupo (ex.: tela aberta enquanto a sincronização com o
+Firebase ainda está em andamento). O comentário do próprio código já dizia que esse caso era "raro,
+sem mensagem visível" — na prática, é esse caminho que gera a tela em branco relatada.
+
+**Correção:** no lugar de `el.innerHTML = ''`, agora mostra a mensagem "Não foi possível carregar
+seus dados agora" com um botão "🔄 Tentar novamente" que chama `renderCompanionScreen()` de novo.
+Nenhuma outra tela, regra de negócio ou dado foi alterado.
+
+**Testado:** reproduzido o cenário de participante não encontrado em ambiente local (servidor
+estático); confirmado que antes da correção a tela ficava em branco e depois da correção mostra a
+mensagem e o botão, sem erros no console.
+
 ## [2026-07-16/17] — Ranqueamento Saudável entre PGs, Registro de Encontros, Lembrete ao PG, Trio no Companheiro de Jornada
 
 Feito diretamente pelo usuário (18 commits, fora do processo usual de Mapa de Impacto →
