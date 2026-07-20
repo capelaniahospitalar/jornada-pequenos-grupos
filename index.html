@@ -5843,9 +5843,15 @@ function renderCompanionSelector(el) {
   // (ex.: tela aberta com a sincronização do Firebase ainda em andamento) e antes ficava em
   // branco sem explicação. Agora mostra uma mensagem com botão de tentar de novo.
   if (!mg || !g || !eu) {
+    // DIAGNÓSTICO TEMPORÁRIO (remover depois de achar a causa do reconhecimento falhando
+    // pós-restauração do Grupo 1, 2026-07-20) — mostra o que exatamente não bateu.
+    const meuIdDiag = (typeof getMyMemberId === 'function') ? getMyMemberId() : '(sem função)';
+    const partsDiag = (g && g.participantes) ? g.participantes.map(p => `${p.nome}[${p.memberId || 'sem-id'}]`).join(', ') : '(sem grupo)';
+    const diag = `mg=${mg ? 'ok' : 'NULO'} g=${g ? 'ok' : 'NULO'} eu=${eu ? 'ok' : 'NULO'} · meuGrupoNum=${mg && mg.grupoNum} meuNome="${mg && mg.nome}" meuTs=${mg && mg.ts} meuMemberId=${meuIdDiag} · participantes=${partsDiag}`;
     el.innerHTML = `<p style="font-size:15px;color:var(--text3);text-align:center;padding:2rem 1rem;font-family:var(--ff-body);line-height:1.6">
       Não foi possível carregar seus dados agora.<br>
       <button onclick="renderCompanionScreen()" style="margin-top:1rem;background:var(--purple);color:#fff;border:none;border-radius:8px;padding:.6rem 1.2rem;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--ff-body)">🔄 Tentar novamente</button>
+      <br><small style="display:block;margin-top:1rem;font-size:11px;color:var(--text3);word-break:break-word;opacity:.8">${sanitize(diag)}</small>
     </p>`;
     return;
   }
