@@ -5947,9 +5947,10 @@ function cpMyGroup() {
 // Trio (3 companheiros) só é oferecido quando o Pequeno Grupo tem número ÍMPAR de
 // participantes — com número par, todo mundo forma duplas e ninguém sobra.
 function cpGrupoImpar(g) { return !!g && ((g.participantes || []).length % 2) === 1; }
-function cpFindParticipant(g, nome, ts) {
+function cpFindParticipant(g, nome, ts, memberId) {
   if (!g || !g.participantes) return null;
-  return (ts && g.participantes.find(p => p.ts === ts)) ||
+  return (memberId && g.participantes.find(p => p.memberId === memberId)) ||
+         (ts && g.participantes.find(p => p.ts === ts)) ||
          g.participantes.find(p => p.nome === nome) || null;
 }
 // compParceiro guarda uma LISTA de até 2 companheiros (trio = pessoa que sobrou
@@ -5961,7 +5962,8 @@ function cpParceiros(p) {
 function cpMyParticipant() {
   const mg = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
   if (!mg) return null;
-  return cpFindParticipant(cpMyGroup(), mg.nome, mg.ts);
+  const meuId = (typeof getMyMemberId === 'function') ? getMyMemberId() : null;
+  return cpFindParticipant(cpMyGroup(), mg.nome, mg.ts, meuId);
 }
 function cpDisplay(p, i) {
   return {
