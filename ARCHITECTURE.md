@@ -185,6 +185,76 @@ durante o RC3.2, registrado para investigação futura, sem alterar comportament
   preparação para a Semana da Primavera.
 - Só inicia depois que o Épico 4 estiver consolidado (inteligência antes da gamificação).
 
+### RC3.5 — Redesenho do IMD por Capilaridade Discipular (aprovado conceitualmente, não implementado)
+
+> Consolidado nas RC3.5.1 (auditoria), RC3.5.2 (proposta) e RC3.5.2A (decisões finais) — só
+> discussão/design até aqui, nenhum código alterado. Migra para "Componentes Homologados" e
+> "Decisões Arquiteturais Consolidadas" somente após a RC3.5.3 (implementação) ser testada e
+> homologada — até lá, vive aqui como roadmap aprovado, não como regra em vigor.
+
+**Motivação (RC3.5.1):** auditoria encontrou que o IMD atual mede majoritariamente volume/médias
+por participante e metas fixas do grupo, não normalizadas pelo nº de participantes — o que permite
+a poucos participantes muito ativos elevarem artificialmente o IMD, e penaliza o PG por crescer
+(novo participante ainda inativo derruba a média). Confirmado com dado real de produção: um PG com
+17% de participantes ativos (1 de 6) rankeava acima de um PG com 100% de participantes ativos (11
+de 11).
+
+**Novo princípio arquitetural aprovado:** *"O melhor caminho para aumentar o IMD deve ser envolver
+um número cada vez maior de participantes, e nunca concentrar as atividades em poucos membros."*
+Nenhuma dimensão pode compensar uma Capilaridade baixa.
+
+**Novos componentes propostos (substituem as 5 dimensões atuais):**
+- **Capilaridade Discipular** (peso dominante) — % de participantes elegíveis que são "ativos no
+  ciclo". Dimensão que governa a classificação textual do PG (ver limiares abaixo).
+- **Engajamento Coletivo** — % de elegíveis que cumpriram o mínimo esperado por frente (oração,
+  gratidão/bondade, missão), substituindo as somas do grupo ÷ meta fixa de hoje.
+- **Profundidade Discipular** (nome revisado de "Qualidade Discipular" na RC3.5.2, a pedido do
+  usuário — evita confusão com o próprio IMD) — mede profundidade/consistência/evolução só entre
+  quem já é considerado ativo; peso baixo, de propósito.
+- **Missão Coletiva** — mantém Embaixadores (já era % de participantes); revisa campanhas
+  administrativas marcadas só pelo Tutor para não contarem como engajamento coletivo.
+- **Regularidade** — sucessora quase inalterada da Fidelidade atual (presença/regularidade de
+  encontros).
+
+**Definição formal de "Participante Ativo" (RC3.5.2A):** elegível (não removido, registrado há
+≥7 dias — período de carência que protege o PG de ser penalizado ao crescer) **e** que tenha
+cumprido **pelo menos 3 dos 7 indicadores** abaixo dentro do mês corrente (ciclo de referência
+único, para não misturar sinais semanais com o sinal mensal de Embaixadores):
+estudo concluído · oração registrada · missão concluída · presença em encontro · bondade
+registrada · gratidão publicada · streak pessoal vivo em algum dia do mês. Contagem de indicadores
+distintos, não sistema de pontos — mantém auditável e sem peso solto no código (mesmo princípio já
+consolidado abaixo, "nenhum peso fica solto").
+
+**Limiares de classificação (RC3.5.2A) — gate fixo, a categoria nunca ultrapassa o que Capilaridade
+e Regularidade permitem, mesmo com IMD numérico alto:**
+
+| Categoria | Capilaridade mínima | Regularidade mínima |
+|---|---|---|
+| Altamente Engajado | ≥75% | ≥70% |
+| Engajado | ≥60% | ≥50%¹ |
+| Engajamento Moderado | ≥40% | ≥30%¹ |
+| Baixo Engajamento | >0% | sem exigência |
+| Não Engajado | 0% (ou 0 elegíveis) | sem exigência |
+
+¹ Limiares de Regularidade para "Engajado" e "Moderado" foram extrapolados pelo assistente a partir
+do par explícito dado pelo usuário só para "Altamente Engajado" (Capilaridade≥75% + Regularidade
+≥70%) — a confirmar/ajustar com dado real na RC3.5.3, não são definitivos.
+
+**Evolução Discipular — reservado, não implementado nesta RC:** mede a variação (Δ) de indicadores
+entre dois pontos no tempo (ex.: início e fim do ciclo) — responde "essa pessoa está crescendo?",
+não só "quanto ela tem hoje". Bloqueado por falta de dado: hoje o app só guarda contadores
+correntes por participante (`estudosConcluidos`, `xp`, `streak`, `missoesConcluidas`), nunca um
+snapshot histórico. Fica reservado o peso zero (`PG_IMD_WEIGHTS.evolucao = 0`, fora do
+`totalScore`) e a flag `FB_FLAGS.evolucaoDiscipular` (reservada, sem leitura ainda) — mesmo padrão
+já usado no projeto para `useTombstone`/`debounceMs` antes de serem implementadas. Não implementar
+até existir infraestrutura de snapshot periódico por participante.
+
+**Compatibilidade confirmada:** nenhuma migração de schema necessária para a versão inicial — todo
+dado usado (`estudosConcluidos`, `streak`, `missoesConcluidas`, `embaixadores`, `gratidoes`,
+`reunioesMes`, `dataInscricao`) já existe por participante. Ressalva a checar antes da RC3.5.3:
+alguns participantes mais antigos têm `dataInscricao` nulo — precisa de regra de fallback para o
+cálculo de carência (proposta: sem data = já elegível).
+
 ---
 
 ## Decisões Arquiteturais Consolidadas
