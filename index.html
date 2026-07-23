@@ -8229,6 +8229,7 @@ const FB_FLAGS = Object.freeze({
   useTombstone    : true,   // (Commit 2) remoção transitória
   identidadeUuid  : true,   // (Etapa 1) memberId UUID + Meus Vínculos / Grupo Aberto (false = volta ao meuGrupo antigo)
   convitesV2      : true,   // (Etapa 2) convites de uso único (false = só ?pg= antigo)
+  imdV2Diagnostico: true,   // (RC3.5.3) mostra IMD atual x novo (Capilaridade) lado a lado no ranking do Tutor — desligar volta ao painel só com o modelo antigo
 });
 
 // Versão lógica + data de build (registrada na telemetria/log p/ auditoria futura)
@@ -9429,6 +9430,279 @@ function atualizarPgIMD(grupoNum) {
 }
 
 // ══════════════════════════════════════
+//  RC3.5.3 — IMD v2 (CAPILARIDADE DISCIPULAR) — MODO DE DUPLA AVALIAÇÃO
+// ══════════════════════════════════════
+// Novo modelo decidido nas RC3.5.1 (auditoria) / RC3.5.2 (proposta) / RC3.5.2A (decisões
+// finais) — ver ARCHITECTURE.md, seção "Roadmap Arquitetural". Convive com o modelo antigo
+// acima (getPgIMD/classificarPgs, 100% intocados) durante a homologação — ver
+// FB_FLAGS.imdV2Diagnostico. O algoritmo antigo só é removido depois de homologada esta RC
+// (decisão explícita do usuário, pra reduzir risco de regressão).
+
+const PG_IMD_V2_WEIGHTS = {
+  capilaridade : 0.30,
+  engajamento  : 0.25,
+  missao       : 0.20,
+  regularidade : 0.15,
+  profundidade : 0.10,
+  evolucao     : 0,      // RC3.5.2A: reservado, não implementado — falta snapshot histórico por participante
+};
+
+const PG_IMD_ATIVO_MIN_INDICADORES = 3; // RC3.5.2A: participante ativo = >= 3 dos indicadores abaixo
+const PG_IMD_CARENCIA_DIAS = 7;          // RC3.5.2A: carência antes de contar contra/a favor do PG
+
+// Limiares de classificação (RC3.5.2A) — gate fixo: a categoria nunca passa do que
+// Capilaridade e Regularidade permitem, mesmo com IMD numérico alto. Checado do mais alto
+// pro mais baixo; o primeiro nível cujos DOIS limiares batem é o vencedor.
+const PG_ENGAJAMENTO_LIMIARES = [
+  { categoria: 'Altamente Engajado',   capilaridade: 75, regularidade: 70 },
+  { categoria: 'Engajado',             capilaridade: 60, regularidade: 50 },
+  { categoria: 'Engajamento Moderado', capilaridade: 40, regularidade: 30 },
+];
+
+// RC3.5.2A: elegibilidade por carência. Usa p.ts (timestamp de registro em ms, sempre
+// presente — mesma fonte já usada em removerDoGrupoAtual/cpFindParticipant) em vez de
+// parsear dataInscricao (string 'DD/MM/AAAA', sem parser existente no código): registros
+// legados sem data confiável têm ts muito antigo/pequeno, o que já os torna elegíveis na
+// hora — mesmo resultado combinado (dataInscricao nula = elegível imediatamente), sem risco
+// de parsing de data quebrar em formato inesperado.
+function participanteElegivelV2(p, agora) {
+  if (!p.ts) return true;
+  return ((agora - p.ts) / 86400000) >= PG_IMD_CARENCIA_DIAS;
+}
+
+// RC3.5.3 (ajustado após teste com dado real de produção): batizado "Participante com
+// Evidência de Engajamento" — deliberadamente NÃO "participante ativo do ciclo", porque o
+// modelo de dados de hoje não sustenta um recorte confiável por período. Duas tentativas
+// descartadas: (a) exigir contrib.weekKey === semana atual — zerava a Capilaridade de PGs
+// claramente engajados só porque a atividade real caiu numa semana anterior (contrib não
+// guarda histórico, só a última semana em que a pessoa agiu); (b) aceitar qualquer contrib
+// sem nenhum recorte — deixaria alguém que agiu uma única vez há meses "ativo" pra sempre,
+// distorcendo o IMD na direção oposta. Decisão do usuário: usar o ÚLTIMO contrib disponível
+// da pessoa (seja qual for a semana), documentando a limitação explicitamente, em vez de
+// forçar uma regra de tempo que o dado não sustenta. Correção definitiva fica reservada para
+// a RC3.6 (`lastActivityAt` por participante — ver ARCHITECTURE.md), que permitirá trocar
+// isto por uma janela móvel real (ex.: últimos 30 dias) sem mudar o conceito de negócio.
+// Ficaram de fora: missão da Jornada (missoesConcluidas é só total vitalício, sem nenhum
+// recorte) e presença nominal (só existe agregado por encontro, sem nome da pessoa).
+function participanteComEvidenciaEngajamentoV2(p, monthKey) {
+  const c = (p.progresso && p.progresso.contrib) ? p.progresso.contrib : null;
+  let indicadores = 0;
+  if (c && c.estudos > 0) indicadores++;
+  if (c && c.oracoes > 0) indicadores++;
+  if (c && c.bondades > 0) indicadores++;
+  if (c && c.gratidao > 0) indicadores++;
+  if (c && c.engajamento > 0) indicadores++;
+  if ((p.progresso?.streak || 0) > 0) indicadores++;
+  if (p.embaixadores?.[monthKey]?.participou) indicadores++;
+  return indicadores >= PG_IMD_ATIVO_MIN_INDICADORES;
+}
+
+// 1) CAPILARIDADE — % de participantes elegíveis com Evidência de Engajamento (ver nota
+// acima sobre a limitação de recorte temporal). Dimensão dominante: nenhuma outra dimensão
+// compensa uma capilaridade baixa (princípio da RC3.5.2).
+function calcularCapilaridadeScoreV2(participantesElegiveis, monthKey) {
+  if (!participantesElegiveis.length) return 0;
+  const comEvidencia = participantesElegiveis.filter(p => participanteComEvidenciaEngajamentoV2(p, monthKey)).length;
+  return pgImdPercent(comEvidencia, participantesElegiveis.length);
+}
+
+// 2) ENGAJAMENTO COLETIVO — % de elegíveis que têm registro (o último disponível, mesma
+// limitação de recorte temporal acima) em cada frente — substitui as somas do grupo ÷ meta
+// fixa do modelo antigo, que agora é sempre "quantas pessoas", nunca "quanto". Média simples
+// das 3 frentes, sem sub-peso extra (mantém auditável).
+function calcularEngajamentoColetivoScoreV2(participantesElegiveis) {
+  if (!participantesElegiveis.length) return 0;
+  const n = participantesElegiveis.length;
+  const contribDoParticipante = p => (p.progresso && p.progresso.contrib) ? p.progresso.contrib : null;
+  const oracaoPct = pgImdPercent(participantesElegiveis.filter(p => (contribDoParticipante(p)?.oracoes || 0) > 0).length, n);
+  const relPct = pgImdPercent(participantesElegiveis.filter(p => {
+    const c = contribDoParticipante(p);
+    return c && (c.bondades > 0 || c.gratidao > 0);
+  }).length, n);
+  const missaoSemanalPct = pgImdPercent(participantesElegiveis.filter(p => (contribDoParticipante(p)?.engajamento || 0) > 0).length, n);
+  return Math.round((oracaoPct + relPct + missaoSemanalPct) / 3);
+}
+
+// 3) PROFUNDIDADE DISCIPULAR (nome revisado de "Qualidade Discipular" na RC3.5.2, a pedido
+// do usuário) — média de estudos concluídos (total acumulado) e streak, só entre quem já tem
+// Evidência de Engajamento. Separa "quantos" (Capilaridade) de "quão fundo" (aqui); peso
+// baixo de propósito, pra não recriar o viés do modelo antigo.
+function calcularProfundidadeScoreV2(participantesComEvidenciaLista) {
+  if (!participantesComEvidenciaLista.length) return 0;
+  const estudosPct = pgImdPercent(
+    participantesComEvidenciaLista.reduce((s, p) => s + (p.progresso?.estudosConcluidos || 0), 0) / participantesComEvidenciaLista.length,
+    STUDIES.length);
+  const streakPct = pgImdPercent(
+    participantesComEvidenciaLista.reduce((s, p) => s + Math.min(p.progresso?.streak || 0, MAX_STREAK_DAYS), 0) / participantesComEvidenciaLista.length,
+    MAX_STREAK_DAYS);
+  return Math.round((estudosPct + streakPct) / 2);
+}
+
+// 4) MISSÃO COLETIVA — % de elegíveis participando dos Embaixadores este mês (já era % de
+// participantes no modelo antigo, mantido). Campanhas administrativas (marcadas só pelo
+// Tutor, sem relação com quantos participantes se envolveram) saem do IMD do participante —
+// continuam existindo só como indicador à parte no painel do Tutor (RC3.5.2, item 3).
+function calcularMissaoColetivaScoreV2(participantesElegiveis, monthKey) {
+  if (!participantesElegiveis.length) return 0;
+  return pgImdPercent(
+    participantesElegiveis.filter(p => p.embaixadores?.[monthKey]?.participou).length,
+    participantesElegiveis.length);
+}
+
+// 5) REGULARIDADE — sucessora da Fidelidade atual, sem mudança de fórmula (já era a
+// dimensão mais resistente ao viés de concentração — não depende do tamanho do roster).
+function calcularRegularidadeScoreV2(g) {
+  return calcularFidelidadeScore(g);
+}
+
+// RC3.5.2A: classificação por gate fixo — nunca ultrapassa o que Capilaridade+Regularidade
+// permitem, mesmo com IMD numérico alto.
+function classificarEngajamentoPgV2(capilaridade, regularidade) {
+  for (const nivel of PG_ENGAJAMENTO_LIMIARES) {
+    if (capilaridade >= nivel.capilaridade && regularidade >= nivel.regularidade) return nivel.categoria;
+  }
+  return capilaridade > 0 ? 'Baixo Engajamento' : 'Não Engajado';
+}
+
+// Calcula o pgIMD v2 inteiro (não persiste, mesmo padrão do getPgIMD original).
+function getPgIMDv2(grupoNum) {
+  const pgIMDv2 = {
+    capilaridadeScore: 0, engajamentoScore: 0, missaoScore: 0, regularidadeScore: 0,
+    profundidadeScore: 0, totalScore: 0, categoria: 'Não Engajado',
+    totalParticipantes: 0, totalElegiveis: 0, totalComEvidencia: 0,
+    calculatedAt: '', schemaVersion: 2,
+  };
+  const g = (typeof PEQUENOS_GRUPOS !== 'undefined') ? PEQUENOS_GRUPOS.find(x => x.num === grupoNum) : null;
+  if (!g || !g.participantes) return pgIMDv2;
+
+  const agora = Date.now();
+  const monthKey = embMonthKey();
+  const participantesSemDup = participantesAtivos(g).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
+  const elegiveis = participantesSemDup.filter(p => participanteElegivelV2(p, agora));
+  const comEvidenciaLista = elegiveis.filter(p => participanteComEvidenciaEngajamentoV2(p, monthKey));
+
+  pgIMDv2.totalParticipantes = participantesSemDup.length;
+  pgIMDv2.totalElegiveis = elegiveis.length;
+  pgIMDv2.totalComEvidencia = comEvidenciaLista.length;
+
+  pgIMDv2.capilaridadeScore = calcularCapilaridadeScoreV2(elegiveis, monthKey);
+  pgIMDv2.engajamentoScore  = calcularEngajamentoColetivoScoreV2(elegiveis);
+  pgIMDv2.missaoScore       = calcularMissaoColetivaScoreV2(elegiveis, monthKey);
+  pgIMDv2.regularidadeScore = calcularRegularidadeScoreV2(g);
+  pgIMDv2.profundidadeScore = calcularProfundidadeScoreV2(comEvidenciaLista);
+
+  pgIMDv2.totalScore = Math.round(
+    pgIMDv2.capilaridadeScore * PG_IMD_V2_WEIGHTS.capilaridade +
+    pgIMDv2.engajamentoScore  * PG_IMD_V2_WEIGHTS.engajamento +
+    pgIMDv2.missaoScore       * PG_IMD_V2_WEIGHTS.missao +
+    pgIMDv2.regularidadeScore * PG_IMD_V2_WEIGHTS.regularidade +
+    pgIMDv2.profundidadeScore * PG_IMD_V2_WEIGHTS.profundidade
+  );
+  pgIMDv2.categoria = classificarEngajamentoPgV2(pgIMDv2.capilaridadeScore, pgIMDv2.regularidadeScore);
+  pgIMDv2.calculatedAt = new Date().toISOString();
+  return pgIMDv2;
+}
+
+// Roda os dois motores (v1 intocado + v2 novo) sobre os mesmos grupos, lado a lado, só para
+// homologação — não persiste nada, não substitui classificarPgs(). Usada só quando
+// FB_FLAGS.imdV2Diagnostico está ligada (ver renderRankingPgs).
+function classificarPgsV2Diagnostico() {
+  const entradasV1 = classificarPgs();
+  return entradasV1.map(e => {
+    const v2 = getPgIMDv2(e.grupoNum);
+    return {
+      ...e,
+      v2Score: v2.totalScore,
+      v2Categoria: v2.categoria,
+      v2Capilaridade: v2.capilaridadeScore,
+      v2Regularidade: v2.regularidadeScore,
+      diferenca: v2.totalScore - e.totalScore,
+    };
+  });
+}
+
+// RC3.5.3 (pedido do usuário): distribuição dos 7 indicadores por PG — quantos participantes
+// elegíveis cumprem CADA indicador individualmente, não só o score agregado. Mais acionável
+// pro Tutor: "ninguém orou este ciclo" orienta onde reforçar; "engajamento baixo" sozinho não.
+function calcularDistribuicaoIndicadoresV2(grupoNum) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return null;
+  const monthKey = embMonthKey();
+  const agora = Date.now();
+  const participantesSemDup = participantesAtivos(g).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
+  const elegiveis = participantesSemDup.filter(p => participanteElegivelV2(p, agora));
+  const contribDe = p => (p.progresso && p.progresso.contrib) ? p.progresso.contrib : null;
+  const contar = fn => elegiveis.filter(fn).length;
+  return {
+    grupoNum,
+    totalElegiveis: elegiveis.length,
+    indicadores: {
+      estudos      : contar(p => (contribDe(p)?.estudos || 0) > 0),
+      oracao       : contar(p => (contribDe(p)?.oracoes || 0) > 0),
+      bondade      : contar(p => (contribDe(p)?.bondades || 0) > 0),
+      gratidao     : contar(p => (contribDe(p)?.gratidao || 0) > 0),
+      missaoSemanal: contar(p => (contribDe(p)?.engajamento || 0) > 0),
+      streak       : contar(p => (p.progresso?.streak || 0) > 0),
+      embaixadores : contar(p => p.embaixadores?.[monthKey]?.participou),
+    },
+    comEvidencia: contar(p => participanteComEvidenciaEngajamentoV2(p, monthKey)),
+  };
+}
+
+// RC3.5.3: tabela de distribuição de indicadores por PG, pro modo diagnóstico.
+function renderDistribuicaoIndicadoresV2(entradas) {
+  if (!entradas.length) return '';
+  const linhas = entradas.map(e => {
+    const d = calcularDistribuicaoIndicadoresV2(e.grupoNum);
+    const n = d ? d.totalElegiveis : 0;
+    if (!n) return `<tr><td style="padding:.3rem .5rem">${sanitize(e.grupo)}</td><td colspan="8" style="padding:.3rem .5rem;text-align:center;color:var(--text3)">sem participante elegível ainda</td></tr>`;
+    const cel = v => `${v}/${n}`;
+    return `<tr>
+      <td style="padding:.3rem .5rem">${sanitize(e.grupo)}</td>
+      <td style="padding:.3rem .5rem;text-align:center">${cel(d.indicadores.estudos)}</td>
+      <td style="padding:.3rem .5rem;text-align:center">${cel(d.indicadores.oracao)}</td>
+      <td style="padding:.3rem .5rem;text-align:center">${cel(d.indicadores.bondade)}</td>
+      <td style="padding:.3rem .5rem;text-align:center">${cel(d.indicadores.gratidao)}</td>
+      <td style="padding:.3rem .5rem;text-align:center">${cel(d.indicadores.missaoSemanal)}</td>
+      <td style="padding:.3rem .5rem;text-align:center">${cel(d.indicadores.streak)}</td>
+      <td style="padding:.3rem .5rem;text-align:center">${cel(d.indicadores.embaixadores)}</td>
+      <td style="padding:.3rem .5rem;text-align:center"><strong>${cel(d.comEvidencia)}</strong></td>
+    </tr>`;
+  }).join('');
+  return `
+    <div class="content-card" style="overflow-x:auto">
+      <div class="phase-tag tag-content" style="margin-bottom:.5rem">📊 Distribuição dos indicadores por PG (diagnóstico)</div>
+      <p class="body-text" style="font-size:13px;margin-bottom:.5rem">Quantos participantes elegíveis (de N) cumprem cada indicador — mostra onde reforçar, não só o placar final.</p>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--ff-body);white-space:nowrap">
+        <thead><tr style="text-align:center;color:var(--text3)">
+          <th style="text-align:left;padding:.3rem .5rem">PG</th>
+          <th style="padding:.3rem .5rem">Estudo</th><th style="padding:.3rem .5rem">Oração</th>
+          <th style="padding:.3rem .5rem">Bondade</th><th style="padding:.3rem .5rem">Gratidão</th>
+          <th style="padding:.3rem .5rem">Missão</th><th style="padding:.3rem .5rem">Streak</th>
+          <th style="padding:.3rem .5rem">Embaix.</th><th style="padding:.3rem .5rem">Evidência</th>
+        </tr></thead>
+        <tbody>${linhas}</tbody>
+      </table>
+    </div>`;
+}
+
+// RC3.5.3 (pedido do usuário): fase de implantação x consolidação — referência = Marco Zero
+// (2026-07-05, produção reinicializada, ver ESTADO-E-ROADMAP.md). Nos primeiros 60 dias, o
+// painel avisa que os índices são LINHA DE BASE (faixas de classificação ainda não
+// calibradas com dado real) — evita que uma distribuição concentrada em "Não Engajado" pareça
+// um defeito, quando na verdade é o app ainda muito novo. Depois de 60 dias, o aviso muda
+// para "fase de consolidação", sinalizando que já há dado real suficiente para calibrar.
+const PG_IMD_V2_MARCO_ZERO = new Date('2026-07-05T00:00:00').getTime();
+const PG_IMD_V2_DIAS_FASE1 = 60;
+function faseImplantacaoIMDv2() {
+  const dias = Math.floor((Date.now() - PG_IMD_V2_MARCO_ZERO) / 86400000);
+  if (dias < PG_IMD_V2_DIAS_FASE1) {
+    return { fase: 1, dias, texto: `📍 Fase 1 — Implantação (dia ${dias} de ${PG_IMD_V2_DIAS_FASE1}). Os índices representam a linha de base para acompanhar a evolução dos Pequenos Grupos — as faixas de classificação (Não Engajado/Baixo/Moderado/Engajado/Altamente Engajado) ainda não foram calibradas com dado real suficiente.` };
+  }
+  return { fase: 2, dias, texto: `📍 Fase 2 — Consolidação (dia ${dias}). Já há dado real acumulado suficiente para calibrar as faixas de classificação, se necessário.` };
+}
+
+// ══════════════════════════════════════
 //  RC3.3 — MOTOR DE CLASSIFICAÇÃO DOS PEQUENOS GRUPOS
 // ══════════════════════════════════════
 // Só o algoritmo que decide ordem/posição/empate — sem tela, ranking visual, medalha,
@@ -9558,6 +9832,26 @@ function renderPgRankingCards(entradas) {
     </div>`).join('');
 }
 
+// RC3.5.3 — cards do modo diagnóstico (v1 atual x v2 novo, lado a lado). Só usada quando
+// FB_FLAGS.imdV2Diagnostico está ligada (ver renderRankingPgs) — nunca substitui
+// renderPgRankingCards, que continua servindo o modelo antigo sozinho quando a flag cai.
+function renderPgRankingCardsV2Diagnostico(entradas) {
+  if (!entradas.length) {
+    return `<div class="content-card"><p class="body-text">Nenhum Pequeno Grupo com dados suficientes ainda.</p></div>`;
+  }
+  return entradas.map(e => `
+    <div class="panel-section" style="margin-bottom:.5rem">
+      <div style="font-size:13px;color:var(--text3);font-family:var(--ff-body);margin-bottom:2px">${medalhaRank(e.rank)}${e.rank}º lugar (modelo atual)</div>
+      <div style="font-size:16px;font-weight:700;color:var(--navy2);font-family:var(--ff-body);margin-bottom:.4rem">${sanitize(e.grupo)}</div>
+      <div class="panel-stat"><span>IMD atual</span><strong>${e.totalScore}</strong></div>
+      <div class="panel-stat"><span>IMD novo (v2)</span><strong>${e.v2Score}</strong></div>
+      <div class="panel-stat"><span>Diferença</span><strong>${e.diferenca > 0 ? '+' : ''}${e.diferenca}</strong></div>
+      <div class="panel-stat"><span>Categoria (v2)</span><strong>${e.v2Categoria}</strong></div>
+      <div class="panel-stat"><span>Capilaridade (v2)</span><strong>${e.v2Capilaridade}%</strong></div>
+      <div class="panel-stat"><span>Participantes</span><strong>${e.totalParticipantes}</strong></div>
+    </div>`).join('');
+}
+
 // RC3.4A.1 — Comando (grava) e consulta (lê) separados: abrir o painel NUNCA grava no
 // Firebase. atualizarPgIMD()/atualizarPgRanking() só devem rodar quando o dado de um PG
 // realmente mudar (evento — encontro registrado, missão concluída, etc.), numa RC futura.
@@ -9569,18 +9863,23 @@ function formatarDataHoraBR(iso) {
 }
 
 function renderRankingPgs(nome) {
-  const entradas = classificarPgs();
+  const diagnostico = FB_FLAGS.imdV2Diagnostico;
+  const entradas = diagnostico ? classificarPgsV2Diagnostico() : classificarPgs();
   const nomeEsc = nome.replace(/'/g,"\\'");
   const atualizadoEm = entradas[0] ? formatarDataHoraBR(entradas[0].calculatedAt) : formatarDataHoraBR(new Date().toISOString());
+  const fase = diagnostico ? faseImplantacaoIMDv2() : null;
 
   document.getElementById('tutorpanel-body').innerHTML = `
     <div class="content-card">
       <div class="phase-tag tag-content">🏆 Índice de Maturidade Discipular dos Pequenos Grupos</div>
       <p class="body-text">O ranking é calculado com base nas dimensões de Comunhão, Relacionamento, Missão, Crescimento e Fidelidade, incentivando o desenvolvimento integral dos Pequenos Grupos.</p>
+      ${diagnostico ? `<p class="body-text" style="color:var(--gold-mid);font-weight:600">🔧 Modo diagnóstico (RC3.5.3): comparando o modelo atual com o novo modelo por Capilaridade, em homologação.</p>` : ''}
+      ${fase ? `<p class="body-text" style="font-size:13px;color:var(--text3)">${fase.texto}</p>` : ''}
       <div class="panel-stat" style="margin-top:.6rem"><span>Atualizado em</span><strong>${atualizadoEm}</strong></div>
       <div class="panel-stat"><span>Total de PGs classificados</span><strong>${entradas.length}</strong></div>
     </div>
-    ${renderPgRankingCards(entradas)}
+    ${diagnostico ? renderPgRankingCardsV2Diagnostico(entradas) : renderPgRankingCards(entradas)}
+    ${diagnostico ? renderDistribuicaoIndicadoresV2(entradas) : ''}
     <button onclick="renderTutorGruposList('${nomeEsc}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Voltar aos meus grupos</button>`;
   resetScroll();
 }

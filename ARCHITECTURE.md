@@ -185,12 +185,16 @@ durante o RC3.2, registrado para investigação futura, sem alterar comportament
   preparação para a Semana da Primavera.
 - Só inicia depois que o Épico 4 estiver consolidado (inteligência antes da gamificação).
 
-### RC3.5 — Redesenho do IMD por Capilaridade Discipular (aprovado conceitualmente, não implementado)
+### RC3.5 — Redesenho do IMD por Capilaridade Discipular (RC3.5.3 implementada — HOMOLOGAÇÃO PARCIAL)
 
-> Consolidado nas RC3.5.1 (auditoria), RC3.5.2 (proposta) e RC3.5.2A (decisões finais) — só
-> discussão/design até aqui, nenhum código alterado. Migra para "Componentes Homologados" e
-> "Decisões Arquiteturais Consolidadas" somente após a RC3.5.3 (implementação) ser testada e
-> homologada — até lá, vive aqui como roadmap aprovado, não como regra em vigor.
+> RC3.5.1 (auditoria) → RC3.5.2 (proposta) → RC3.5.2A (decisões finais) → RC3.5.3 (implementação,
+> `index.html`, motor `getPgIMDv2`/`classificarPgsV2Diagnostico`, convive com o motor antigo
+> intocado via `FB_FLAGS.imdV2Diagnostico`). **Homologação parcial (decisão do usuário):**
+> arquitetura, algoritmo, fórmula, conceito de Capilaridade e a regra de 3 indicadores estão
+> homologados — mas os LIMIARES de classificação (tabela abaixo) permanecem como linha de base,
+> não homologados, até um período de dado real acumulado (ver "Fase de Implantação" abaixo). Só
+> migra inteiro para "Componentes Homologados"/"Decisões Arquiteturais Consolidadas" quando os
+> limiares também forem confirmados com dado real.
 
 **Motivação (RC3.5.1):** auditoria encontrou que o IMD atual mede majoritariamente volume/médias
 por participante e metas fixas do grupo, não normalizadas pelo nº de participantes — o que permite
@@ -216,14 +220,22 @@ Nenhuma dimensão pode compensar uma Capilaridade baixa.
 - **Regularidade** — sucessora quase inalterada da Fidelidade atual (presença/regularidade de
   encontros).
 
-**Definição formal de "Participante Ativo" (RC3.5.2A):** elegível (não removido, registrado há
-≥7 dias — período de carência que protege o PG de ser penalizado ao crescer) **e** que tenha
-cumprido **pelo menos 3 dos 7 indicadores** abaixo dentro do mês corrente (ciclo de referência
-único, para não misturar sinais semanais com o sinal mensal de Embaixadores):
-estudo concluído · oração registrada · missão concluída · presença em encontro · bondade
-registrada · gratidão publicada · streak pessoal vivo em algum dia do mês. Contagem de indicadores
-distintos, não sistema de pontos — mantém auditável e sem peso solto no código (mesmo princípio já
-consolidado abaixo, "nenhum peso fica solto").
+**Elegibilidade (RC3.5.3, implementada):** não removido + registrado há ≥7 dias
+(`PG_IMD_CARENCIA_DIAS`) — usa `p.ts` (timestamp de registro em ms, sempre presente) em vez de
+parsear `dataInscricao` (string 'DD/MM/AAAA', sem parser no código); registros legados sem data
+confiável têm `ts` muito antigo/pequeno, o que já os torna elegíveis na hora — mesmo resultado da
+decisão original (`dataInscricao` nulo = elegível imediatamente), sem risco de parsing quebrar.
+
+**"Participante Ativo" → renomeado para "Participante com Evidência de Engajamento" (achado
+durante a implementação da RC3.5.3, não um recuo da regra de negócio):** a definição continua
+**≥3 dos 7 indicadores** (estudo · oração · bondade · gratidão · missão semanal · streak ·
+Embaixadores — missão da Jornada e presença nominal ficaram de fora, ver ressalva abaixo), mas o
+**recorte por ciclo teve que ser abandonado** — testado com dado real, nem "semana atual"
+(zerava PGs claramente engajados só por virada de semana, pois `contrib.weekKey` não guarda
+histórico) nem "qualquer contrib sem limite" (deixaria alguém inativo há meses "ativo" para
+sempre) se sustentavam. Solução adotada: usa o ÚLTIMO `contrib` disponível da pessoa (seja qual
+for a semana), sem fingir que é um recorte temporal real — daí o nome "Evidência de Engajamento"
+em vez de "ativo no ciclo". Correção definitiva depende da **RC3.6** (ver Roadmap, abaixo).
 
 **Limiares de classificação (RC3.5.2A) — gate fixo, a categoria nunca ultrapassa o que Capilaridade
 e Regularidade permitem, mesmo com IMD numérico alto:**
@@ -238,7 +250,27 @@ e Regularidade permitem, mesmo com IMD numérico alto:**
 
 ¹ Limiares de Regularidade para "Engajado" e "Moderado" foram extrapolados pelo assistente a partir
 do par explícito dado pelo usuário só para "Altamente Engajado" (Capilaridade≥75% + Regularidade
-≥70%) — a confirmar/ajustar com dado real na RC3.5.3, não são definitivos.
+≥70%) — **ainda não confirmados com dado real, e não serão ajustados por reação a um resultado
+baixo** (decisão explícita do usuário: baixar a régua só porque o resultado ficou baixo é erro
+clássico de calibração). Ficam como estão até o fim da Fase 1.
+
+**Fase de Implantação x Consolidação (decisão do usuário, RC3.5.3):** testado com dado real de
+produção (23/07/2026), a distribuição ficou **33 de 37 PGs "Não Engajado", 4 "Baixo Engajamento",
+0 em Moderado ou acima** — não interpretado como régua rigorosa demais, e sim como reflexo de um
+app muito recente (maioria dos PGs criada há 1-2 semanas, muitos participantes ainda dentro da
+carência de 7 dias). Função `faseImplantacaoIMDv2()` calcula os dias desde o Marco Zero
+(2026-07-05, ver "Estado dos dados na nuvem" no `ESTADO-E-ROADMAP.md`) e exibe no painel: **Fase 1
+— Implantação** (dias 0-60, os índices são linha de base, faixas ainda não calibradas) → **Fase 2
+— Consolidação** (a partir do dia 60, dado real acumulado suficiente pra calibrar se necessário).
+Só então os limiares acima devem ser revisados — com base em distribuição real, não em reação a
+um resultado inicial baixo.
+
+**Painel de diagnóstico — distribuição dos indicadores por PG (RC3.5.3, pedido do usuário):**
+`calcularDistribuicaoIndicadoresV2(grupoNum)` + `renderDistribuicaoIndicadoresV2(entradas)` —
+mostra, por PG, quantos participantes elegíveis (de quantos) cumprem CADA um dos 7 indicadores
+individualmente (não só o score agregado). Objetivo: o Tutor enxerga onde reforçar ("ninguém orou
+este ciclo") em vez de só "engajamento baixo". Exibido no painel de ranking só quando
+`FB_FLAGS.imdV2Diagnostico` está ligada, junto dos cards lado a lado (IMD atual x novo).
 
 **Evolução Discipular — reservado, não implementado nesta RC:** mede a variação (Δ) de indicadores
 entre dois pontos no tempo (ex.: início e fim do ciclo) — responde "essa pessoa está crescendo?",
@@ -249,11 +281,27 @@ snapshot histórico. Fica reservado o peso zero (`PG_IMD_WEIGHTS.evolucao = 0`, 
 já usado no projeto para `useTombstone`/`debounceMs` antes de serem implementadas. Não implementar
 até existir infraestrutura de snapshot periódico por participante.
 
-**Compatibilidade confirmada:** nenhuma migração de schema necessária para a versão inicial — todo
-dado usado (`estudosConcluidos`, `streak`, `missoesConcluidas`, `embaixadores`, `gratidoes`,
-`reunioesMes`, `dataInscricao`) já existe por participante. Ressalva a checar antes da RC3.5.3:
-alguns participantes mais antigos têm `dataInscricao` nulo — precisa de regra de fallback para o
-cálculo de carência (proposta: sem data = já elegível).
+**Compatibilidade confirmada:** nenhuma migração de schema foi necessária — todo dado usado
+(`progresso.contrib`, `estudosConcluidos`, `streak`, `embaixadores`, `ts`) já existia por
+participante. A ressalva original do `dataInscricao` nulo não bloqueou nada: a RC3.5.3 usa `ts`
+(sempre presente) em vez de `dataInscricao`, o que já resolve o caso legado por construção.
+
+**Indicadores fora do escopo da RC3.5.3 (dado não existe hoje):** missão da Jornada
+(`missoesConcluidas` é só total vitalício, sem nenhum recorte por tempo) e presença nominal em
+encontro (só existe agregado por reunião — presentes/total —, sem o nome de quem esteve lá). Não
+bloqueiam a Capilaridade (calculada com os outros 6 indicadores + Embaixadores = 7), mas reduzem a
+precisão do modelo até existirem.
+
+### RC3.6 — `lastActivityAt` por participante (roadmap futuro, não iniciado)
+
+Corrige a limitação encontrada na RC3.5.3 (ver "Participante com Evidência de Engajamento" acima):
+sem um carimbo de última atividade, não existe hoje forma de calcular uma janela móvel real (ex.:
+"ativo nos últimos 30 dias"). Proposta: novo campo `p.progresso.lastActivityAt` (timestamp em ms),
+atualizado por qualquer ação relevante (mesmos gatilhos de `bumpPgProgress`/conclusão de
+estudo/missão/streak). O critério de "Participante Ativo" passaria a ser
+`(agora - lastActivityAt) <= 30 dias`, substituindo a Evidência de Engajamento (que usa o último
+dado disponível, sem limite de idade) por uma janela real. Aditivo, não quebra nada existente.
+Só inicia depois de a Fase 1 de implantação terminar (dado real suficiente pra validar o impacto).
 
 ---
 
