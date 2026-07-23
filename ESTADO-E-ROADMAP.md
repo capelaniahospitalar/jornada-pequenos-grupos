@@ -1,8 +1,53 @@
-# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-07-18)
+# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-07-23)
 
 > Documento para retomar o trabalho em outra máquina/sessão. Cole o conteúdo de volta
 > para o assistente ao recomeçar — a "memória" do assistente **não viaja entre máquinas**;
 > só este arquivo (via GitHub) viaja. **Nenhuma alteração de código sem aprovação do desenho.**
+
+## ⭐ SESSÃO 2026-07-23 — retomar por aqui
+
+Três frentes fechadas nesta sessão, todas já commitadas. Detalhe técnico completo em
+`ARCHITECTURE.md` (seção "Roadmap Arquitetural", item RC3.5) e `CHANGELOG.md` (entradas de
+2026-07-23) — este resumo é só o "onde estamos".
+
+**1. C3 — Tombstone transitório na remoção de participantes (roadmap técnico, concluído).**
+Remover alguém de um PG agora marca `removed:true` + `updatedAt` em vez de apagar na hora — evita
+que um aparelho com cache desatualizado ressuscite um participante já removido por outro. Poda
+automática some com o registro de vez depois de 30 dias. Gated por `FB_FLAGS.useTombstone`
+(`true`) — desligar reverte ao comportamento antigo em 1 linha.
+
+**2. Correção da IA bíblica do chat.** O `systemPrompt` (index.html ~linha 2681) tinha dois
+problemas: (a) se identificava como assistente do OUTRO app da Capelania ("Aos Pés do Mestre
+Jesus") — vestígio de cópia entre os dois produtos, corrigido para a identidade real deste app; (b)
+enquadrava doutrina como "posição da IASD" em vez de "o que a Bíblia ensina" — corrigido com uma
+regra explícita no prompt, com exceção só para perguntas que são especificamente sobre a
+denominação em si (história, "é seita?", dízimos).
+
+**3. IMD v2 por Capilaridade Discipular — RC3.5, tecnicamente concluída; RC3.5.4 em observação.**
+Sequência: RC3.5.1 (auditoria — achou que o IMD antigo deixava poucos participantes muito ativos
+inflarem o índice do PG) → RC3.5.2 (proposta do novo modelo) → RC3.5.2A (decisões finais:
+"Participante com Evidência de Engajamento" = ≥3 de 7 indicadores, carência de 7 dias, limiares
+por categoria) → RC3.5.3 (implementado: `getPgIMDv2`/`classificarPgsV2Diagnostico`, convive com o
+motor antigo intocado via `FB_FLAGS.imdV2Diagnostico`, painel de diagnóstico comparativo dentro do
+Painel do Tutor) → RC3.5.4 (fase de observação, sem mudança de algoritmo, 5 indicadores
+acompanhados: Taxa de Conversão, nº de PGs com evidência, média de indicadores, distribuição dos 7
+indicadores, evolução do ranking — este último ainda não implementável, falta histórico).
+- **Homologação técnica:** concluída (algoritmo, fórmula, Capilaridade, regra dos 3 indicadores).
+- **Homologação funcional:** em andamento — limiares numéricos ficam como linha de base até a
+  Fase 1 terminar (critérios: ≥8 semanas desde o Marco Zero → a partir de ~2026-08-30 no mínimo, +
+  todos os PGs fora da carência + distribuição estável por 3 semanas + validação dos Tutores).
+- **Meta operacional da Fase 1** (não é critério de homologação): Conversão 16%→40%, média de
+  indicadores 1,3→3,0/7, PGs com evidência 4/37→15/37.
+- **Regra combinada:** nenhuma mudança de fórmula/peso/limiar durante a Fase 1, exceto correção de
+  defeito real — evita "alvo em movimento" enquanto se coleta evidência.
+- **RC3.6 — "Evolução Discipular e Inteligência Temporal"** (planejada, não iniciada): reúne
+  `lastActivityAt`, janela móvel, histórico de snapshots, evolução individual/de PG, tendências —
+  só inicia quando os critérios de encerramento da Fase 1 acima forem atingidos (por critério, não
+  por calendário).
+
+**Próximo passo real: nenhuma ação de código pendente.** É observação — reabrir o painel de
+diagnóstico periodicamente e acompanhar os 5 indicadores até os critérios de encerramento da Fase 1
+baterem. Só aí decidir se os limiares precisam de ajuste e considerar abrir a RC3.6.
 
 ## 📝 Registro retroativo — Ranqueamento entre PGs, Registro de Encontros, Lembrete ao PG, Trio (2026-07-16/17)
 

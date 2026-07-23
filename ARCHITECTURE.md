@@ -185,11 +185,14 @@ durante o RC3.2, registrado para investigação futura, sem alterar comportament
   preparação para a Semana da Primavera.
 - Só inicia depois que o Épico 4 estiver consolidado (inteligência antes da gamificação).
 
-### RC3.5 — Redesenho do IMD por Capilaridade Discipular (RC3.5.3 HOMOLOGADA TECNICAMENTE — RC3.5.4 HOMOLOGAÇÃO FUNCIONAL em andamento)
+### RC3.5 — Redesenho do IMD por Capilaridade Discipular (IMD v2 EM PRODUÇÃO desde a RC3.5.5 — RC3.5.4 HOMOLOGAÇÃO FUNCIONAL em andamento)
 
-> RC3.5.1 (auditoria) → RC3.5.2 (proposta) → RC3.5.2A (decisões finais) → RC3.5.3 (implementação,
-> `index.html`, motor `getPgIMDv2`/`classificarPgsV2Diagnostico`, convive com o motor antigo
-> intocado via `FB_FLAGS.imdV2Diagnostico`) → RC3.5.4 (homologação operacional, em andamento).
+> RC3.5.1 (auditoria) → RC3.5.2 (proposta) → RC3.5.2A (decisões finais) → RC3.5.3 (implementação
+> em modo de dupla avaliação) → RC3.5.4 (homologação operacional, indicadores da Fase 1) →
+> **RC3.5.5 (entrada em produção — motor `getPgIMDv2`/`classificarPgsV2` é agora o ÚNICO IMD
+> exibido na interface; motor antigo `getPgIMD`/`classificarPgs` preservado intocado no código,
+> sem nenhuma tela chamando-o, só como rollback de contingência via `FB_FLAGS.imdV2 = false` —
+> remoção definitiva prevista para o encerramento da RC3.6).**
 > **Distinção formal entre homologação técnica e funcional (decisão do usuário):**
 > - **Homologação TÉCNICA — concluída (RC3.5.3):** motor v2 isolado por feature flag, convivência
 >   com o algoritmo antigo, painel de diagnóstico comparativo, tabela de distribuição dos
@@ -356,6 +359,51 @@ ajuste, nunca por reação a um resultado inicial baixo.
 fórmula ou peso é feita neste período — **exceto correção de defeitos reais** (bugs). Preserva a
 estabilidade da base de comparação; qualquer ajuste de calibração vem de comportamento real
 acumulado, não de impressão inicial.
+
+### RC3.5.5 — Entrada em Produção do IMD v2 (concluída, só interface — nenhuma fórmula alterada)
+
+Encerra a fase de comparação visual: a homologação técnica (RC3.5.3) foi considerada concluída, e
+o IMD v2 passa a ser o **único** índice exibido na interface. Mudança estritamente de
+apresentação — nenhuma fórmula, peso, regra de cálculo, limiar ou estrutura de dado foi alterada
+(ver "Regra de mudança durante a Fase 1" acima, que continua valendo).
+
+**Removido da interface:** os cards de comparação "IMD atual x IMD novo (v2)" e "Diferença"
+(`renderPgRankingCardsV2Diagnostico`, apagado do código — cumpriu sua função só durante a
+homologação técnica) e o aviso "🔧 Modo diagnóstico: comparando o modelo atual com o novo modelo".
+Nenhuma referência a "v2", "novo", "atual" ou "antigo" sobrevive na tela — onde existia, virou
+simplesmente "IMD".
+
+**Preservado na interface (painel de diagnóstico continua exclusivo de Tutor/Coordenador):** aviso
+de Fase de Implantação, Taxa de Conversão, PGs com Evidência de Engajamento, Média de Indicadores,
+tabela de distribuição dos 7 indicadores, categorias do IMD v2 (Não Engajado/Baixo/Moderado/
+Engajado/Altamente Engajado). Nada disso foi removido — só o que comparava as duas versões.
+
+**Motor de classificação novo, exclusivo do v2:** `classificarPgsV2()` +
+`compararPgsParaRankingV2()`/`PG_RANKING_TIEBREAK_V2` — antes, o ranking oficial usava o rank/
+percentual calculados por `classificarPgs()` (v1) mesmo no modo diagnóstico (só anexava os campos
+do v2 para exibir ao lado); agora que só o v2 é mostrado, o rank/percentual/desempate também
+precisavam vir do v2 — daí o novo motor, que nunca lê nada do antigo. Mesmo padrão de "PG
+formado" e de empate esportivo (1,2,2,4) do motor v1.
+
+**Achado durante o teste (corrigido antes do commit):** `contarPgsComEvidenciaV2` ainda lia o
+campo `e.v2Capilaridade` (nome usado só nas entradas do extinto modo diagnóstico) — como
+`classificarPgsV2()` usa `capilaridadeScore`, o indicador "PGs com Evidência de Engajamento"
+mostrava 0 pra qualquer dado. Corrigido para ler `e.capilaridadeScore`; testado de novo com dado
+real, resultado bate com a linha de base já registrada (4 de 37).
+
+**Rollback de contingência:** `FB_FLAGS.imdV2 = false` (renomeada de `imdV2Diagnostico`) faz
+`renderRankingPgs` voltar por inteiro ao motor antigo (`classificarPgs`/`renderPgRankingCards`),
+sem nenhum elemento do v2 — útil só se a Fase 1 revelar um defeito grave no v2. O motor antigo
+(`getPgIMD`, `classificarPgs`, `calcularComunhaoScore` e as demais 4 dimensões v1) permanece
+100% intocado no código só para esse cenário; remoção definitiva prevista para o encerramento da
+RC3.6.
+
+**Testado:** no preview (servidor estático local + dado real de produção via leitura, sem nenhuma
+escrita) — 37 PGs renderizando sem erro de console; confirmado por busca no código que nenhuma
+referência a "v2"/"atual"/"antigo"/"diagnóstico" sobrevive na tela de produção; rollback verificado
+funcionalmente (motor antigo chamado isoladamente, mesmos resultados de antes). Este app não tem
+telas separadas de "Participante"/"Administrativo" para o IMD — só existe dentro do Painel do
+Tutor/Coordenador (mesmo controle de acesso de sempre); participante continua sem ver o ranking.
 
 ### RC3.6 — Evolução Discipular e Inteligência Temporal (roadmap futuro, não iniciado)
 

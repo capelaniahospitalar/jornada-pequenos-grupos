@@ -1,5 +1,35 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-23] — RC3.5.5: Entrada em produção do IMD v2, remoção da comparação visual
+
+Só interface — nenhuma fórmula, peso, limiar ou estrutura de dado do IMD foi alterada.
+
+**Removido da tela:** cards "IMD atual x IMD novo (v2)" e "Diferença" (função
+`renderPgRankingCardsV2Diagnostico` apagada do código); aviso "🔧 Modo diagnóstico: comparando
+o modelo atual com o novo modelo". Onde existia "IMD novo (v2)"/"IMD atual"/"modelo atual" na
+tela, agora existe só **"IMD"**.
+
+**Preservado (painel de diagnóstico do Tutor/Coordenador):** aviso de Fase de Implantação, Taxa
+de Conversão, PGs com Evidência de Engajamento, Média de Indicadores, tabela de distribuição dos
+7 indicadores, categorias do IMD (Não Engajado/Baixo/Moderado/Engajado/Altamente Engajado).
+
+**Novo motor de classificação exclusivo do v2:** `classificarPgsV2()` +
+`compararPgsParaRankingV2()` — o rank/percentual/desempate mostrados agora vêm só do v2 (antes,
+mesmo no modo diagnóstico, vinham do motor antigo por baixo). `FB_FLAGS.imdV2Diagnostico`
+renomeada para `FB_FLAGS.imdV2` — `false` faz rollback de contingência completo pro motor antigo
+(`getPgIMD`/`classificarPgs`, preservados intocados no código, sem tela chamando-os por padrão);
+remoção definitiva prevista para o encerramento da RC3.6.
+
+**Bug encontrado e corrigido antes do commit:** `contarPgsComEvidenciaV2` ainda lia o nome de
+campo do extinto modo diagnóstico (`v2Capilaridade`) — o novo motor usa `capilaridadeScore`,
+então o indicador "PGs com Evidência de Engajamento" mostrava 0 pra qualquer dado. Corrigido;
+retestado com produção, bate com a linha de base já registrada (4 de 37).
+
+**Testado:** preview local + dado real de produção (só leitura) — 37 PGs renderizando sem erro de
+console; confirmado por busca no código que nenhuma referência a v2/atual/antigo/diagnóstico
+sobrevive na tela; rollback verificado funcionalmente (motor antigo chamado isoladamente, mesmos
+resultados de sempre).
+
 ## [2026-07-23] — RC3.5.3/RC3.5.4: Novo IMD v2 com Capilaridade, diagnóstico comparativo e Fase de Implantação
 
 Precedido de auditoria (RC3.5.1) e proposta arquitetural (RC3.5.2/RC3.5.2A) — ver `ARCHITECTURE.md`

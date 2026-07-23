@@ -8229,7 +8229,7 @@ const FB_FLAGS = Object.freeze({
   useTombstone    : true,   // (Commit 2) remoção transitória
   identidadeUuid  : true,   // (Etapa 1) memberId UUID + Meus Vínculos / Grupo Aberto (false = volta ao meuGrupo antigo)
   convitesV2      : true,   // (Etapa 2) convites de uso único (false = só ?pg= antigo)
-  imdV2Diagnostico: true,   // (RC3.5.3) mostra IMD atual x novo (Capilaridade) lado a lado no ranking do Tutor — desligar volta ao painel só com o modelo antigo
+  imdV2           : true,   // (RC3.5.5) IMD v2/Capilaridade é o índice oficial em produção — false = rollback de contingência ao algoritmo antigo (getPgIMD/classificarPgs, preservados intocados só para esse cenário durante a Fase 1; remoção definitiva prevista no encerramento da RC3.6)
 });
 
 // Versão lógica + data de build (registrada na telemetria/log p/ auditoria futura)
@@ -9430,13 +9430,14 @@ function atualizarPgIMD(grupoNum) {
 }
 
 // ══════════════════════════════════════
-//  RC3.5.3 — IMD v2 (CAPILARIDADE DISCIPULAR) — MODO DE DUPLA AVALIAÇÃO
+//  RC3.5.3/RC3.5.5 — IMD v2 (CAPILARIDADE DISCIPULAR) — ÍNDICE OFICIAL EM PRODUÇÃO
 // ══════════════════════════════════════
 // Novo modelo decidido nas RC3.5.1 (auditoria) / RC3.5.2 (proposta) / RC3.5.2A (decisões
-// finais) — ver ARCHITECTURE.md, seção "Roadmap Arquitetural". Convive com o modelo antigo
-// acima (getPgIMD/classificarPgs, 100% intocados) durante a homologação — ver
-// FB_FLAGS.imdV2Diagnostico. O algoritmo antigo só é removido depois de homologada esta RC
-// (decisão explícita do usuário, pra reduzir risco de regressão).
+// finais), implementado na RC3.5.3 e colocado em produção na RC3.5.5 — ver ARCHITECTURE.md,
+// seção "Roadmap Arquitetural". O modelo antigo (getPgIMD/classificarPgs, logo acima) fica
+// 100% intocado no código, mas não é mais chamado por nenhuma tela — existe só como
+// mecanismo de rollback de contingência (`FB_FLAGS.imdV2 = false`) durante a Fase 1. Remoção
+// definitiva prevista para o encerramento da RC3.6.
 
 const PG_IMD_V2_WEIGHTS = {
   capilaridade : 0.30,
@@ -9610,22 +9611,51 @@ function getPgIMDv2(grupoNum) {
   return pgIMDv2;
 }
 
-// Roda os dois motores (v1 intocado + v2 novo) sobre os mesmos grupos, lado a lado, só para
-// homologação — não persiste nada, não substitui classificarPgs(). Usada só quando
-// FB_FLAGS.imdV2Diagnostico está ligada (ver renderRankingPgs).
-function classificarPgsV2Diagnostico() {
-  const entradasV1 = classificarPgs();
-  return entradasV1.map(e => {
-    const v2 = getPgIMDv2(e.grupoNum);
+// RC3.5.5: critério de desempate exclusivo do IMD v2 — mesmo princípio do PG_RANKING_TIEBREAK
+// (v1), nunca sorteio, mas usando só os campos que o v2 calcula.
+const PG_RANKING_TIEBREAK_V2 = ['totalScore', 'capilaridadeScore', 'regularidadeScore', 'engajamentoScore', 'missaoScore', 'profundidadeScore'];
+function compararPgsParaRankingV2(a, b) {
+  for (const campo of PG_RANKING_TIEBREAK_V2) {
+    if (b[campo] !== a[campo]) return b[campo] - a[campo];
+  }
+  return 0;
+}
+
+// RC3.5.5: motor de classificação oficial — só o IMD v2, nunca lê nada do motor antigo (que
+// fica preservado, intocado, só para rollback via FB_FLAGS.imdV2 = false). Mesmo critério de
+// "PG formado" já usado em classificarPgs() (nome OU participantes, exceto PG de teste) e
+// mesmo padrão de empate esportivo (1,2,2,4 — nunca sorteio).
+function classificarPgsV2() {
+  const gruposFormados = PEQUENOS_GRUPOS.filter(g =>
+    (g.nome || participantesAtivos(g).length) && !isPgDeTeste(g.nome));
+  const calculatedAt = new Date().toISOString();
+  const entradas = gruposFormados.map(g => {
+    const v2 = getPgIMDv2(g.num);
     return {
-      ...e,
-      v2Score: v2.totalScore,
-      v2Categoria: v2.categoria,
-      v2Capilaridade: v2.capilaridadeScore,
-      v2Regularidade: v2.regularidadeScore,
-      diferenca: v2.totalScore - e.totalScore,
+      grupoNum: g.num,
+      grupo: g.nome || (PG_DEFAULT_NAME + ' ' + g.num),
+      totalParticipantes: v2.totalParticipantes,
+      totalElegiveis: v2.totalElegiveis,
+      totalComEvidencia: v2.totalComEvidencia,
+      totalScore: v2.totalScore,
+      capilaridadeScore: v2.capilaridadeScore,
+      engajamentoScore: v2.engajamentoScore,
+      missaoScore: v2.missaoScore,
+      regularidadeScore: v2.regularidadeScore,
+      profundidadeScore: v2.profundidadeScore,
+      categoria: v2.categoria,
     };
   });
+  entradas.sort(compararPgsParaRankingV2);
+  const total = entradas.length;
+  let rankAtual = 1;
+  entradas.forEach((entrada, i) => {
+    if (i > 0 && compararPgsParaRankingV2(entradas[i - 1], entrada) !== 0) rankAtual = i + 1;
+    entrada.rank = rankAtual;
+    entrada.percentile = total ? Math.max(0, Math.min(100, Math.round(((total - rankAtual) / total) * 100))) : 0;
+    entrada.calculatedAt = calculatedAt;
+  });
+  return entradas;
 }
 
 // RC3.5.3 (pedido do usuário): distribuição dos 7 indicadores por PG — quantos participantes
@@ -9713,7 +9743,7 @@ function calcularTaxaConversaoV2(entradas) {
 // RC3.5.4: nº de PGs com pelo menos 1 participante com Evidência de Engajamento — mede
 // "expansão da cultura de uso" (quantos grupos já têm QUALQUER sinal, não quantos são bons).
 function contarPgsComEvidenciaV2(entradas) {
-  return entradas.filter(e => e.v2Capilaridade > 0).length;
+  return entradas.filter(e => e.capilaridadeScore > 0).length;
 }
 
 // RC3.5.4: média de indicadores cumpridos por participante elegível, no sistema inteiro — mede
@@ -9880,22 +9910,18 @@ function renderPgRankingCards(entradas) {
     </div>`).join('');
 }
 
-// RC3.5.3 — cards do modo diagnóstico (v1 atual x v2 novo, lado a lado). Só usada quando
-// FB_FLAGS.imdV2Diagnostico está ligada (ver renderRankingPgs) — nunca substitui
-// renderPgRankingCards, que continua servindo o modelo antigo sozinho quando a flag cai.
-function renderPgRankingCardsV2Diagnostico(entradas) {
+// RC3.5.5: card oficial do ranking — só o IMD v2 (nenhuma referência ao modelo antigo).
+function renderPgRankingCardsV2(entradas) {
   if (!entradas.length) {
     return `<div class="content-card"><p class="body-text">Nenhum Pequeno Grupo com dados suficientes ainda.</p></div>`;
   }
   return entradas.map(e => `
     <div class="panel-section" style="margin-bottom:.5rem">
-      <div style="font-size:13px;color:var(--text3);font-family:var(--ff-body);margin-bottom:2px">${medalhaRank(e.rank)}${e.rank}º lugar (modelo atual)</div>
+      <div style="font-size:13px;color:var(--text3);font-family:var(--ff-body);margin-bottom:2px">${medalhaRank(e.rank)}${e.rank}º lugar</div>
       <div style="font-size:16px;font-weight:700;color:var(--navy2);font-family:var(--ff-body);margin-bottom:.4rem">${sanitize(e.grupo)}</div>
-      <div class="panel-stat"><span>IMD atual</span><strong>${e.totalScore}</strong></div>
-      <div class="panel-stat"><span>IMD novo (v2)</span><strong>${e.v2Score}</strong></div>
-      <div class="panel-stat"><span>Diferença</span><strong>${e.diferenca > 0 ? '+' : ''}${e.diferenca}</strong></div>
-      <div class="panel-stat"><span>Categoria (v2)</span><strong>${e.v2Categoria}</strong></div>
-      <div class="panel-stat"><span>Capilaridade (v2)</span><strong>${e.v2Capilaridade}%</strong></div>
+      <div class="panel-stat"><span>IMD</span><strong>${e.totalScore}</strong></div>
+      <div class="panel-stat"><span>Categoria</span><strong>${e.categoria}</strong></div>
+      <div class="panel-stat"><span>Capilaridade</span><strong>${e.capilaridadeScore}%</strong></div>
       <div class="panel-stat"><span>Participantes</span><strong>${e.totalParticipantes}</strong></div>
     </div>`).join('');
 }
@@ -9911,32 +9937,51 @@ function formatarDataHoraBR(iso) {
 }
 
 function renderRankingPgs(nome) {
-  const diagnostico = FB_FLAGS.imdV2Diagnostico;
-  const entradas = diagnostico ? classificarPgsV2Diagnostico() : classificarPgs();
   const nomeEsc = nome.replace(/'/g,"\\'");
+  const voltarBtn = `<button onclick="renderTutorGruposList('${nomeEsc}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Voltar aos meus grupos</button>`;
+
+  if (!FB_FLAGS.imdV2) {
+    // RC3.5.5: rollback de contingência — só roda com a flag desligada manualmente. Motor
+    // antigo (classificarPgs/getPgIMD) preservado intocado só para esse cenário durante a
+    // Fase 1; remoção definitiva prevista no encerramento da RC3.6.
+    const entradasLegado = classificarPgs();
+    const atualizadoEmLegado = entradasLegado[0] ? formatarDataHoraBR(entradasLegado[0].calculatedAt) : formatarDataHoraBR(new Date().toISOString());
+    document.getElementById('tutorpanel-body').innerHTML = `
+      <div class="content-card">
+        <div class="phase-tag tag-content">🏆 Índice de Maturidade Discipular dos Pequenos Grupos</div>
+        <p class="body-text">O ranking é calculado com base nas dimensões de Comunhão, Relacionamento, Missão, Crescimento e Fidelidade, incentivando o desenvolvimento integral dos Pequenos Grupos.</p>
+        <div class="panel-stat" style="margin-top:.6rem"><span>Atualizado em</span><strong>${atualizadoEmLegado}</strong></div>
+        <div class="panel-stat"><span>Total de PGs classificados</span><strong>${entradasLegado.length}</strong></div>
+      </div>
+      ${renderPgRankingCards(entradasLegado)}
+      ${voltarBtn}`;
+    resetScroll();
+    return;
+  }
+
+  const entradas = classificarPgsV2();
   const atualizadoEm = entradas[0] ? formatarDataHoraBR(entradas[0].calculatedAt) : formatarDataHoraBR(new Date().toISOString());
-  const fase = diagnostico ? faseImplantacaoIMDv2() : null;
-  const conversao = diagnostico ? calcularTaxaConversaoV2(entradas) : null;
-  const pgsComEvidencia = diagnostico ? contarPgsComEvidenciaV2(entradas) : null;
-  const mediaIndicadores = diagnostico ? calcularMediaIndicadoresV2(entradas) : null;
+  const fase = faseImplantacaoIMDv2();
+  const conversao = calcularTaxaConversaoV2(entradas);
+  const pgsComEvidencia = contarPgsComEvidenciaV2(entradas);
+  const mediaIndicadores = calcularMediaIndicadoresV2(entradas);
 
   document.getElementById('tutorpanel-body').innerHTML = `
     <div class="content-card">
       <div class="phase-tag tag-content">🏆 Índice de Maturidade Discipular dos Pequenos Grupos</div>
-      <p class="body-text">O ranking é calculado com base nas dimensões de Comunhão, Relacionamento, Missão, Crescimento e Fidelidade, incentivando o desenvolvimento integral dos Pequenos Grupos.</p>
-      ${diagnostico ? `<p class="body-text" style="color:var(--gold-mid);font-weight:600">🔧 Modo diagnóstico (RC3.5.3): comparando o modelo atual com o novo modelo por Capilaridade, em homologação.</p>` : ''}
-      ${fase ? `<p class="body-text" style="font-size:13px;color:var(--text3)">${fase.texto}</p>` : ''}
+      <p class="body-text">O IMD mede a maturidade discipular coletiva do Pequeno Grupo pelas dimensões de Capilaridade, Engajamento Coletivo, Missão, Regularidade e Profundidade — quantos participantes realmente vivem a Jornada, não só quanto foi produzido.</p>
+      <p class="body-text" style="font-size:13px;color:var(--text3)">${fase.texto}</p>
       <div class="panel-stat" style="margin-top:.6rem"><span>Atualizado em</span><strong>${atualizadoEm}</strong></div>
       <div class="panel-stat"><span>Total de PGs classificados</span><strong>${entradas.length}</strong></div>
-      ${conversao ? `<div class="panel-stat"><span>Elegíveis no sistema</span><strong>${conversao.totalElegiveis}</strong></div>
+      <div class="panel-stat"><span>Elegíveis no sistema</span><strong>${conversao.totalElegiveis}</strong></div>
       <div class="panel-stat"><span>Com Evidência de Engajamento</span><strong>${conversao.totalComEvidencia}</strong></div>
-      <div class="panel-stat"><span>Taxa de Conversão (RC3.5.4)</span><strong>${conversao.conversao}%</strong></div>
+      <div class="panel-stat"><span>Taxa de Conversão</span><strong>${conversao.conversao}%</strong></div>
       <div class="panel-stat"><span>PGs com Evidência de Engajamento</span><strong>${pgsComEvidencia} de ${entradas.length}</strong></div>
-      <div class="panel-stat"><span>Média de indicadores por participante</span><strong>${mediaIndicadores}/7</strong></div>` : ''}
+      <div class="panel-stat"><span>Média de indicadores por participante</span><strong>${mediaIndicadores}/7</strong></div>
     </div>
-    ${diagnostico ? renderPgRankingCardsV2Diagnostico(entradas) : renderPgRankingCards(entradas)}
-    ${diagnostico ? renderDistribuicaoIndicadoresV2(entradas) : ''}
-    <button onclick="renderTutorGruposList('${nomeEsc}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Voltar aos meus grupos</button>`;
+    ${renderPgRankingCardsV2(entradas)}
+    ${renderDistribuicaoIndicadoresV2(entradas)}
+    ${voltarBtn}`;
   resetScroll();
 }
 
