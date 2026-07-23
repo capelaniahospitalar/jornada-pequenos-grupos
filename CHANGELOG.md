@@ -1,5 +1,33 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-23] — Correção: IA bíblica falando em nome da denominação + referência ao app errado
+
+**Relato do usuário:** a IA do chat bíblico (`sendAI`/`systemPrompt`, `index.html` ~linha 2681)
+respondia enquadrando o ensino como posição oficial da Igreja Adventista do Sétimo Dia (IASD), o
+que pode soar excludente para participantes do PG que não são adventistas — a doutrina é bíblica,
+então a IA deve apresentá-la como "o que a Bíblia ensina", não "a posição da denominação".
+
+**Achado adicional durante a investigação:** o `systemPrompt` também se identificava como
+assistente oficial do aplicativo **"Aos Pés do Mestre Jesus"** — nome do OUTRO produto da
+Capelania (app de discipulado individual, repo `jornada-discipular`), com a lista de estudos
+copiada de lá também. Confirmado com o usuário que é vestígio de cópia entre os dois apps
+(histórico Git compartilhado) e corrigido para a identidade real deste app.
+
+**Correção:**
+- Identificação do assistente corrigida para "Jornada Discipular em Pequenos Grupos" (não mais
+  "Aos Pés do Mestre Jesus"); lista de estudos corrigida para os 13 estudos reais deste app.
+- Nova regra explícita no topo do prompt ("REGRA DE OURO"): toda resposta doutrinária deve ser
+  apresentada como ensino bíblico ("o que a Bíblia ensina"), nunca como "a posição adventista" ou
+  "segundo a IASD" — com uma exceção clara: perguntas que são especificamente SOBRE a denominação
+  (história, organização, "isso é seita?", administração de dízimos) continuam respondidas
+  nomeando a IASD, porque aí a pergunta é sobre a instituição, não sobre doutrina bíblica.
+- A seção "FUNDAMENTO — TEMAS-CHAVE COMO ENSINO BÍBLICO" (que já pedia isso só para uma lista
+  específica de temas) não foi removida — a nova regra geral a reforça, sem contradizê-la.
+
+**Testado:** no preview (servidor estático local), app carrega sem erros de console. A correção é
+só no texto de instrução da IA (`systemPrompt`); não foi possível testar a resposta real da IA
+neste ambiente (sem chamar o serviço de IA em produção).
+
 ## [2026-07-23] — C3: Tombstone transitório na remoção de participantes
 
 Item do roadmap técnico (`ESTADO-E-ROADMAP.md`), precedido de Mapa de Impacto + ADR aprovados
