@@ -1,5 +1,53 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-23] — RC3.5.3/RC3.5.4: Novo IMD v2 com Capilaridade, diagnóstico comparativo e Fase de Implantação
+
+Precedido de auditoria (RC3.5.1) e proposta arquitetural (RC3.5.2/RC3.5.2A) — ver `ARCHITECTURE.md`
+para o histórico completo de decisões. Só design/documentação até a RC3.5.2A; esta entrada cobre o
+código da RC3.5.3 (implementação) e RC3.5.4 (indicadores de homologação operacional).
+
+**Motivação:** auditoria encontrou que o IMD atual mede majoritariamente volume/médias por
+participante e metas fixas do grupo (não normalizadas pelo nº de participantes) — permitindo a
+poucos participantes muito ativos elevarem artificialmente o IMD, e penalizando o PG por crescer.
+
+**Implementado (RC3.5.3):**
+- Motor `getPgIMDv2`/`classificarPgsV2Diagnostico` — novo modelo por **Capilaridade Discipular**
+  (% de participantes elegíveis com evidência de engajamento; nenhuma outra dimensão compensa
+  capilaridade baixa), Engajamento Coletivo, Profundidade Discipular, Missão Coletiva e
+  Regularidade. Convive com o motor antigo 100% intocado (`getPgIMD`/`classificarPgs`), sob
+  `FB_FLAGS.imdV2Diagnostico` — modo de dupla avaliação para homologação segura.
+- "Participante Ativo" → **"Participante com Evidência de Engajamento"** (renomeado durante a
+  implementação, achado real: nem "semana atual" nem "sem limite" se sustentavam com o dado
+  existente) = elegível (não removido, ≥7 dias de registro via `p.ts`) e com ≥3 dos 7 indicadores
+  (estudo/oração/bondade/gratidão/missão semanal/streak/Embaixadores).
+- Classificação por gate fixo (Altamente Engajado/Engajado/Moderado/Baixo/Não Engajado) — a
+  categoria nunca ultrapassa o que Capilaridade+Regularidade permitem, mesmo com IMD numérico alto.
+- Painel de diagnóstico no ranking do Tutor: cards lado a lado (IMD atual x novo + diferença +
+  categoria) e tabela de distribuição dos 7 indicadores por PG.
+- Aviso de **Fase 1 — Implantação** (`faseImplantacaoIMDv2`, referência Marco Zero 2026-07-05,
+  muda sozinho para Fase 2 a partir do dia 60) — evita que a distribuição baixa inicial pareça
+  defeito, quando reflete só um app muito recente.
+
+**Implementado (RC3.5.4 — indicadores de homologação operacional, sem mudança de algoritmo):**
+`calcularTaxaConversaoV2` (Taxa de Conversão para Evidência de Engajamento — KPI principal da Fase
+1), `contarPgsComEvidenciaV2` (nº de PGs com pelo menos 1 participante engajado) e
+`calcularMediaIndicadoresV2` (profundidade média de indicadores por participante elegível) —
+exibidos no topo do painel diagnóstico. Linha de base registrada em 23/07/2026: 38 elegíveis, 6
+com evidência (16% de conversão), 4 de 37 PGs com evidência, média 1,3/7 indicadores.
+
+**Homologação parcial (decisão do usuário):** arquitetura/algoritmo/Capilaridade/regra dos 3
+indicadores homologados tecnicamente; limiares numéricos de classificação ficam como linha de
+base até o fim da Fase 1 (critérios objetivos de encerramento registrados no `ARCHITECTURE.md`).
+
+**Testado:** no preview (servidor estático local + dado real de produção via leitura, sem nenhuma
+escrita) — 37 PGs renderizando sem erro de console; cards de diagnóstico, tabela de distribuição e
+os 5 indicadores conferidos visualmente (screenshot). Não testado ao vivo dentro do Painel do Tutor
+real (exigiria autenticação de Tutor/Coordenador).
+
+**Reservado para o futuro (RC3.6, não implementado):** `lastActivityAt` por participante —
+permitirá trocar "Evidência de Engajamento" por uma janela móvel real (últimos 30 dias) e medir
+trajetória (quem evoluiu, quais PGs cresceram/estagnaram), não só a fotografia do momento atual.
+
 ## [2026-07-23] — Correção: IA bíblica falando em nome da denominação + referência ao app errado
 
 **Relato do usuário:** a IA do chat bíblico (`sendAI`/`systemPrompt`, `index.html` ~linha 2681)

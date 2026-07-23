@@ -9484,7 +9484,10 @@ function participanteElegivelV2(p, agora) {
 // isto por uma janela móvel real (ex.: últimos 30 dias) sem mudar o conceito de negócio.
 // Ficaram de fora: missão da Jornada (missoesConcluidas é só total vitalício, sem nenhum
 // recorte) e presença nominal (só existe agregado por encontro, sem nome da pessoa).
-function participanteComEvidenciaEngajamentoV2(p, monthKey) {
+// Conta quantos dos 7 indicadores a pessoa cumpre (0-7) — usado tanto pelo corte binário
+// (participanteComEvidenciaEngajamentoV2) quanto pela média de profundidade da RC3.5.4
+// (calcularMediaIndicadoresV2), evitando duplicar a lista de indicadores em dois lugares.
+function contarIndicadoresV2(p, monthKey) {
   const c = (p.progresso && p.progresso.contrib) ? p.progresso.contrib : null;
   let indicadores = 0;
   if (c && c.estudos > 0) indicadores++;
@@ -9494,7 +9497,11 @@ function participanteComEvidenciaEngajamentoV2(p, monthKey) {
   if (c && c.engajamento > 0) indicadores++;
   if ((p.progresso?.streak || 0) > 0) indicadores++;
   if (p.embaixadores?.[monthKey]?.participou) indicadores++;
-  return indicadores >= PG_IMD_ATIVO_MIN_INDICADORES;
+  return indicadores;
+}
+
+function participanteComEvidenciaEngajamentoV2(p, monthKey) {
+  return contarIndicadoresV2(p, monthKey) >= PG_IMD_ATIVO_MIN_INDICADORES;
 }
 
 // 1) CAPILARIDADE — % de participantes elegíveis com Evidência de Engajamento (ver nota
@@ -9703,6 +9710,30 @@ function calcularTaxaConversaoV2(entradas) {
   return { totalElegiveis, totalComEvidencia, conversao };
 }
 
+// RC3.5.4: nº de PGs com pelo menos 1 participante com Evidência de Engajamento — mede
+// "expansão da cultura de uso" (quantos grupos já têm QUALQUER sinal, não quantos são bons).
+function contarPgsComEvidenciaV2(entradas) {
+  return entradas.filter(e => e.v2Capilaridade > 0).length;
+}
+
+// RC3.5.4: média de indicadores cumpridos por participante elegível, no sistema inteiro — mede
+// profundidade do uso agregada (Capilaridade já mede alcance/amplitude; esta mede intensidade).
+function calcularMediaIndicadoresV2(entradas) {
+  const monthKey = embMonthKey();
+  const agora = Date.now();
+  let soma = 0, total = 0;
+  entradas.forEach(e => {
+    const g = PEQUENOS_GRUPOS.find(x => x.num === e.grupoNum);
+    if (!g) return;
+    const participantesSemDup = participantesAtivos(g).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
+    participantesSemDup.filter(p => participanteElegivelV2(p, agora)).forEach(p => {
+      soma += contarIndicadoresV2(p, monthKey);
+      total++;
+    });
+  });
+  return total ? Math.round((soma / total) * 10) / 10 : 0;
+}
+
 // RC3.5.3 (pedido do usuário): fase de implantação x consolidação — referência = Marco Zero
 // (2026-07-05, produção reinicializada, ver ESTADO-E-ROADMAP.md). Nos primeiros 60 dias, o
 // painel avisa que os índices são LINHA DE BASE (faixas de classificação ainda não
@@ -9886,6 +9917,8 @@ function renderRankingPgs(nome) {
   const atualizadoEm = entradas[0] ? formatarDataHoraBR(entradas[0].calculatedAt) : formatarDataHoraBR(new Date().toISOString());
   const fase = diagnostico ? faseImplantacaoIMDv2() : null;
   const conversao = diagnostico ? calcularTaxaConversaoV2(entradas) : null;
+  const pgsComEvidencia = diagnostico ? contarPgsComEvidenciaV2(entradas) : null;
+  const mediaIndicadores = diagnostico ? calcularMediaIndicadoresV2(entradas) : null;
 
   document.getElementById('tutorpanel-body').innerHTML = `
     <div class="content-card">
@@ -9897,7 +9930,9 @@ function renderRankingPgs(nome) {
       <div class="panel-stat"><span>Total de PGs classificados</span><strong>${entradas.length}</strong></div>
       ${conversao ? `<div class="panel-stat"><span>Elegíveis no sistema</span><strong>${conversao.totalElegiveis}</strong></div>
       <div class="panel-stat"><span>Com Evidência de Engajamento</span><strong>${conversao.totalComEvidencia}</strong></div>
-      <div class="panel-stat"><span>Taxa de Conversão (RC3.5.4)</span><strong>${conversao.conversao}%</strong></div>` : ''}
+      <div class="panel-stat"><span>Taxa de Conversão (RC3.5.4)</span><strong>${conversao.conversao}%</strong></div>
+      <div class="panel-stat"><span>PGs com Evidência de Engajamento</span><strong>${pgsComEvidencia} de ${entradas.length}</strong></div>
+      <div class="panel-stat"><span>Média de indicadores por participante</span><strong>${mediaIndicadores}/7</strong></div>` : ''}
     </div>
     ${diagnostico ? renderPgRankingCardsV2Diagnostico(entradas) : renderPgRankingCards(entradas)}
     ${diagnostico ? renderDistribuicaoIndicadoresV2(entradas) : ''}

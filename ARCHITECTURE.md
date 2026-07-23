@@ -307,27 +307,83 @@ responder com dado real (não hipótese):
 - Existe algum indicador que quase ninguém registra (candidato a revisão)?
 - Existe algum indicador que praticamente todo mundo cumpre (perdeu poder discriminatório)?
 
-**Métrica-chave a acompanhar: Taxa de Conversão para Evidência de Engajamento** — `% de
-participantes elegíveis (no sistema inteiro) que têm Evidência de Engajamento`, implementada em
-`calcularTaxaConversaoV2(entradas)`, exibida no topo do painel de diagnóstico junto com os totais
-absolutos (elegíveis / com evidência). Mede se o app está convertendo cadastro em engajamento real,
-independente do ranking entre PGs. **Linha de base registrada em 2026-07-23: 38 elegíveis, 6 com
-evidência, 16% de conversão.** Só leitura, recalculada ao vivo a cada abertura do painel — **não
-persiste histórico semana a semana** (decidir onde/quando gravar um snapshot é uma decisão maior,
-deixada em aberto; até lá, o acompanhamento ao longo da Fase 1 é manual, por leitura periódica do
-painel). Candidato natural de escopo para uma RC futura, se a observação manual se mostrar
-insuficiente.
+**Os 5 indicadores a acompanhar semanalmente durante a Fase 1 (decisão do usuário):**
 
-### RC3.6 — `lastActivityAt` por participante (roadmap futuro, não iniciado)
+| Indicador | Objetivo | Implementado em |
+|---|---|---|
+| Taxa de Conversão | Principal KPI da adoção — % de elegíveis com Evidência de Engajamento | `calcularTaxaConversaoV2` |
+| Nº de PGs com Evidência de Engajamento | Expansão da cultura de uso (quantos grupos já têm QUALQUER sinal) | `contarPgsComEvidenciaV2` |
+| Média de indicadores por participante | Profundidade do uso (distinto de Capilaridade, que é binário ≥3) | `calcularMediaIndicadoresV2` |
+| Distribuição dos 7 indicadores | Identificar práticas negligenciadas ou sem poder discriminatório | `renderDistribuicaoIndicadoresV2` (já existia) |
+| Evolução do ranking | Validar a coerência do novo IMD ao longo do tempo | **Não implementado** — exige histórico persistido (ver RC3.6/nota abaixo); hoje só existe a "foto" do momento |
 
-Corrige a limitação encontrada na RC3.5.3 (ver "Participante com Evidência de Engajamento" acima):
-sem um carimbo de última atividade, não existe hoje forma de calcular uma janela móvel real (ex.:
-"ativo nos últimos 30 dias"). Proposta: novo campo `p.progresso.lastActivityAt` (timestamp em ms),
-atualizado por qualquer ação relevante (mesmos gatilhos de `bumpPgProgress`/conclusão de
-estudo/missão/streak). O critério de "Participante Ativo" passaria a ser
-`(agora - lastActivityAt) <= 30 dias`, substituindo a Evidência de Engajamento (que usa o último
-dado disponível, sem limite de idade) por uma janela real. Aditivo, não quebra nada existente.
-Só inicia depois de a Fase 1 de implantação terminar (dado real suficiente pra validar o impacto).
+**Linha de base registrada em 2026-07-23:** 38 elegíveis, 6 com Evidência de Engajamento (16% de
+conversão), 4 de 37 PGs com pelo menos 1 participante engajado, média de 1,3 de 7 indicadores por
+participante elegível. Os 4 primeiros indicadores são só leitura, recalculados ao vivo a cada
+abertura do painel — **nenhum persiste histórico semana a semana** (decidir onde/quando gravar um
+snapshot é uma decisão maior, deixada em aberto; até lá, o acompanhamento ao longo da Fase 1 é
+manual, por leitura periódica do painel). O 5º ("Evolução do ranking") não pode ser respondido sem
+essa persistência — é o ponto de partida natural da RC3.6, abaixo.
+
+**Meta operacional da Fase 1 (decisão do usuário — NÃO é critério de homologação, é objetivo de
+gestão pastoral para Tutores/Coordenadores agirem em cima):**
+
+| Indicador | Linha de base (23/07/2026) | Meta Fase 1 |
+|---|---:|---:|
+| Taxa de Conversão | 16% | 40% |
+| Média de indicadores por participante | 1,3/7 | 3,0/7 |
+| PGs com Evidência de Engajamento | 4/37 | 15/37 |
+
+Atingir (ou não) essa meta não muda os critérios de encerramento abaixo nem os limiares de
+classificação — é só a referência que transforma o painel de "medição passiva" em orientação de
+ação concreta: a partir de agora, a pergunta de gestão deixa de ser "como melhorar o algoritmo?" e
+passa a ser "como aumentar a Taxa de Conversão para Evidência de Engajamento?".
+
+**Critérios objetivos para encerramento da Fase 1 (decisão do usuário — substitui percepção
+subjetiva por condição verificável):** a homologação funcional (RC3.5.4) só se conclui quando as
+4 condições abaixo ocorrerem **simultaneamente**:
+1. Pelo menos 8 semanas de observação desde o Marco Zero (2026-07-05 → a partir de ~2026-08-30).
+2. Todos os PGs já fora do período de carência de 7 dias (nenhum participante recém-registrado
+   distorcendo a leitura).
+3. A distribuição das categorias (Não Engajado/Baixo/Moderado/Engajado/Altamente Engajado)
+   estável por, no mínimo, 3 semanas consecutivas.
+4. Tutores e Coordenadores confirmarem que o ranking representa adequadamente a realidade dos
+   grupos que eles conhecem pessoalmente.
+Só então os limiares da tabela acima devem ser revisados — e só se a evidência acumulada pedir
+ajuste, nunca por reação a um resultado inicial baixo.
+
+**Regra de mudança durante a Fase 1 (decisão do usuário):** nenhuma alteração de algoritmo,
+fórmula ou peso é feita neste período — **exceto correção de defeitos reais** (bugs). Preserva a
+estabilidade da base de comparação; qualquer ajuste de calibração vem de comportamento real
+acumulado, não de impressão inicial.
+
+### RC3.6 — Evolução Discipular e Inteligência Temporal (roadmap futuro, não iniciado)
+
+> Renomeado de "RC3.6 — `lastActivityAt`" (decisão do usuário): não é só uma correção técnica
+> pontual — é o eixo unificador de tudo que depende do fator TEMPO, hoje ausente do IMD. Reúne sob
+> um mesmo guarda-chuva conceitual: `lastActivityAt`, janela móvel de atividade, histórico de
+> snapshots, evolução individual, evolução dos PGs, tendências, comparação entre ciclos, e
+> crescimento ou estagnação — em vez de tratar cada peça como um item avulso.
+
+Até a RC3.5.3, o IMD mede duas coisas num único instante: **quantos** estão engajados
+(Capilaridade) e **como** estão engajados (as demais dimensões) — sempre uma fotografia do momento
+atual, nunca uma trajetória. A RC3.6 muda esse eixo: passa a medir **quem evoluiu**, respondendo
+perguntas que a RC3.5 estrutural não consegue:
+- Quais PGs mais cresceram nos últimos 2 meses?
+- Quais líderes (Tutores/Coordenadores) conseguiram aumentar a Taxa de Conversão do próprio grupo?
+- Quais grupos estagnaram (mesma Capilaridade/categoria por várias semanas)?
+- Quais participantes específicos passaram de baixa para alta Evidência de Engajamento?
+
+**Pré-requisito técnico (achado na RC3.5.3):** sem um carimbo de última atividade, não existe hoje
+forma de calcular nem uma janela móvel real (ex.: "ativo nos últimos 30 dias") nem uma trajetória
+ao longo do tempo — as duas dependem da mesma peça de infraestrutura que falta: **histórico**, não
+só estado atual. Proposta: novo campo `p.progresso.lastActivityAt` (timestamp em ms, atualizado
+pelos mesmos gatilhos de `bumpPgProgress`/conclusão de estudo/missão/streak) resolve a janela móvel
+por participante; um snapshot periódico persistido (por PG e/ou por participante) resolve a
+trajetória agregada ("Evolução do ranking", 5º indicador da RC3.5.4). Aditivo, não quebra nada
+existente. Só inicia depois que a Fase 1 terminar e os critérios de encerramento acima forem
+atendidos — a RC3.5.4 é, na prática, a coleta de evidência que vai dizer se essa infraestrutura
+longitudinal é o próximo passo certo.
 
 ---
 
