@@ -3281,7 +3281,7 @@ function renderTutorGruposList(nome) {
         <div class="tutor-grupo-info-line">🤝 Coordenador: <strong>${sanitize(g.coordenador || '— não definido —')}</strong></div>
         <div class="tutor-grupo-info-line">📖 Último estudo concluído: <strong>${ultimoEstudoNome}</strong> (${progresso.estudos || 0}/13)</div>
         <div class="tutor-grupo-info-line">🗓️ Reunião: <strong>${reuniao}</strong></div>
-        <div class="tutor-grupo-info-line">👥 ${g.participantes.length} participante${g.participantes.length===1?'':'s'} — toque para ver detalhes</div>
+        <div class="tutor-grupo-info-line">👥 ${participantesAtivos(g).length} participante${participantesAtivos(g).length===1?'':'s'} — toque para ver detalhes</div>
       </div>`;
   }).join('');
 
@@ -3557,7 +3557,7 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
   // Missões de jornada (não campanha) para referência de label
   const missaoJornada = JOURNEY_MISSIONS.filter(m => !m.id.startsWith('pg_'));
 
-  const participantesSemDup = g.participantes.filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
+  const participantesSemDup = participantesAtivos(g).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
   const participantesHtml = participantesSemDup.length
     ? participantesSemDup.map(p => {
         const prog = p.progresso || null;
@@ -3635,7 +3635,7 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
     ${nivelSection}
     ${renderCampanhasTutor(grupoNum, nome)}
     <div class="panel-section">
-      <div class="panel-title">Participantes e Missões (${g.participantes.length})</div>
+      <div class="panel-title">Participantes e Missões (${participantesSemDup.length})</div>
       ${participantesHtml}
     </div>
     ${renderProgramaSemanal()}
@@ -3940,7 +3940,7 @@ function openPanel() {
   // livre, então o cruzamento é por nome — se não achar, fica sem WhatsApp).
   function acharWaPorNome(nome) {
     if (!g || !nome) return '';
-    const p = g.participantes.find(p => p.nome === nome);
+    const p = participantesAtivos(g).find(p => p.nome === nome);
     return p ? p.wa : '';
   }
 
@@ -7464,6 +7464,20 @@ function podarGratidoesExpiradas(lista) {
   return (lista || []).filter(item => (item.ts || 0) >= limite);
 }
 
+// ── C3: tombstone transitório ────────────────────────────────────────────
+// Participante removido não é apagado na hora (para o merge conseguir diferenciar
+// "removido" de "ainda não sincronizado" entre aparelhos) — vira removed:true +
+// updatedAt, some de exibições/contagens ativas, e só é apagado de vez do documento
+// depois de 30 dias (mesmo padrão da poda de gratidões, acima).
+const PARTICIPANTE_REMOVIDO_VALIDADE_MS = 30 * 24 * 60 * 60 * 1000;
+function podarParticipantesRemovidos(lista) {
+  const limite = Date.now() - PARTICIPANTE_REMOVIDO_VALIDADE_MS;
+  return (lista || []).filter(p => !p.removed || (p.updatedAt || 0) >= limite);
+}
+function participantesAtivos(g) {
+  return ((g && g.participantes) || []).filter(p => !p.removed);
+}
+
 function loadGrupos() {
   try {
     const s = localStorage.getItem(GRUPOS_KEY);
@@ -7477,7 +7491,7 @@ function loadGrupos() {
           PEQUENOS_GRUPOS[idx].coordenador = g.coordenador ?? null;
           PEQUENOS_GRUPOS[idx].diaReuniao = g.diaReuniao ?? null;
           PEQUENOS_GRUPOS[idx].horaReuniao = g.horaReuniao ?? null;
-          PEQUENOS_GRUPOS[idx].participantes = g.participantes || [];
+          PEQUENOS_GRUPOS[idx].participantes = podarParticipantesRemovidos(g.participantes || []);
           PEQUENOS_GRUPOS[idx].gratidoes = podarGratidoesExpiradas(g.gratidoes || []);
           PEQUENOS_GRUPOS[idx].reunioesMes = filtrarReunioesMes(g.reunioesMes || {});
         }
@@ -8396,7 +8410,7 @@ function applyGruposData(salvo) {
     PEQUENOS_GRUPOS[idx].coordenador   = g.coordenador   ?? null;
     PEQUENOS_GRUPOS[idx].diaReuniao    = g.diaReuniao    ?? null;
     PEQUENOS_GRUPOS[idx].horaReuniao   = g.horaReuniao   ?? null;
-    const partic = g.participantes || [];
+    const partic = podarParticipantesRemovidos(g.participantes || []);
     PEQUENOS_GRUPOS[idx].participantes = partic.filter((p, i, arr) => arr.findIndex(x => (x.nome||'').trim().toLowerCase() === (p.nome||'').trim().toLowerCase()) === i);
     PEQUENOS_GRUPOS[idx].gratidoes = podarGratidoesExpiradas(g.gratidoes || []);
     PEQUENOS_GRUPOS[idx].reunioesMes = filtrarReunioesMes(g.reunioesMes || {});
@@ -8421,6 +8435,13 @@ function mergeGruposData(remoteList, localGroups) {
       const idx = merged.findIndex(rp => (rp.ts || rp.nome) === tsKey);
       if (idx < 0) {
         merged.push(lp);
+      } else if (FB_FLAGS.useTombstone) {
+        // C3: participante existe nos dois lados — vence quem tem o toque mais recente,
+        // seja uma edição estrutural/remoção (updatedAt no topo) ou uma atualização de
+        // progresso (progresso.updatedAt). Evita ressuscitar remoção concorrente.
+        const ru = Math.max(merged[idx]?.updatedAt || 0, merged[idx]?.progresso?.updatedAt || 0);
+        const lu = Math.max(lp?.updatedAt || 0, lp?.progresso?.updatedAt || 0);
+        if (lu >= ru) merged[idx] = lp;
       } else {
         // Participante existe nos dois lados: mantém a versão mais recente (evita perder progresso próprio)
         const ru = merged[idx]?.progresso?.updatedAt || 0;
@@ -8856,8 +8877,8 @@ function renderInscricaoBody(g, jaInscrito, meuGrupo) {
         <span class="grupo-info-ico">👥</span>
         <div class="grupo-info-txt">
           <div class="grupo-info-lbl">Participantes inscritos</div>
-          <div class="grupo-info-val">${[...new Map(g.participantes.map(p => [p.nome.trim().toLowerCase(), p])).values()].length}</div>
-          ${g.participantes.length > 0 ? `<div style="margin-top:.4rem;display:flex;flex-direction:column;gap:.15rem">${[...new Map(g.participantes.map(p => [p.nome.trim().toLowerCase(), p])).values()].map(p => `<span style="font-size:13px;color:var(--text2);font-family:var(--ff-body)">• ${sanitize(p.nome)}</span>`).join('')}</div>` : ''}
+          <div class="grupo-info-val">${[...new Map(participantesAtivos(g).map(p => [p.nome.trim().toLowerCase(), p])).values()].length}</div>
+          ${participantesAtivos(g).length > 0 ? `<div style="margin-top:.4rem;display:flex;flex-direction:column;gap:.15rem">${[...new Map(participantesAtivos(g).map(p => [p.nome.trim().toLowerCase(), p])).values()].map(p => `<span style="font-size:13px;color:var(--text2);font-family:var(--ff-body)">• ${sanitize(p.nome)}</span>`).join('')}</div>` : ''}
         </div>
       </div>
     </div>`;
@@ -8971,7 +8992,14 @@ function removerDoGrupoAtual(grupoNum) {
   if (FB_FLAGS.identidadeUuid) removeVinculo(grupoNum);
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
   if (g && meuGrupo) {
-    g.participantes = g.participantes.filter(p => p.ts !== meuGrupo.ts);
+    if (FB_FLAGS.useTombstone) {
+      // C3: tombstone — marca como removido em vez de apagar na hora, para o merge
+      // conseguir diferenciar "removido" de "ainda não sincronizado" entre aparelhos.
+      const pRemovido = g.participantes.find(p => p.ts === meuGrupo.ts);
+      if (pRemovido) { pRemovido.removed = true; pRemovido.updatedAt = Date.now(); }
+    } else {
+      g.participantes = g.participantes.filter(p => p.ts !== meuGrupo.ts);
+    }
     // Se a pessoa que saiu era tutor ou coordenadora, libera o papel novamente
     if (meuGrupo.papel === 'tutor') g.tutor = null;
     if (meuGrupo.papel === 'coordenador') g.coordenador = null;
@@ -9156,7 +9184,7 @@ function getPgGroupWeek(grupoNum) {
   const wk = (typeof getISOWeekPg === 'function') ? getISOWeekPg() : null;
   let estudos = 0, oracoes = 0, bondades = 0, gratidao = 0, engajamento = 0, estudosSomados = 0, membros = 0;
   if (g && g.participantes) {
-    g.participantes.forEach(p => {
+    participantesAtivos(g).forEach(p => {
       membros++;
       const pr = p.progresso || {};
       if (pr.contrib && pr.contrib.weekKey === wk) {
@@ -9359,7 +9387,7 @@ function getPgIMD(grupoNum) {
   };
   const g = (typeof PEQUENOS_GRUPOS !== 'undefined') ? PEQUENOS_GRUPOS.find(x => x.num === grupoNum) : null;
   if (!g || !g.participantes) return pgIMD;
-  const participantesSemDup = g.participantes.filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
+  const participantesSemDup = participantesAtivos(g).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
 
   if (participantesSemDup.length) {
     const somaXP = participantesSemDup.reduce((soma, p) => soma + (p.progresso?.xp || 0), 0);
@@ -9439,11 +9467,11 @@ function compararPgsParaRanking(a, b) {
 // usada em outras telas, ex.: sanitize(g.nome || 'Grupo ' + g.num)) — não é excluído do ranking.
 function classificarPgs() {
   const gruposFormados = PEQUENOS_GRUPOS.filter(g =>
-    (g.nome || (g.participantes && g.participantes.length)) && !isPgDeTeste(g.nome));
+    (g.nome || participantesAtivos(g).length) && !isPgDeTeste(g.nome));
   const calculatedAt = new Date().toISOString();
   const entradas = gruposFormados.map(g => {
     const imd = getPgIMD(g.num);
-    const participantesSemDup = (g.participantes || []).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
+    const participantesSemDup = participantesAtivos(g).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
     return {
       grupoNum: g.num,
       grupo: g.nome || (PG_DEFAULT_NAME + ' ' + g.num),
@@ -9901,7 +9929,7 @@ function renderPgProgressHome() {
 
   const totalParticipantes = (() => {
     const g = (typeof PEQUENOS_GRUPOS !== 'undefined') ? PEQUENOS_GRUPOS.find(x => x.num === meuGrupo.grupoNum) : null;
-    return g ? g.participantes.length : 0;
+    return g ? participantesAtivos(g).length : 0;
   })();
 
   const goalKeys = Object.keys(metas);

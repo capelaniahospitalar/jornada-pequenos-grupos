@@ -279,11 +279,20 @@ Cada commit é precedido de **Mapa de Impacto** (análise, sem código); tombsto
 - **C1 — Concorrência:** FEITO (ver acima).
 - **Etapa 1 (identidade) + Etapa 2 (convites):** FEITO (ver acima) — cobre o que antes era descrito
   como "C2 — Modelo Meus Grupos", mas foi além (também substituiu o sistema de convite/link).
-- **C3 — Tombstone transitório:** remoção vira `removed:true` (+ carimbo) e `updatedAt` por
-  participante no topo; merge compara remoção × edição (mais recente vence); resolve a
-  ressurreição do achado de campo acima. Inclui **ADR** com **Exit Criteria**. Flag
-  `FB_FLAGS.useTombstone` já existe no código (`true`) mas **não está implementada** — nenhuma
-  função lê esse flag ainda; é só um marcador reservado do plano original.
+- **C3 — Tombstone transitório: FEITO (2026-07-23).** Remoção vira `removed:true` (+ `updatedAt`
+  no topo do participante, separado de `progresso.updatedAt`); `mergeGruposData` passa a comparar
+  `Math.max(updatedAt, progresso.updatedAt)` dos dois lados — remoção × edição, mais recente vence
+  — resolvendo a ressurreição do achado de campo acima. Nova `podarParticipantesRemovidos()` apaga
+  o tombstone de vez após 30 dias (mesmo padrão de `podarGratidoesExpiradas`); nova
+  `participantesAtivos(g)` filtra removidos em ~10 pontos de exibição/contagem (painel do tutor,
+  ranking IMD, tela de inscrição, card de progresso). Sem script de migração — dado antigo sem os
+  campos novos é tratado como não removido. Comportamento gated por `FB_FLAGS.useTombstone`
+  (`true` por padrão) — desligar reverte ao hard-delete antigo em 1 linha. Mapa de Impacto + ADR
+  aprovados pelo usuário antes do código. **Testado no preview** (servidor estático local, rede do
+  Firebase não tocada): sem erros de console; lógica de filtro/poda/merge validada isoladamente no
+  console do navegador (ver `CHANGELOG.md`). **Não testado ao vivo** contra dois aparelhos reais
+  (residual: se algum dispositivo ficar mais de 30 dias offline com um participante já removido em
+  outro aparelho, pode ressuscitá-lo ao sincronizar — risco aceito na decisão dos 30 dias).
 - **C4 — Debounce ~400ms** (`FB_FLAGS.debounceMs`) com dirty-check de payload. Mesma situação:
   flag existe (`400`) mas **não está implementada/lida em nenhum lugar do código**.
 - **C5 — Limpeza: FEITO (2026-07-02).** `FUNC-01` (4 duplicatas: `sendMyPrayer`, `clearMyPrayer`,

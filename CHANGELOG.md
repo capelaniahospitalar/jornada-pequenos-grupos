@@ -1,5 +1,36 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-23] — C3: Tombstone transitório na remoção de participantes
+
+Item do roadmap técnico (`ESTADO-E-ROADMAP.md`), precedido de Mapa de Impacto + ADR aprovados
+pelo usuário antes do código.
+
+**Problema resolvido:** `removerDoGrupoAtual()` apagava o participante da lista na hora
+(`filter`). No merge (`mergeGruposData`), um aparelho com cache local desatualizado (ainda com o
+participante removido por outro aparelho) o ressuscitava, porque o código não sabia diferenciar
+"participante novo, ainda não sincronizado" de "participante removido, ainda não sincronizado".
+
+**Mudança:** participante removido agora vira `removed:true` + `updatedAt` (carimbo no topo do
+registro, separado de `progresso.updatedAt`) em vez de ser apagado. No merge, quando o mesmo
+participante existe nos dois lados, vence quem tem o toque mais recente — seja uma remoção ou uma
+edição de progresso — usando `Math.max(updatedAt, progresso.updatedAt)` de cada lado. Nova função
+`podarParticipantesRemovidos()` (espelha `podarGratidoesExpiradas`) apaga o registro de vez do
+documento 30 dias depois da remoção; `participantesAtivos(g)` filtra os removidos em todos os
+pontos de exibição/contagem (painel do tutor, ranking IMD/Índice de Maturidade Discipular, tela de
+inscrição, card de progresso do PG — ~10 pontos ao todo).
+
+**Compatibilidade:** registros antigos sem `removed`/`updatedAt` continuam válidos (tratados como
+não removidos / carimbo zero) — sem script de migração. Comportamento inteiro controlado por
+`FB_FLAGS.useTombstone` (já existia como flag reservada, `true` por padrão) — desligar essa flag
+volta ao comportamento antigo (apaga na hora, sem tombstone) em 1 linha, mesmo padrão de rollback
+do Commit 1.
+
+**Testado:** no preview (servidor estático local, sem tocar Firebase de produção) — página carrega
+sem erros de console; testes de lógica isolados no console do navegador confirmam: participante
+removido some da lista ativa mas dado antigo sem os campos novos continua aparecendo; tombstone de
+31 dias é podado enquanto um de 1 dia é mantido; remoção mais recente vence sobre progresso
+desatualizado local e vice-versa (edição mais recente vence sobre remoção antiga).
+
 ## [2026-07-19] — Correção: tela do Companheiro de Jornada abrindo em branco
 
 **Relato do usuário:** ao acessar o app, a tela "Companheiro de Jornada" abria (título aparecia)
