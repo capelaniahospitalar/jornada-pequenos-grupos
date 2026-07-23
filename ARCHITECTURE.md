@@ -185,16 +185,20 @@ durante o RC3.2, registrado para investigação futura, sem alterar comportament
   preparação para a Semana da Primavera.
 - Só inicia depois que o Épico 4 estiver consolidado (inteligência antes da gamificação).
 
-### RC3.5 — Redesenho do IMD por Capilaridade Discipular (RC3.5.3 implementada — HOMOLOGAÇÃO PARCIAL)
+### RC3.5 — Redesenho do IMD por Capilaridade Discipular (RC3.5.3 HOMOLOGADA TECNICAMENTE — RC3.5.4 HOMOLOGAÇÃO FUNCIONAL em andamento)
 
 > RC3.5.1 (auditoria) → RC3.5.2 (proposta) → RC3.5.2A (decisões finais) → RC3.5.3 (implementação,
 > `index.html`, motor `getPgIMDv2`/`classificarPgsV2Diagnostico`, convive com o motor antigo
-> intocado via `FB_FLAGS.imdV2Diagnostico`). **Homologação parcial (decisão do usuário):**
-> arquitetura, algoritmo, fórmula, conceito de Capilaridade e a regra de 3 indicadores estão
-> homologados — mas os LIMIARES de classificação (tabela abaixo) permanecem como linha de base,
-> não homologados, até um período de dado real acumulado (ver "Fase de Implantação" abaixo). Só
-> migra inteiro para "Componentes Homologados"/"Decisões Arquiteturais Consolidadas" quando os
-> limiares também forem confirmados com dado real.
+> intocado via `FB_FLAGS.imdV2Diagnostico`) → RC3.5.4 (homologação operacional, em andamento).
+> **Distinção formal entre homologação técnica e funcional (decisão do usuário):**
+> - **Homologação TÉCNICA — concluída (RC3.5.3):** motor v2 isolado por feature flag, convivência
+>   com o algoritmo antigo, painel de diagnóstico comparativo, tabela de distribuição dos
+>   indicadores, conceito de Capilaridade, regra dos 3 indicadores, Fase de Implantação prevista,
+>   documentação arquitetural atualizada, testado com dado real sem regressão aparente.
+> - **Homologação FUNCIONAL — em andamento (RC3.5.4):** os LIMIARES de classificação (tabela
+>   abaixo) continuam como linha de base, não confirmados — só migram para "Componentes
+>   Homologados"/"Decisões Arquiteturais Consolidadas" ao final da Fase 1, com base em evidência
+>   real acumulada, nunca por reação a um resultado inicial baixo.
 
 **Motivação (RC3.5.1):** auditoria encontrou que o IMD atual mede majoritariamente volume/médias
 por participante e metas fixas do grupo, não normalizadas pelo nº de participantes — o que permite
@@ -291,6 +295,28 @@ participante. A ressalva original do `dataInscricao` nulo não bloqueou nada: a 
 encontro (só existe agregado por reunião — presentes/total —, sem o nome de quem esteve lá). Não
 bloqueiam a Capilaridade (calculada com os outros 6 indicadores + Embaixadores = 7), mas reduzem a
 precisão do modelo até existirem.
+
+### RC3.5.4 — Homologação Operacional (em andamento, sem alteração de algoritmo)
+
+Fase de pura observação durante a Fase 1 de Implantação — **nenhuma mudança de fórmula, peso ou
+código de cálculo nesta etapa**, só coleta de evidência real para decidir, ao final da Fase 1, se
+os limiares de classificação permanecem ou precisam de ajuste. Perguntas que a Fase 1 deve
+responder com dado real (não hipótese):
+- Quantos PGs conseguem atingir os 3 indicadores mínimos de Evidência de Engajamento?
+- Qual indicador (dos 7) é naturalmente o mais difícil de cumprir?
+- Existe algum indicador que quase ninguém registra (candidato a revisão)?
+- Existe algum indicador que praticamente todo mundo cumpre (perdeu poder discriminatório)?
+
+**Métrica-chave a acompanhar: Taxa de Conversão para Evidência de Engajamento** — `% de
+participantes elegíveis (no sistema inteiro) que têm Evidência de Engajamento`, implementada em
+`calcularTaxaConversaoV2(entradas)`, exibida no topo do painel de diagnóstico junto com os totais
+absolutos (elegíveis / com evidência). Mede se o app está convertendo cadastro em engajamento real,
+independente do ranking entre PGs. **Linha de base registrada em 2026-07-23: 38 elegíveis, 6 com
+evidência, 16% de conversão.** Só leitura, recalculada ao vivo a cada abertura do painel — **não
+persiste histórico semana a semana** (decidir onde/quando gravar um snapshot é uma decisão maior,
+deixada em aberto; até lá, o acompanhamento ao longo da Fase 1 é manual, por leitura periódica do
+painel). Candidato natural de escopo para uma RC futura, se a observação manual se mostrar
+insuficiente.
 
 ### RC3.6 — `lastActivityAt` por participante (roadmap futuro, não iniciado)
 

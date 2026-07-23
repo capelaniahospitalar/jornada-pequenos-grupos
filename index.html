@@ -9686,6 +9686,23 @@ function renderDistribuicaoIndicadoresV2(entradas) {
     </div>`;
 }
 
+// RC3.5.4 (Homologação Operacional, pedido do usuário): Taxa de Conversão para Evidência de
+// Engajamento — agregado do sistema inteiro (não por PG), pra acompanhar ao longo da Fase 1 se
+// o app está convertendo participante cadastrado em participante realmente engajado. Só leitura,
+// recalculada ao vivo a cada abertura do painel — não persiste histórico semana a semana (isso
+// exigiria decidir onde/quando gravar um snapshot e um gatilho de escrita, o que é uma decisão
+// maior, deixada em aberto — ver nota no ARCHITECTURE.md).
+function calcularTaxaConversaoV2(entradas) {
+  let totalElegiveis = 0, totalComEvidencia = 0;
+  entradas.forEach(e => {
+    const v2 = getPgIMDv2(e.grupoNum);
+    totalElegiveis += v2.totalElegiveis;
+    totalComEvidencia += v2.totalComEvidencia;
+  });
+  const conversao = totalElegiveis ? Math.round((totalComEvidencia / totalElegiveis) * 100) : 0;
+  return { totalElegiveis, totalComEvidencia, conversao };
+}
+
 // RC3.5.3 (pedido do usuário): fase de implantação x consolidação — referência = Marco Zero
 // (2026-07-05, produção reinicializada, ver ESTADO-E-ROADMAP.md). Nos primeiros 60 dias, o
 // painel avisa que os índices são LINHA DE BASE (faixas de classificação ainda não
@@ -9868,6 +9885,7 @@ function renderRankingPgs(nome) {
   const nomeEsc = nome.replace(/'/g,"\\'");
   const atualizadoEm = entradas[0] ? formatarDataHoraBR(entradas[0].calculatedAt) : formatarDataHoraBR(new Date().toISOString());
   const fase = diagnostico ? faseImplantacaoIMDv2() : null;
+  const conversao = diagnostico ? calcularTaxaConversaoV2(entradas) : null;
 
   document.getElementById('tutorpanel-body').innerHTML = `
     <div class="content-card">
@@ -9877,6 +9895,9 @@ function renderRankingPgs(nome) {
       ${fase ? `<p class="body-text" style="font-size:13px;color:var(--text3)">${fase.texto}</p>` : ''}
       <div class="panel-stat" style="margin-top:.6rem"><span>Atualizado em</span><strong>${atualizadoEm}</strong></div>
       <div class="panel-stat"><span>Total de PGs classificados</span><strong>${entradas.length}</strong></div>
+      ${conversao ? `<div class="panel-stat"><span>Elegíveis no sistema</span><strong>${conversao.totalElegiveis}</strong></div>
+      <div class="panel-stat"><span>Com Evidência de Engajamento</span><strong>${conversao.totalComEvidencia}</strong></div>
+      <div class="panel-stat"><span>Taxa de Conversão (RC3.5.4)</span><strong>${conversao.conversao}%</strong></div>` : ''}
     </div>
     ${diagnostico ? renderPgRankingCardsV2Diagnostico(entradas) : renderPgRankingCards(entradas)}
     ${diagnostico ? renderDistribuicaoIndicadoresV2(entradas) : ''}
