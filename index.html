@@ -2941,13 +2941,24 @@ function tutorHasPass(nome) {
   return p !== undefined && p !== null && p !== '';
 }
 
+// RC-REST-02: só aceita como "mesma pessoa" se um nome for o outro por completo, ou um dos
+// dois for um PREFIXO de palavra inteira do outro (ex.: "Renan" casa com "Renan Fernando
+// Castro Silva", mas "Ana" não casa com "Mariana") — cobre o caso real de alguém logar com
+// nome curto/apelido enquanto o grupo tem o nome completo gravado, sem abrir margem para
+// coincidência de substring no meio da palavra.
+function nomesCorrespondem(a, b) {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  return a.startsWith(b + ' ') || b.startsWith(a + ' ');
+}
+
 // ── Encontrar todos os PGs onde esta pessoa é Tutor ou Coordenador ─────
 function getGruposDoResponsavel(nome) {
   if (!nome || typeof PEQUENOS_GRUPOS === 'undefined') return [];
   const nomeNorm = nome.trim().toLowerCase();
   return PEQUENOS_GRUPOS.filter(g =>
-    (g.tutor && g.tutor.trim().toLowerCase() === nomeNorm) ||
-    (g.coordenador && g.coordenador.trim().toLowerCase() === nomeNorm)
+    nomesCorrespondem(g.tutor && g.tutor.trim().toLowerCase(), nomeNorm) ||
+    nomesCorrespondem(g.coordenador && g.coordenador.trim().toLowerCase(), nomeNorm)
   );
 }
 

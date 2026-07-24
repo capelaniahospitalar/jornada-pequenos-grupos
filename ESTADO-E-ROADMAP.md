@@ -1,10 +1,56 @@
-# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-07-23)
+# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-07-24)
 
 > Documento para retomar o trabalho em outra máquina/sessão. Cole o conteúdo de volta
 > para o assistente ao recomeçar — a "memória" do assistente **não viaja entre máquinas**;
 > só este arquivo (via GitHub) viaja. **Nenhuma alteração de código sem aprovação do desenho.**
 
-## ⭐ SESSÃO 2026-07-23 — retomar por aqui
+## ⭐ SESSÃO 2026-07-24 — retomar por aqui
+
+**RC-REST-02 — Correção de identificação de Tutor/Coordenador por nome abreviado (concluída,
+commitada).** Sequência de auditoria disciplinada a pedido do usuário: RC-AUD-01 (congelamento,
+nenhuma alteração) → RC-AUD-02 (leitura direta do Firestore em produção, só leitura — confirmou
+que nenhum grupo/participante foi perdido) → RC-AUD-03 (rastreio do fluxo Firestore → cache →
+estado → Painel do Tutor, achou duas causas candidatas) → RC-AUD-04 (diff contra a baseline RC1,
+`43f2d15`) → RC-REST-01 (plano, sem implementar) → RC-REST-02 (implementação) → RC-REST-03
+(auditoria final de falso-positivo, antes do commit). Detalhe técnico completo no `CHANGELOG.md`,
+entrada `[2026-07-24]`.
+
+- **Causa raiz:** `getGruposDoResponsavel` comparava nome por igualdade exata; grupos com o tutor
+  gravado em forma abreviada (`"Renan"` em vez de `"Renan Fernando Castro Silva"`) ficavam
+  invisíveis no Painel, mesmo intactos na nuvem. Afetava também Felipe Rodrigues da Silva
+  (coordenador do grupo 9, gravado só como `"Felipe"`) — ele não via nenhum grupo antes da
+  correção.
+- **Correção:** nova função `nomesCorrespondem()`, casamento por igualdade ou prefixo de palavra
+  inteira. Confinada à leitura — nenhuma mudança em persistência, Firestore, IMD, Ranking, XP ou
+  gamificação (verificado por diff).
+- **Validado contra produção real, só leitura:** zero falso positivo entre pessoas diferentes nos
+  27 nomes distintos hoje na base (5 tutores × 22 coordenadores, todas as combinações). Matriz
+  completa de "antes x depois" por tutor no `CHANGELOG.md`.
+- **Limitação conhecida, não bloqueante:** comparação por prefixo pode ambiguar entre pessoas
+  diferentes que compartilham o primeiro nome (ex. sintético testado: "João" casaria com "João
+  Pedro" e "João Paulo" ao mesmo tempo). Não ocorre hoje. Motiva a próxima RC abaixo.
+
+## 🔭 RC4 — Identidade Canônica dos Responsáveis (planejada, não iniciada)
+
+Registrada a pedido do usuário na homologação da RC-REST-02, para não deixar a limitação
+conhecida "solta" sem plano.
+
+**Objetivo:** eliminar de vez a dependência de comparação textual de nome para autorização/
+associação de grupo. Cada Tutor/Coordenador passa a ter um identificador único e imutável
+(`memberId`, WhatsApp, ou outro UID canônico — o app já tem `memberId` para participantes desde a
+Etapa 1/`identidadeUuid`, ver `ARCHITECTURE.md`). O **nome vira só `displayName`** — nunca mais
+usado em regra de autorização, associação de grupo ou cálculo de permissão.
+
+**Por quê agora não:** a RC-REST-02 resolve o problema real e imediato (2 tutores sem ver seus
+grupos) sem esse risco se materializar na base atual (verificado — zero colisão hoje). A migração
+para identidade canônica é mudança estrutural maior, toca login/allowlist/criação de senha em
+vários pontos — trabalho de próxima RC, não gambiarra em cima da correção pontual.
+
+**Critério de abertura:** sem data fixa — abrir quando (a) um novo tutor/coordenador real com
+primeiro nome repetido entrar na base, ou (b) o número de tutores crescer o suficiente para o
+risco deixar de ser teórico, o que vier primeiro.
+
+## ⭐ SESSÃO 2026-07-23
 
 Três frentes fechadas nesta sessão, todas já commitadas. Detalhe técnico completo em
 `ARCHITECTURE.md` (seção "Roadmap Arquitetural", item RC3.5) e `CHANGELOG.md` (entradas de

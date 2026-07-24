@@ -1,5 +1,46 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-24] — RC-REST-02: Correção de identificação de Tutor/Coordenador por nome abreviado
+
+Corrige a identificação de tutor/coordenador quando existem grafias abreviadas e completas do
+mesmo nome, restaurando a visualização correta dos grupos sem alterar persistência, Firestore,
+IMD, Ranking ou gamificação.
+
+**Causa raiz (achada por auditoria, RC-AUD-01 a RC-AUD-04):** `getGruposDoResponsavel(nome)`
+comparava o nome do login com `g.tutor`/`g.coordenador` por igualdade exata de string. Dois
+grupos reais tinham o tutor gravado como `"Renan"` (nome curto) enquanto a credencial de login
+usa o nome completo `"Renan Fernando Castro Silva"` — a comparação falhava e os grupos 5 e 9
+ficavam invisíveis no Painel do Tutor, mesmo intactos no Firestore (confirmado por leitura direta
+da nuvem). O mesmo padrão afetava Felipe Rodrigues da Silva, coordenador do grupo 9 gravado como
+só `"Felipe"` — ele não via **nenhum** grupo antes desta correção.
+
+**Correção:** nova função `nomesCorrespondem(a, b)` — aceita igualdade exata (comportamento de
+sempre) ou prefixo de palavra inteira em qualquer direção (`"renan"` casa com `"renan fernando
+castro silva"`; `"ana"` **não** casa com `"mariana"`, evita colisão por substring solta). Usada
+só dentro de `getGruposDoResponsavel`.
+
+**Validado com dado real de produção (RC-REST-02/03, só leitura):** comparação par a par de
+todos os 5 nomes de tutor e 22 nomes de coordenador distintos hoje na base — zero falso positivo
+entre pessoas diferentes; as únicas duas correspondências encontradas são a mesma pessoa em duas
+grafias. Nenhum dos 4 tutores da allowlist passou a ver grupo que não fosse seu (checado
+individualmente). Felipe passa a ver `[9, 23]` (antes: nenhum); Renan passa a ver `[5, 9]` a mais
+(grupo 9 com 4 participantes reais confirmados intactos); Uálace e Wladimir inalterados.
+
+**Limitação conhecida (não bloqueia esta RC, registrada para acompanhamento):** a estratégia de
+comparação por prefixo depende da premissa "não existem duas pessoas distintas com o mesmo
+primeiro nome" — testado com o cenário sintético `"João"` vs `"João Pedro"` vs `"João Paulo"`:
+`nomesCorrespondem` casaria `"João"` com os dois, mesmo sendo pessoas diferentes. Não ocorre hoje
+(verificado contra os 27 nomes reais distintos da base), mas pode voltar a acontecer conforme o
+número de tutores/coordenadores crescer. A migração para identificadores estáveis
+(`memberId`/WhatsApp/UID), com nome virando só campo de exibição, permanece registrada como
+melhoria arquitetural futura — ver `ESTADO-E-ROADMAP.md`, "RC4 — Identidade Canônica dos
+Responsáveis".
+
+**Não alterado:** Firestore, `saveGrupos`/`saveGruposToFirebase`/`trySaveGrupos` (persistência),
+`getPgIMD`/`getPgIMDv2`/`classificarPgs`/`classificarPgsV2` (IMD/Ranking), XP, gamificação —
+confirmado por diff (mudança confinada a 1 função nova + 2 linhas dentro de
+`getGruposDoResponsavel`).
+
 ## [2026-07-23] — RC3.5.5: Entrada em produção do IMD v2, remoção da comparação visual
 
 Só interface — nenhuma fórmula, peso, limiar ou estrutura de dado do IMD foi alterada.
