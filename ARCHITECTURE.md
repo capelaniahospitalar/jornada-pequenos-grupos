@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Versão arquitetural** | `v3.4a.1-homologado` |
-| **Última atualização** | 2026-07-16 |
+| **Última atualização** | 2026-07-27 |
 
 > Este documento registra **exclusivamente** o que já foi homologado e o roadmap arquitetural
 > aprovado. Propostas em discussão, funcionalidades ainda não implementadas ou decisões
@@ -110,6 +110,40 @@ trabalho da outra.
 - **Sem gamificação visual:** sem medalha animada, barra, gráfico, nível ou efeito — só os
   números que o motor já calcula, mais o emoji de posição (🥇🥈🥉) para os 3 primeiros.
 
+### Cobertura Setorial Institucional (RC4.8.2 / RC4.8.2A / RC4.8.3)
+
+- **Descrição:** mede quanto de cada setor institucional (RH, Jurídico, DP, NCP etc.) está
+  coberto por colaboradores matriculados nos PGs — indicador oficial do ADV-E. Um PG pode
+  representar um ou vários setores.
+- **Três responsabilidades deliberadamente separadas** (ver ADR-001, seção "Registro de
+  Decisões Arquiteturais"):
+  1. **Cadastro Mestre de Setores** (`SETORES_MESTRE`) — só identidade institucional:
+     `{setorId, nome, ativo, departamentoPaiId}`. `setorId` é estável e nunca reaproveitado;
+     `nome` é só exibição, nunca usado como chave de referência (mesma diretriz já adotada
+     para tutor/coordenador — ver "RC4 — Identidade Canônica dos Responsáveis" no
+     `ESTADO-E-ROADMAP.md`). `ativo` e `departamentoPaiId` (hierarquia/agrupamento por
+     grande área) são campos reservados, sem comportamento implementado ainda.
+  2. **Efetivo Institucional dos Setores** (`SETORES_EFETIVO`) — componente compartilhado,
+     não exclusivo do Painel ADV-E: qualquer indicador institucional futuro que precise saber
+     "quantos colaboradores este setor tem" (Embaixadores, Escola Sabatina, treinamentos
+     obrigatórios, capelania etc.) usa a mesma fonte. `{setorId, totalColaboradores,
+     atualizadoEm, historico[]}` — `totalColaboradores`/`atualizadoEm` são só o "ponteiro
+     atual"; `historico[]` é **append-only** (editar nunca sobrescreve uma entrada, sempre
+     empilha uma nova), com cada entrada já no formato de registro versionado: `{registroId,
+     setorId, totalColaboradores, atualizadoEm, origem, usuario, observacao}`.
+  3. **Cobertura Setorial** — `calcularCoberturaSetorial(grupoNum)`. **Nunca persistida** —
+     cálculo puro, recalculado ao vivo a cada abertura de tela, mesmo padrão do `getPgIMD`.
+     Cruza participantes ativos do PG (por `p.setorId`) com o efetivo atual do setor;
+     classifica 🟢 (≥40%) / 🟡 (30–39%) / 🔴 (<30%).
+- **Migração:** `migrarSetoresParaMestre()` — idempotente, normaliza o formato antigo
+  (RC4.8.2: setor como objeto local ao PG) para o modelo de três componentes, sem perder a
+  atribuição de setor já feita por participante.
+- **Sincronização:** `g.setores` (lista de `setorId` por PG) sincroniza como qualquer campo
+  de grupo; `SETORES_MESTRE`/`SETORES_EFETIVO` sincronizam como campos de topo próprios
+  (`setoresMestre`/`setoresEfetivo`), mesmo padrão de `TUTORS`/`tutores` — **exigem entrar na
+  allowlist da regra do Firestore (`hasOnly([...])`)** antes de irem para produção, senão a
+  gravação falha com 403 silencioso (mesmo bug já visto com o campo `convites`).
+
 ### Persistência
 
 Campos por grupo (`PEQUENOS_GRUPOS[n]`), sincronizados como qualquer outro dado do grupo:
@@ -120,6 +154,9 @@ Campos por grupo (`PEQUENOS_GRUPOS[n]`), sincronizados como qualquer outro dado 
 | `pgRanking` | `atualizarPgRanking()` | Idem — ainda não é chamada por nenhum evento automático. |
 | `pgRanking.schemaVersion` / `pgIMD.schemaVersion` | idem | Versão do formato do objeto, para migração futura. |
 | `pgRanking.displayName` | `atualizarPgRanking()` | Instantâneo do nome do grupo no momento do cálculo (não uma referência viva) — preserva "como o grupo se chamava naquela data" para histórico/relatórios futuros. |
+| `g.setores` | `confirmarAdicionarSetor()`/`excluirSetor()`/`moverSetor()` | Lista de `setorId` — referências ao Cadastro Mestre, nunca objetos completos. |
+| `SETORES_MESTRE` (campo de topo `setoresMestre`) | `confirmarAdicionarSetor()`/`confirmarEditarSetorMestre()` | Identidade institucional de setor — nunca contém total de colaboradores. |
+| `SETORES_EFETIVO` (campo de topo `setoresEfetivo`) | `registrarEfetivoSetor()` | Estado operacional com histórico append-only — nunca sobrescreve uma entrada existente. |
 
 ---
 
@@ -165,6 +202,76 @@ Discussão → Proposta → Decisão → Implementação → Homologação → D
 Item de auditoria aberto (RC3.2-A, ainda não executado): verificar se `pgProgress`, `pgNivel`,
 badges, campanhas, streak e desbloqueios estão de fato sendo persistidos no Firebase — achado
 durante o RC3.2, registrado para investigação futura, sem alterar comportamento até lá.
+
+---
+
+## Registro de Decisões Arquiteturais (ADR)
+
+> Diferente do restante deste documento (que registra o "o quê" já homologado), um ADR
+> registra o "porquê" de uma decisão — o problema, as alternativas descartadas e as
+> consequências aceitas. Existe para que, meses depois, ninguém precise redescobrir por que
+> uma estrutura de dados ficou "mais complicada do que parecia necessário".
+
+### ADR-001 — Separação entre Identidade, Efetivo Operacional e Cobertura Calculada de Setores
+
+**Data:** 2026-07-27 · **Status:** Aceito (RC4.8.2A)
+
+**Problema:** a RC4.8 precisa medir a Cobertura Setorial dos PGs (indicador oficial do
+ADV-E). A primeira modelagem (RC4.8.2) guardou nome e total de colaboradores dentro de cada
+PG. A auditoria da RC4.8.1 identificou que isso reproduziria o mesmo defeito já corrigido na
+RC-REST-02 (identificação de tutor por nome, não por id estável): dois PGs cadastrando "RH"
+gerariam dois registros sem relação nenhuma entre si, impedindo agregação institucional
+correta (double counting ou fragmentação do total). Uma correção intermediária (RC4.8.2A,
+primeira versão) criou um Cadastro Mestre com `setorId` estável — mas ainda guardava
+`totalColaboradores` junto da identidade, o que gerou um segundo problema: total de
+colaboradores muda com o tempo (é um indicador operacional), enquanto nome/identidade é
+permanente; misturar os dois faria uma edição de rotina (atualizar o efetivo) se comportar
+como uma reescrita de identidade, e qualquer histórico ficaria preso ao mesmo registro,
+sujeito a ser sobrescrito.
+
+**Alternativas consideradas:**
+1. Total de colaboradores por PG (modelo original da RC4.8.2) — descartada: permite que o
+   mesmo setor institucional seja contado (ou digitado) de forma diferente em cada PG que o
+   representa, sem nenhuma garantia de consistência.
+2. Um único Cadastro Mestre com identidade + total de colaboradores embutido (primeira
+   versão da RC4.8.2A) — descartada: mistura um atributo permanente (nome) com um valor
+   operacional que muda com o tempo (total); editar o total destruiria/sobrescreveria
+   qualquer histórico anterior, sem intenção.
+3. **Três componentes com responsabilidade única cada — adotada:** identidade
+   (`SETORES_MESTRE`), estado operacional com histórico append-only (`SETORES_EFETIVO`), e
+   cobertura sempre calculada ao vivo, nunca persistida (`calcularCoberturaSetorial`).
+
+**Decisão:** adotar a alternativa 3.
+- Identidade nunca muda por causa de uma alteração de efetivo.
+- Efetivo nunca é sobrescrito — toda alteração empilha um novo registro no histórico
+  (`historico[]`), nunca modifica uma entrada existente.
+- Cobertura nunca é persistida — é sempre derivada, no mesmo padrão já usado por `getPgIMD`
+  (Motor de Negócio: cálculo puro, sem efeito colateral).
+
+**Consequências positivas:**
+- Um mesmo setor institucional pode ser reaproveitado por múltiplos PGs sem duplicar dado
+  nem fragmentar o total (testado ao vivo: dois PGs representando "RH" compartilham o mesmo
+  total institucional, cada um contando seus próprios matriculados independentemente).
+- Renomear um setor não quebra nenhuma referência — mesma garantia já dada para
+  tutor/coordenador (RC4 — Identidade Canônica).
+- Alterar o efetivo de um setor preserva o dado histórico anterior, abrindo caminho natural
+  para relatórios temporais assim que existir infraestrutura para isso (ver RC3.6, abaixo).
+- Nenhuma tela recalcula o que o motor já calcula — mantém o princípio arquitetural já
+  vigente no projeto ("Separação entre cálculo e interface").
+
+**Limitações conhecidas:**
+- Este modelo **não resolve sozinho** "qual era a cobertura em agosto" — isso exigiria também
+  um snapshot histórico de quantos participantes cada PG tinha naquele mês, que ainda não
+  existe (mesmo gap já registrado na RC3.6 para o IMD: "Evolução Discipular e Inteligência
+  Temporal"). O histórico de efetivo é necessário, mas não suficiente, para reconstrução
+  temporal completa — decisão explícita de não antecipar uma solução parcial só para
+  setores, tratando isso como extensão futura da mesma RC3.6.
+- `ativo` (Cadastro Mestre) e `departamentoPaiId` (hierarquia/agrupamento por grande área)
+  estão reservados, sem nenhuma tela ou regra de negócio lendo esses campos ainda.
+- Dois novos campos de topo no documento do Firestore (`setoresMestre`, `setoresEfetivo`)
+  exigem atualização manual da allowlist da regra de segurança (`hasOnly([...])`) antes de
+  produção — sem isso, a sincronização entre aparelhos desses dois campos falha
+  silenciosamente (mesmo padrão de bug já visto com o campo `convites`, 2026-07-08).
 
 ---
 
@@ -432,6 +539,78 @@ trajetória agregada ("Evolução do ranking", 5º indicador da RC3.5.4). Aditiv
 existente. Só inicia depois que a Fase 1 terminar e os critérios de encerramento acima forem
 atendidos — a RC3.5.4 é, na prática, a coleta de evidência que vai dizer se essa infraestrutura
 longitudinal é o próximo passo certo.
+
+**Nota (RC4.8.2A, 2026-07-27):** a mesma lacuna de infraestrutura temporal identificada aqui para o
+IMD reapareceu, de forma independente, na modelagem de Cobertura Setorial (ver ADR-001) — reforça
+que o problema é estrutural, não específico de um indicador. Quando a infraestrutura longitudinal
+desta RC3.6 for construída, ela deve atender IMD, Cobertura Setorial, ADV-E e demais indicadores
+institucionais ao mesmo tempo, em vez de um mecanismo de histórico por RC.
+
+### RC4.8 — Cobertura Setorial Institucional / ADV-E (em andamento)
+
+> Sequência homologada: RC4.8.1 (auditoria arquitetural, sem código) → RC4.8.2 (cadastro dos
+> setores do PG) → RC4.8.2A (Cadastro Mestre + Efetivo Institucional, ver ADR-001) → RC4.8.3A
+> (motor de cálculo, em andamento) → RC4.8.3B (interface, planejada) → RC4.8.4 (Painel ADV-E,
+> planejada) → RC4.9 (Motor Institucional de Relatórios, **deliberadamente postergada** — ver
+> abaixo).
+
+- **RC4.8.1 — Diagnóstico arquitetural (concluído).** Auditoria de como modelar Cobertura
+  Setorial sem repetir o defeito de comparação por nome já corrigido na RC-REST-02.
+- **RC4.8.2 — Cadastro dos Setores do PG (concluído).** Bloco "Cobertura Setorial" no Painel
+  do Tutor/Coordenador: adicionar/editar/excluir/reordenar, só cadastro, sem cálculo.
+- **RC4.8.2A — Cadastro Mestre de Setores + Efetivo Institucional (homologada conceitualmente).**
+  Ver "Cobertura Setorial Institucional" nos Componentes Homologados e ADR-001, acima.
+- **RC4.8.3A — Motor de Cobertura Setorial (em andamento).** Só cálculo: leitura do Efetivo
+  Institucional, contagem automática de participantes por setor, percentual, classificação
+  🟢/🟡/🔴 — `calcularCoberturaSetorial()`. Nenhuma alteração visual além do indispensável para
+  validar o motor.
+- **RC4.8.3B — Interface de Cobertura (planejada, depois do motor homologado).** Painel
+  visual, indicadores, barras de progresso, resumo do PG, mensagens de meta atingida —
+  consome só o que o motor da RC4.8.3A já calcula, nunca recalcula nada (mesmo princípio já
+  usado no Painel do Tutor — Ranking dos PGs). Já deve seguir a **diretriz de relatório**
+  abaixo (decisão da RC4.9, aplicada retroativamente a este relatório).
+- **RC4.8.4 — Painel ADV-E (planejada).** Dashboard institucional cross-PG: por setor (nome,
+  total, matriculados, cobertura, meta, status) + indicadores gerais (total de setores,
+  setores acima/abaixo da meta, cobertura institucional) + gráficos. Consome
+  `SETORES_MESTRE`/`SETORES_EFETIVO` diretamente (fonte única), sem agregação por nome.
+  Também segue a diretriz de relatório abaixo.
+
+**Diretriz de relatório (decisão da RC4.9, 2026-07-27 — vale desde já para RC4.8.3B e
+RC4.8.4, mesmo antes do motor genérico existir):** todo relatório novo separa **modelo de
+dados** (um objeto próprio do relatório — título, subtítulo, data/hora, tabelas, indicadores,
+rodapé — no espírito de um futuro `ReportModel`, mesmo que ainda não seja o objeto
+compartilhado da RC4.9) de **apresentação** (tela, impressão, resumo para WhatsApp, resumo
+para e-mail). Objetivo: quando a RC4.9 for iniciada, grande parte da estrutura já vai estar
+organizada dessa forma, em vez de precisar ser desmontada de uma implementação monolítica.
+
+**Checklist de implantação desta RC (antes de produção):** adicionar `setoresMestre` e
+`setoresEfetivo` na allowlist da regra do Firestore (`hasOnly([...])`) — ver ADR-001,
+"Limitações conhecidas".
+
+### RC4.9 — Motor Institucional de Relatórios (deliberadamente postergada)
+
+**Decisão arquitetural (2026-07-27):** extrair o Motor Institucional de Relatórios (modelo
+de dados único — `ReportModel` — e renderizadores compartilhados para tela, impressão,
+WhatsApp e e-mail) **somente depois que existirem pelo menos dois relatórios concretos
+implementados** (Cobertura Setorial — RC4.8.3B — e Painel ADV-E — RC4.8.4), evitando
+abstração prematura e permitindo que o modelo seja derivado da experiência prática do
+sistema, não desenhado no vazio. Mesma disciplina já aplicada em outras decisões deste
+projeto (ex.: RC3.6 não antecipar solução parcial de histórico).
+
+**Escopo já decidido, para quando a RC4.9 iniciar** (evita retrabalho de decisão, só de
+implementação):
+- **Impressão:** obrigatória, via recursos nativos do navegador (`window.print()` + CSS
+  `@media print`). Nenhuma dependência externa.
+- **PDF:** sem biblioteca. Primeira versão usa o fluxo nativo do navegador ("Imprimir →
+  Salvar como PDF") — zero dependência nova, sem aumento do tamanho do app. Biblioteca de
+  PDF só entra em avaliação futura, se surgir requisito real que a justifique.
+- **WhatsApp — Fase 1 (nesta arquitetura):** resumo textual institucional gerado
+  automaticamente a partir do `ReportModel`, compartilhado pelo mecanismo `wa.me` já
+  existente no app (mesmo usado em convites/lembretes). Não anexa arquivo.
+- **WhatsApp — Fase 2 (futura):** envio de documento, condicionado a existir infraestrutura
+  de geração de arquivo (ver decisão de PDF acima).
+- **E-mail:** sem backend, não existe envio real. Limite desta fase: abrir o cliente de
+  e-mail via `mailto:` com assunto/corpo preenchidos automaticamente. Nenhum anexo esperado.
 
 ---
 

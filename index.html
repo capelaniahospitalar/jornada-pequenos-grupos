@@ -3582,11 +3582,22 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
           : p.tipo === 'coordenador' ? '🤝 Coordenador'
           : '🌿 Participante';
 
+        // RC4.8.3: seletor de setor só aparece se o PG já tem setores cadastrados (RC4.8.2) —
+        // é a base do cálculo automático de Cobertura Setorial (calcularCoberturaSetorial).
+        const seletorSetorHtml = (g.setores && g.setores.length) ? `
+          <div style="margin-top:.3rem">
+            <select onchange="atribuirSetorParticipante(${grupoNum}, '${nome.replace(/'/g,"\\'")}', '${p.ts}', this.value)" style="font-size:12.5px;padding:.25rem .4rem;border:0.5px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text2);font-family:var(--ff-body)">
+              <option value="">Setor: —</option>
+              ${g.setores.map(sid => { const sm = SETORES_MESTRE.find(x => x.setorId === sid); return sm ? `<option value="${sid}" ${p.setorId===sid?'selected':''}>${sanitize(sm.nome)}</option>` : ''; }).join('')}
+            </select>
+          </div>` : '';
+
         if (!prog) return `
           <div class="tutor-participante-row">
             <div class="tutor-participante-nome">${sanitize(p.nome)}</div>
             <div class="tutor-participante-meta">${tipoLabel} · inscrito em ${sanitize(p.dataInscricao || '—')}</div>
             <div style="font-size:13px;color:var(--text3);padding:.2rem 0">Ainda não iniciou estudos pelo app.</div>
+            ${seletorSetorHtml}
           </div>`;
 
         return `
@@ -3597,6 +3608,7 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
             </div>
             <div class="tutor-participante-meta">${tipoLabel} · 🔥 ${prog.streak||0} dias · atualizado em ${prog.atualizado||'—'}</div>
             <div style="font-size:12px;color:var(--text3);margin-top:.2rem;font-family:var(--ff-body)">✅ ${prog.missoesConcluidas||0} missões concluídas</div>
+            ${seletorSetorHtml}
           </div>`;
       }).join('')
     : '<div style="font-size:15px;color:var(--text3);padding:.5rem 0">Nenhum participante inscrito ainda.</div>';
@@ -3641,6 +3653,7 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
     ${souCoordenadorDesteGrupo ? `<button onclick="iniciarConvidarParticipanteDoPainel(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:#FF6B4A;border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">🔗 Convidar Participante</button>` : ''}
     <button onclick="iniciarEditarNomeGrupo(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">✎ Editar nome do grupo</button>
     <button onclick="iniciarEditarReuniaoPainel(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">🗓️ Editar dia e horário</button>
+    ${renderSetoresSection(g, grupoNum, nome)}
     <div class="panel-section">
       <div class="panel-title">Progresso semanal do grupo</div>
       <div class="panel-stat"><span>🙏 Pedidos de oração</span><strong>${grpW.oracoes}/${metas.oracoes.meta}</strong></div>
@@ -3742,6 +3755,243 @@ function confirmarEditarReuniaoPainel(grupoNum, nome) {
   if (!g) return;
   g.diaReuniao = dia || null;
   g.horaReuniao = hora || null;
+  saveGrupos();
+  renderTutorGrupoDetalhe(grupoNum, nome);
+}
+
+// ── RC4.8.2: Cadastro dos Setores do PG (Cobertura Setorial) ───────────────
+// g.setores é sincronizado como qualquer outro dado do grupo.
+//
+// RC4.8.2A: g.setores guarda só uma LISTA DE setorId (referências ao Cadastro Mestre,
+// SETORES_MESTRE) — nome e total de colaboradores viraram fatos institucionais únicos,
+// não mais duplicados por PG. "Adicionar setor" escolhe um setor já existente no mestre
+// OU cria um novo (que passa a existir para qualquer outro PG reaproveitar); "Editar"
+// edita o registro mestre (vale para todos os PGs que o referenciam); "Excluir" só
+// remove a referência deste PG, nunca apaga o setor institucional.
+//
+// RC4.8.3: Cálculo Automático da Cobertura — "matriculados" NUNCA é digitado; é sempre
+// contado a partir de participantesAtivos(g) com p.setorId apontando para este setor
+// (atribuído via atribuirSetorParticipante, na lista de Participantes). Cálculo puro,
+// sem persistência (mesmo padrão de getPgIMD) — recalcula sozinho a cada render, então
+// "novo participante"/"remoção"/"mudança de setor"/"alteração do total" (critérios da
+// RC4.8.3) já disparam recálculo automaticamente, pois todos re-renderizam esta tela.
+function calcularCoberturaSetorial(grupoNum) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return [];
+  const participantes = participantesAtivos(g).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
+  return (g.setores || []).map(setorId => {
+    const mestre = SETORES_MESTRE.find(sm => sm.setorId === setorId);
+    const efetivo = SETORES_EFETIVO.find(e => e.setorId === setorId);
+    if (!mestre || !efetivo) return null; // referência órfã — não quebra a tela
+    const totalColaboradores = efetivo.totalColaboradores || 0;
+    const matriculados = participantes.filter(p => p.setorId === setorId).length;
+    const coberturaPct = totalColaboradores > 0 ? Math.round(matriculados / totalColaboradores * 100) : 0;
+    const status = coberturaPct >= 40 ? '🟢' : coberturaPct >= 30 ? '🟡' : '🔴';
+    return { setorId, nome: mestre.nome, totalColaboradores, matriculados, coberturaPct, status };
+  }).filter(Boolean);
+}
+
+function renderSetoresSection(g, grupoNum, nome) {
+  const setoresCalc = calcularCoberturaSetorial(grupoNum);
+  const nomeEsc = nome.replace(/'/g,"\\'");
+  const listaHtml = setoresCalc.length
+    ? setoresCalc.map((s, i) => `
+        <div style="padding:.6rem 0;border-bottom:0.5px solid var(--border)">
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="flex:1;min-width:0;font-size:15px;font-weight:600;color:var(--text);font-family:var(--ff-body)">${sanitize(s.nome)}</div>
+            <button onclick="moverSetor(${grupoNum},'${nomeEsc}','${s.setorId}',-1)" ${i===0?'disabled':''} style="background:none;border:0.5px solid var(--border);border-radius:6px;width:30px;height:30px;flex-shrink:0;color:var(--text3);cursor:pointer;font-size:14px;${i===0?'opacity:.3':''}">↑</button>
+            <button onclick="moverSetor(${grupoNum},'${nomeEsc}','${s.setorId}',1)" ${i===setoresCalc.length-1?'disabled':''} style="background:none;border:0.5px solid var(--border);border-radius:6px;width:30px;height:30px;flex-shrink:0;color:var(--text3);cursor:pointer;font-size:14px;${i===setoresCalc.length-1?'opacity:.3':''}">↓</button>
+            <button onclick="iniciarEditarSetor(${grupoNum},'${nomeEsc}','${s.setorId}')" style="background:none;border:0.5px solid var(--border);border-radius:6px;width:30px;height:30px;flex-shrink:0;color:var(--text2);cursor:pointer;font-size:14px">✎</button>
+            <button onclick="excluirSetor(${grupoNum},'${nomeEsc}','${s.setorId}')" style="background:none;border:0.5px solid var(--border);border-radius:6px;width:30px;height:30px;flex-shrink:0;color:#E05050;cursor:pointer;font-size:14px">🗑️</button>
+          </div>
+          <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:.4rem;font-size:13px;color:var(--text2);font-family:var(--ff-body)">
+            <span>Total: <strong>${s.totalColaboradores}</strong></span>
+            <span>Participantes cadastrados: <strong>${s.matriculados}</strong></span>
+            <span>Cobertura: <strong>${s.coberturaPct}%</strong></span>
+            <span>${s.status}</span>
+          </div>
+        </div>`).join('')
+    : '<div style="font-size:14px;color:var(--text3);padding:.4rem 0;font-family:var(--ff-body)">Nenhum setor cadastrado ainda.</div>';
+
+  return `
+    <div class="panel-section">
+      <div class="panel-title">🏢 Cobertura Setorial</div>
+      <p style="font-size:14px;color:var(--text3);margin-bottom:.4rem;font-family:var(--ff-body)">Setores da instituição representados por este Pequeno Grupo. Atribua o setor de cada participante na lista abaixo (Participantes e Missões) — a cobertura é contada automaticamente.</p>
+      ${listaHtml}
+      <button onclick="iniciarAdicionarSetor(${grupoNum},'${nomeEsc}')" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.6rem 1rem;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body);margin-top:.5rem">➕ Adicionar setor</button>
+    </div>`;
+}
+
+// "Adicionar" oferece escolher um setor institucional já existente (que este PG ainda não
+// representa) ou criar um novo, que passa a existir no Cadastro Mestre para qualquer outro
+// PG reaproveitar.
+function iniciarAdicionarSetor(grupoNum, nome) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  const body = document.getElementById('tutorpanel-body');
+  if (!g || !body) return;
+  const nomeEsc = nome.replace(/'/g,"\\'");
+  const jaTem = new Set(g.setores || []);
+  const disponiveis = SETORES_MESTRE.filter(sm => !jaTem.has(sm.setorId));
+
+  const formHtml = `
+    <div class="panel-section" id="form-setor">
+      <div class="panel-title">➕ Adicionar setor</div>
+      <div class="insc-field">
+        <label>Setor</label>
+        <select class="insc-input" id="setor-escolha" onchange="toggleNovoSetorCampos(this.value)">
+          <option value="">Selecione…</option>
+          ${disponiveis.map(sm => `<option value="${sm.setorId}">${sanitize(sm.nome)}</option>`).join('')}
+          <option value="__novo__">➕ Novo setor institucional…</option>
+        </select>
+      </div>
+      <div id="novo-setor-campos" style="display:none;margin-top:.5rem">
+        <div class="insc-field-row">
+          <div class="insc-field">
+            <label>Nome do novo setor</label>
+            <input class="insc-input" id="setor-nome" type="text" maxlength="40">
+          </div>
+          <div class="insc-field">
+            <label>Total de colaboradores</label>
+            <input class="insc-input" id="setor-total" type="number" min="0">
+          </div>
+        </div>
+      </div>
+      <div id="form-setor-erro" style="color:#E05050;font-size:14px;margin:.3rem 0;min-height:18px"></div>
+      <div style="display:flex;gap:8px">
+        <button class="insc-submit-btn" style="margin:0;flex:1" onclick="confirmarAdicionarSetor(${grupoNum},'${nomeEsc}')">✓ Adicionar</button>
+        <button onclick="renderTutorGrupoDetalhe(${grupoNum},'${nomeEsc}')" style="background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">Cancelar</button>
+      </div>
+    </div>`;
+
+  const existing = document.getElementById('form-setor');
+  if (existing) existing.remove();
+  body.insertAdjacentHTML('afterbegin', formHtml);
+}
+
+function toggleNovoSetorCampos(valor) {
+  const campos = document.getElementById('novo-setor-campos');
+  if (campos) campos.style.display = (valor === '__novo__') ? 'block' : 'none';
+}
+
+function confirmarAdicionarSetor(grupoNum, nome) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return;
+  const escolha = document.getElementById('setor-escolha')?.value;
+  const erro = document.getElementById('form-setor-erro');
+  if (!escolha) { if (erro) erro.textContent = 'Selecione um setor.'; return; }
+
+  let setorId;
+  if (escolha === '__novo__') {
+    const nomeInput  = document.getElementById('setor-nome')?.value.trim();
+    const totalInput = parseInt(document.getElementById('setor-total')?.value, 10);
+    if (!nomeInput) { if (erro) erro.textContent = 'Dê um nome ao setor.'; return; }
+    if (!Number.isFinite(totalInput) || totalInput < 0) { if (erro) erro.textContent = 'Informe o total de colaboradores.'; return; }
+    // Reaproveita por nome (case-insensitive) em vez de duplicar no Cadastro Mestre
+    const nomeNorm = nomeInput.toLowerCase();
+    let mestre = SETORES_MESTRE.find(sm => sm.nome.trim().toLowerCase() === nomeNorm);
+    if (!mestre) {
+      mestre = { setorId: uuid(), nome: nomeInput, ativo: true, departamentoPaiId: null };
+      SETORES_MESTRE.push(mestre);
+      saveSetoresMestreLocal();
+    }
+    if (!SETORES_EFETIVO.find(e => e.setorId === mestre.setorId)) {
+      registrarEfetivoSetor(mestre.setorId, totalInput, 'painel_pg', nome);
+    }
+    setorId = mestre.setorId;
+  } else {
+    setorId = escolha;
+  }
+
+  g.setores = g.setores || [];
+  if (!g.setores.includes(setorId)) g.setores.push(setorId);
+  saveGrupos();
+  renderTutorGrupoDetalhe(grupoNum, nome);
+}
+
+// "Editar" atua sobre o registro MESTRE (nome, identidade) e sobre o EFETIVO (total,
+// operacional, com histórico) — vale para todos os PGs que representam este setor.
+function iniciarEditarSetor(grupoNum, nome, setorId) {
+  const mestre = SETORES_MESTRE.find(sm => sm.setorId === setorId);
+  const efetivo = SETORES_EFETIVO.find(e => e.setorId === setorId);
+  const body = document.getElementById('tutorpanel-body');
+  if (!mestre || !body) return;
+  const nomeEsc = nome.replace(/'/g,"\\'");
+
+  const formHtml = `
+    <div class="panel-section" id="form-setor">
+      <div class="panel-title">✎ Editar setor institucional</div>
+      <p style="font-size:13px;color:var(--text3);margin-bottom:.4rem;font-family:var(--ff-body)">Esta edição vale para todos os Pequenos Grupos que representam este setor.</p>
+      <div class="insc-field-row">
+        <div class="insc-field">
+          <label>Setor</label>
+          <input class="insc-input" id="setor-nome" type="text" maxlength="40" value="${sanitize(mestre.nome)}">
+        </div>
+        <div class="insc-field">
+          <label>Total de colaboradores</label>
+          <input class="insc-input" id="setor-total" type="number" min="0" value="${efetivo ? efetivo.totalColaboradores : ''}">
+        </div>
+      </div>
+      <div id="form-setor-erro" style="color:#E05050;font-size:14px;margin:.3rem 0;min-height:18px"></div>
+      <div style="display:flex;gap:8px">
+        <button class="insc-submit-btn" style="margin:0;flex:1" onclick="confirmarEditarSetorMestre(${grupoNum},'${nomeEsc}','${setorId}')">✓ Salvar</button>
+        <button onclick="renderTutorGrupoDetalhe(${grupoNum},'${nomeEsc}')" style="background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">Cancelar</button>
+      </div>
+    </div>`;
+
+  const existing = document.getElementById('form-setor');
+  if (existing) existing.remove();
+  body.insertAdjacentHTML('afterbegin', formHtml);
+}
+
+function confirmarEditarSetorMestre(grupoNum, nome, setorId) {
+  const mestre = SETORES_MESTRE.find(sm => sm.setorId === setorId);
+  if (!mestre) return;
+  const nomeInput  = document.getElementById('setor-nome')?.value.trim();
+  const totalInput = parseInt(document.getElementById('setor-total')?.value, 10);
+  const erro = document.getElementById('form-setor-erro');
+  if (!nomeInput) { if (erro) erro.textContent = 'Dê um nome ao setor.'; return; }
+  if (!Number.isFinite(totalInput) || totalInput < 0) { if (erro) erro.textContent = 'Informe o total de colaboradores.'; return; }
+  mestre.nome = nomeInput;
+  saveSetoresMestreLocal();
+  registrarEfetivoSetor(setorId, totalInput, 'painel_pg', nome);
+  saveGrupos();
+  renderTutorGrupoDetalhe(grupoNum, nome);
+}
+
+// Remove só a referência deste PG — o setor institucional continua existindo no mestre
+// para qualquer outro PG que o represente.
+function excluirSetor(grupoNum, nome, setorId) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return;
+  const mestre = SETORES_MESTRE.find(sm => sm.setorId === setorId);
+  const nomeSetor = mestre ? mestre.nome : 'este setor';
+  if (!confirm(`Remover "${nomeSetor}" deste Pequeno Grupo? O setor continua cadastrado institucionalmente para outros PGs.`)) return;
+  g.setores = (g.setores || []).filter(id => id !== setorId);
+  saveGrupos();
+  renderTutorGrupoDetalhe(grupoNum, nome);
+}
+
+function moverSetor(grupoNum, nome, setorId, direcao) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g || !g.setores) return;
+  const i = g.setores.indexOf(setorId);
+  const j = i + direcao;
+  if (i < 0 || j < 0 || j >= g.setores.length) return;
+  [g.setores[i], g.setores[j]] = [g.setores[j], g.setores[i]];
+  saveGrupos();
+  renderTutorGrupoDetalhe(grupoNum, nome);
+}
+
+// RC4.8.3: atribui/troca o setor de UM participante — é o gatilho de "mudança de setor"
+// que faz calcularCoberturaSetorial() recontar na próxima renderização. setorId vazio
+// ('') = participante sem setor definido (não conta em nenhuma cobertura).
+function atribuirSetorParticipante(grupoNum, nome, participanteTs, setorId) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return;
+  const p = (g.participantes || []).find(x => String(x.ts) === String(participanteTs));
+  if (!p) return;
+  p.setorId = setorId || null;
+  p.updatedAt = Date.now();
   saveGrupos();
   renderTutorGrupoDetalhe(grupoNum, nome);
 }
@@ -4789,6 +5039,112 @@ const STUDY_ATTRS = [
 // Armazenados no Firestore (campo "tutores" em jdpg/grupos) e carregados via syncFromFirebase().
 // Para atualizar: edite o documento no Firebase Console → campo tutores (array de objetos {name,icon,wa}).
 let TUTORS = [];
+
+// RC4.8.2A (homologada com ajustes): identidade institucional de setor separada do seu
+// estado operacional — mesma disciplina já consolidada neste projeto para pgIMD/pgRanking
+// ("um não sabe calcular o outro") e para identidade de tutor/coordenador (RC4 — Identidade
+// Canônica): nome nunca é usado como referência, só para exibição; toda referência interna
+// usa setorId, estável e nunca reaproveitado.
+//
+// 1) SETORES_MESTRE — só identidade: {setorId, nome, ativo, departamentoPaiId}.
+//    departamentoPaiId é reservado (sempre null hoje) — permitirá agrupar setores em
+//    grandes áreas (Assistência, Administrativo, Apoio...) sem migração futura de schema.
+//    Nenhum dado operacional mora aqui.
+//
+// 2) SETORES_EFETIVO — "Efetivo Institucional dos Setores": componente compartilhado,
+//    não exclusivo do Painel ADV-E ou de PGs — qualquer indicador institucional futuro
+//    (Embaixadores, Escola Sabatina, treinamentos obrigatórios, capelania etc.) que precise
+//    saber "quantos colaboradores este setor tem" usa a mesma fonte. {setorId,
+//    totalColaboradores, atualizadoEm, historico[]}. totalColaboradores/atualizadoEm são só
+//    o "ponteiro atual" (denormalizado do último item do histórico, para leitura rápida);
+//    historico[] é append-only — editar nunca reescreve uma entrada, sempre empilha uma
+//    nova. Cada entrada já nasce pensada como registro versionado (nem todo campo é usado
+//    hoje, mas o formato não vai precisar migrar quando forem):
+//      { registroId, setorId, totalColaboradores, atualizadoEm, origem, usuario, observacao }
+//
+// 3) Cobertura (matriculados/percentual/status) NUNCA é persistida — continua 100% cálculo
+//    puro (calcularCoberturaSetorial), mesmo padrão do getPgIMD. Fotografia histórica por
+//    período ("como estava a cobertura em agosto") fica fora do escopo: é o mesmo problema
+//    de infraestrutura temporal já registrado na RC3.6 (falta snapshot de participantes ao
+//    longo do tempo) — quando essa infraestrutura for construída, deve atender IMD,
+//    Cobertura Setorial, ADV-E, Frequência etc. ao mesmo tempo, não um mecanismo por RC.
+//
+// Ambos sincronizados como campos de topo próprios ("setoresMestre"/"setoresEfetivo"), no
+// mesmo padrão de TUTORS/"tutores" — IMPORTANTE: os dois precisam entrar na allowlist da
+// regra do Firestore (hasOnly([...])) para sincronizar entre aparelhos, senão gravam 403
+// silencioso (mesmo bug já visto com o campo "convites" em 2026-07-08).
+const SETORES_MESTRE_KEY = 'jdpg_setores_mestre_v1';
+let SETORES_MESTRE = [];
+const SETORES_EFETIVO_KEY = 'jdpg_setores_efetivo_v1';
+let SETORES_EFETIVO = [];
+
+function loadSetoresMestreLocal() {
+  try { const s = localStorage.getItem(SETORES_MESTRE_KEY); SETORES_MESTRE = s ? (JSON.parse(s) || []) : SETORES_MESTRE; }
+  catch(e) { console.warn('loadSetoresMestreLocal:', e); }
+  try { const s = localStorage.getItem(SETORES_EFETIVO_KEY); SETORES_EFETIVO = s ? (JSON.parse(s) || []) : SETORES_EFETIVO; }
+  catch(e) { console.warn('loadSetoresEfetivoLocal:', e); }
+}
+function saveSetoresMestreLocal() {
+  try { localStorage.setItem(SETORES_MESTRE_KEY, JSON.stringify(SETORES_MESTRE)); }
+  catch(e) { console.warn('saveSetoresMestreLocal:', e); }
+}
+function saveSetoresEfetivoLocal() {
+  try { localStorage.setItem(SETORES_EFETIVO_KEY, JSON.stringify(SETORES_EFETIVO)); }
+  catch(e) { console.warn('saveSetoresEfetivoLocal:', e); }
+}
+
+// Registra um novo total de colaboradores para um setor — nunca sobrescreve o histórico,
+// sempre empilha um registro novo e atualiza só o "ponteiro atual".
+function registrarEfetivoSetor(setorId, totalColaboradores, origem, usuario) {
+  let efetivo = SETORES_EFETIVO.find(e => e.setorId === setorId);
+  const agora = Date.now();
+  const registro = { registroId: uuid(), setorId, totalColaboradores, atualizadoEm: agora, origem: origem || 'painel_pg', usuario: usuario || null, observacao: null };
+  if (!efetivo) {
+    efetivo = { setorId, totalColaboradores, atualizadoEm: agora, historico: [registro] };
+    SETORES_EFETIVO.push(efetivo);
+  } else {
+    efetivo.totalColaboradores = totalColaboradores;
+    efetivo.atualizadoEm = agora;
+    efetivo.historico = efetivo.historico || [];
+    efetivo.historico.push(registro);
+  }
+  saveSetoresEfetivoLocal();
+  return efetivo;
+}
+
+// Normaliza g.setores do formato antigo da RC4.8.2/4.8.3 (array de objetos {id, nome,
+// totalColaboradores} local ao PG) para o modelo homologado: identidade em SETORES_MESTRE,
+// efetivo em SETORES_EFETIVO. Idempotente — só age se detectar o formato antigo (typeof
+// !== string); reaproveita por nome (case-insensitive) em vez de duplicar — a ÚNICA vez que
+// comparação por nome é aceitável aqui, por ser um evento de transição único, não uma regra
+// de negócio permanente. Também remapeia p.setorId de cada participante do id antigo (local
+// ao PG) para o novo setorId do mestre, para não perder a atribuição já feita.
+function migrarSetoresParaMestre() {
+  let mudou = false;
+  PEQUENOS_GRUPOS.forEach(g => {
+    if (!Array.isArray(g.setores) || !g.setores.length || typeof g.setores[0] !== 'object') return;
+    const mapaIdAntigoParaNovo = {};
+    g.setores.forEach(velho => {
+      const nomeNorm = (velho.nome || '').trim().toLowerCase();
+      let mestre = SETORES_MESTRE.find(sm => sm.nome.trim().toLowerCase() === nomeNorm);
+      if (!mestre) {
+        mestre = { setorId: uuid(), nome: velho.nome, ativo: true, departamentoPaiId: null };
+        SETORES_MESTRE.push(mestre);
+      }
+      if (!SETORES_EFETIVO.find(e => e.setorId === mestre.setorId)) {
+        registrarEfetivoSetor(mestre.setorId, velho.totalColaboradores || 0, 'migracao', null);
+      }
+      mapaIdAntigoParaNovo[velho.id] = mestre.setorId;
+    });
+    g.setores = g.setores.map(velho => mapaIdAntigoParaNovo[velho.id]);
+    (g.participantes || []).forEach(p => {
+      if (p.setorId && mapaIdAntigoParaNovo[p.setorId]) p.setorId = mapaIdAntigoParaNovo[p.setorId];
+    });
+    mudou = true;
+  });
+  if (mudou) { saveSetoresMestreLocal(); saveGrupos(); }
+  return mudou;
+}
 
 function getAttrs() {
   const base = { sabedoria:0, oracao:0, amor:0, perseveranca:0, saude:0, missao:0 };
@@ -7453,6 +7809,7 @@ const PEQUENOS_GRUPOS = Array.from({length:50}, (_, i) => ({
   gratidoes: [],
   reunioesMes: {},    // frequência do PG por mês: {'2026-07': {encontros: [{id, data, presentes, total, marcadoPor, ts}]}}
   maxParticipantes: null, // null = ilimitado
+  setores: [],        // RC4.8.2: cadastro dos setores institucionais cobertos por este PG — {id, nome, totalColaboradores}
 }));
 
 // A frequência do PG só passou a valer de fato a partir de julho/2026 — meses
@@ -7493,6 +7850,7 @@ function participantesAtivos(g) {
 }
 
 function loadGrupos() {
+  loadSetoresMestreLocal();
   try {
     const s = localStorage.getItem(GRUPOS_KEY);
     if (s) {
@@ -7508,10 +7866,12 @@ function loadGrupos() {
           PEQUENOS_GRUPOS[idx].participantes = podarParticipantesRemovidos(g.participantes || []);
           PEQUENOS_GRUPOS[idx].gratidoes = podarGratidoesExpiradas(g.gratidoes || []);
           PEQUENOS_GRUPOS[idx].reunioesMes = filtrarReunioesMes(g.reunioesMes || {});
+          PEQUENOS_GRUPOS[idx].setores = g.setores || [];
         }
       });
     }
   } catch(e) { console.warn('loadGrupos:', e); }
+  migrarSetoresParaMestre();
 }
 
 // Persiste os grupos apenas em localStorage (sem tocar na nuvem).
@@ -7527,6 +7887,7 @@ function saveGruposLocal() {
       participantes: g.participantes,
       gratidoes: g.gratidoes || [],
       reunioesMes: g.reunioesMes || {},
+      setores: g.setores || [],
     }));
     localStorage.setItem(GRUPOS_KEY, JSON.stringify(dadosSalvar));
   } catch(e) { console.warn('saveGrupos localStorage:', e); }
@@ -8369,7 +8730,7 @@ function fbWarnTooLarge() {
   } catch(e) { console.warn('fbWarnTooLarge:', e); }
 }
 
-async function fbWriteGrupos(cfg, data, tutoresData, baseUpdateTime, convitesData) {
+async function fbWriteGrupos(cfg, data, tutoresData, baseUpdateTime, convitesData, setoresMestreData, setoresEfetivoData) {
   const dadosStr = JSON.stringify(data);
   // Guarda de tamanho: a regra do Firestore rejeita "dados" >= 500 KB. Aborta antes de
   // um write fadado a falhar e avisa o usuário, evitando perda silenciosa.
@@ -8389,6 +8750,9 @@ async function fbWriteGrupos(cfg, data, tutoresData, baseUpdateTime, convitesDat
   const maskFields = ['dados', 'ts'];
   if (tutoresData) { fields.tutores = { stringValue: JSON.stringify(tutoresData) }; maskFields.push('tutores'); }
   if (convitesData) { fields.convites = { stringValue: JSON.stringify(convitesData) }; maskFields.push('convites'); }  // ETAPA 2
+  // RC4.8.2A: campo de topo novo — precisa estar na allowlist (hasOnly) da regra do Firestore.
+  if (setoresMestreData) { fields.setoresMestre = { stringValue: JSON.stringify(setoresMestreData) }; maskFields.push('setoresMestre'); }
+  if (setoresEfetivoData) { fields.setoresEfetivo = { stringValue: JSON.stringify(setoresEfetivoData) }; maskFields.push('setoresEfetivo'); }
   const body = { fields };
   // COMMIT 1: pré-condição de concorrência — só grava se o documento não mudou desde a leitura
   let url = fbDocUrl(cfg) + maskFields.map(f => '&updateMask.fieldPaths=' + encodeURIComponent(f)).join('');
@@ -8433,6 +8797,7 @@ function applyGruposData(salvo) {
     PEQUENOS_GRUPOS[idx].pgNivel = g.pgNivel || null;
     PEQUENOS_GRUPOS[idx].pgIMD = g.pgIMD || null;
     PEQUENOS_GRUPOS[idx].pgRanking = g.pgRanking || null;
+    PEQUENOS_GRUPOS[idx].setores = g.setores || [];
   });
 }
 
@@ -8491,6 +8856,7 @@ function mergeGruposData(remoteList, localGroups) {
       coordenador: lg.coordenador ?? rg.coordenador,
       diaReuniao: lg.diaReuniao ?? rg.diaReuniao,
       horaReuniao: lg.horaReuniao ?? rg.horaReuniao,
+      setores: lg.setores ?? rg.setores,
     };
   });
 }
@@ -8510,6 +8876,16 @@ async function syncFromFirebase() {
       if (typeof mergeConvites === 'function' && Array.isArray(result.convites)) {
         saveConvitesLocal(mergeConvites(result.convites, loadConvites()));
       }
+      // RC4.8.2A: carrega o Cadastro Mestre de Setores e o Efetivo Institucional do Firestore
+      if (Array.isArray(result.setoresMestre) && result.setoresMestre.length > 0) {
+        SETORES_MESTRE = result.setoresMestre;
+        saveSetoresMestreLocal();
+      }
+      if (Array.isArray(result.setoresEfetivo) && result.setoresEfetivo.length > 0) {
+        SETORES_EFETIVO = result.setoresEfetivo;
+        saveSetoresEfetivoLocal();
+      }
+      migrarSetoresParaMestre();
       try { localStorage.setItem(GRUPOS_KEY, JSON.stringify(result.dados)); } catch(e) { console.warn('sync localStorage:', e); }
       fbLastSyncTime = Date.now();
       renderGrupoSyncBadge();
@@ -8556,8 +8932,9 @@ async function trySaveGrupos(cfg, baseUpdateTime) {
     reunioesMes: g.reunioesMes || {},
     pgIMD: g.pgIMD || null,
     pgRanking: g.pgRanking || null,
+    setores: g.setores || [],
   }));
-  return fbWriteGrupos(cfg, payload, TUTORS.length ? TUTORS : undefined, baseUpdateTime);
+  return fbWriteGrupos(cfg, payload, TUTORS.length ? TUTORS : undefined, baseUpdateTime, undefined, SETORES_MESTRE.length ? SETORES_MESTRE : undefined, SETORES_EFETIVO.length ? SETORES_EFETIVO : undefined);
 }
 
 // Orquestra: prepara → grava → em conflito, backoff aleatório e tenta de novo (até 3x).
@@ -8724,6 +9101,9 @@ async function salvarFbConfig() {
     if (result && result.dados) {
       applyGruposData(result.dados);
       if (Array.isArray(result.tutores) && result.tutores.length > 0) TUTORS = result.tutores;
+      if (Array.isArray(result.setoresMestre) && result.setoresMestre.length > 0) { SETORES_MESTRE = result.setoresMestre; saveSetoresMestreLocal(); }
+      if (Array.isArray(result.setoresEfetivo) && result.setoresEfetivo.length > 0) { SETORES_EFETIVO = result.setoresEfetivo; saveSetoresEfetivoLocal(); }
+      migrarSetoresParaMestre();
       fbLastKnownTs = result.ts;
       try { localStorage.setItem(GRUPOS_KEY, JSON.stringify(result.dados)); } catch(_) {}
     } else {
