@@ -3656,8 +3656,7 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
     ${souCoordenadorDesteGrupo ? `<button onclick="iniciarConvidarParticipanteDoPainel(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:#FF6B4A;border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">🔗 Convidar Participante</button>` : ''}
     <button onclick="iniciarEditarNomeGrupo(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">✎ Editar nome do grupo</button>
     <button onclick="iniciarEditarReuniaoPainel(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">🗓️ Editar dia e horário</button>
-    ${renderSetoresSection(g, grupoNum, nome)}
-    ${renderEmbaixadoresPgSection(g, grupoNum, nome)}
+    ${renderPainelIndicadoresPorSetor(g, grupoNum, nome)}
     <div class="panel-section">
       <div class="panel-title">Progresso semanal do grupo</div>
       <div class="panel-stat"><span>🙏 Pedidos de oração</span><strong>${grpW.oracoes}/${metas.oracoes.meta}</strong></div>
@@ -3790,6 +3789,14 @@ function participanteContaParaSetor(g, p, setorId) {
   return !!g && !!p && !p.removed && (g.setores || []).includes(setorId) && p.setorId === setorId;
 }
 
+// Metas institucionais por indicador — nomeadas, nunca soltas no meio do código (mesmo
+// princípio já usado em PG_IMD_WEIGHTS). PG_COBERTURA: 🟢≥40% / 🟡30–39% / 🔴<30% (dado
+// explícito, RC4.8.1). EMBAIXADORES: meta de 20% confirmada na homologação da RC4.8.5A — a
+// faixa 🟡 abaixo dela (15–19%) é uma SUPOSIÇÃO desta RC (mesma proporção de 75% da meta
+// usada em PG_COBERTURA: 30/40), nunca especificada explicitamente; ajustar se incorreta.
+const PG_COBERTURA_META_PCT = 40;
+const EMBAIXADORES_META_PCT = 20;
+
 function calcularCoberturaSetorial(grupoNum) {
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
   if (!g) return [];
@@ -3801,37 +3808,78 @@ function calcularCoberturaSetorial(grupoNum) {
     const totalColaboradores = efetivo.totalColaboradores || 0;
     const matriculados = participantes.filter(p => participanteContaParaSetor(g, p, setorId)).length;
     const coberturaPct = totalColaboradores > 0 ? Math.round(matriculados / totalColaboradores * 100) : 0;
-    const status = coberturaPct >= 40 ? '🟢' : coberturaPct >= 30 ? '🟡' : '🔴';
-    return { setorId, nome: mestre.nome, totalColaboradores, matriculados, coberturaPct, status };
+    const status = coberturaPct >= PG_COBERTURA_META_PCT ? '🟢' : coberturaPct >= PG_COBERTURA_META_PCT * 0.75 ? '🟡' : '🔴';
+    return { setorId, nome: mestre.nome, totalColaboradores, matriculados, coberturaPct, metaPct: PG_COBERTURA_META_PCT, status };
   }).filter(Boolean);
 }
 
-function renderSetoresSection(g, grupoNum, nome) {
-  const setoresCalc = calcularCoberturaSetorial(grupoNum);
+// Barra de progresso reaproveitando o visual do renderMeterHtml (medidor meta x realizado)
+// já usado para frequência de encontros — só parametrizando meta e cor por status.
+function renderBarraIndicador(pct, metaPct, status) {
+  const p = Math.max(0, Math.min(100, pct));
+  const cor = status === '🟢' ? '#2A9D5C' : status === '🟡' ? 'var(--gold-mid)' : '#E05050';
+  return `
+    <div style="height:12px;border-radius:99px;background:var(--bg);overflow:hidden;margin-top:3px">
+      <div style="height:100%;width:${p}%;border-radius:99px;background:${cor};transition:width .4s"></div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:2px;font-family:var(--ff-body)">Meta: ${metaPct}%</div>`;
+}
+
+// RC4.8.3B (Painel de Indicadores, 2026-07-27): Cobertura Setorial e Embaixadores fundidos
+// num único painel por setor — o coordenador olha um setor por vez, não um módulo por vez.
+// Continua consumindo os dois motores já homologados (calcularCoberturaSetorial,
+// calcularEmbaixadoresPorSetor) sem alterar a fórmula de nenhum — só a apresentação.
+function renderPainelIndicadoresPorSetor(g, grupoNum, nome) {
+  const cobertura = calcularCoberturaSetorial(grupoNum);
+  const monthKey = embMonthKey();
+  const embaixadores = calcularEmbaixadoresPorSetor(monthKey);
   const nomeEsc = nome.replace(/'/g,"\\'");
-  const listaHtml = setoresCalc.length
-    ? setoresCalc.map((s, i) => `
-        <div style="padding:.6rem 0;border-bottom:0.5px solid var(--border)">
+  const setores = g.setores || [];
+
+  const listaHtml = setores.length
+    ? setores.map((setorId, i) => {
+        const cob = cobertura.find(c => c.setorId === setorId);
+        const emb = embaixadores.find(e => e.setorId === setorId);
+        if (!cob || !emb) return '';
+        return `
+        <div style="padding:.7rem 0;border-bottom:0.5px solid var(--border)">
           <div style="display:flex;align-items:center;gap:6px">
-            <div style="flex:1;min-width:0;font-size:15px;font-weight:600;color:var(--text);font-family:var(--ff-body)">${sanitize(s.nome)}</div>
-            <button onclick="moverSetor(${grupoNum},'${nomeEsc}','${s.setorId}',-1)" ${i===0?'disabled':''} style="background:none;border:0.5px solid var(--border);border-radius:6px;width:30px;height:30px;flex-shrink:0;color:var(--text3);cursor:pointer;font-size:14px;${i===0?'opacity:.3':''}">↑</button>
-            <button onclick="moverSetor(${grupoNum},'${nomeEsc}','${s.setorId}',1)" ${i===setoresCalc.length-1?'disabled':''} style="background:none;border:0.5px solid var(--border);border-radius:6px;width:30px;height:30px;flex-shrink:0;color:var(--text3);cursor:pointer;font-size:14px;${i===setoresCalc.length-1?'opacity:.3':''}">↓</button>
-            <button onclick="iniciarEditarSetor(${grupoNum},'${nomeEsc}','${s.setorId}')" style="background:none;border:0.5px solid var(--border);border-radius:6px;width:30px;height:30px;flex-shrink:0;color:var(--text2);cursor:pointer;font-size:14px">✎</button>
-            <button onclick="excluirSetor(${grupoNum},'${nomeEsc}','${s.setorId}')" style="background:none;border:0.5px solid var(--border);border-radius:6px;width:30px;height:30px;flex-shrink:0;color:#E05050;cursor:pointer;font-size:14px">🗑️</button>
+            <div style="flex:1;min-width:0;font-size:16px;font-weight:700;color:var(--text);font-family:var(--ff-body)">${sanitize(cob.nome)}</div>
+            <button onclick="moverSetor(${grupoNum},'${nomeEsc}','${setorId}',-1)" ${i===0?'disabled':''} style="background:none;border:0.5px solid var(--border);border-radius:6px;width:30px;height:30px;flex-shrink:0;color:var(--text3);cursor:pointer;font-size:14px;${i===0?'opacity:.3':''}">↑</button>
+            <button onclick="moverSetor(${grupoNum},'${nomeEsc}','${setorId}',1)" ${i===setores.length-1?'disabled':''} style="background:none;border:0.5px solid var(--border);border-radius:6px;width:30px;height:30px;flex-shrink:0;color:var(--text3);cursor:pointer;font-size:14px;${i===setores.length-1?'opacity:.3':''}">↓</button>
+            <button onclick="iniciarEditarSetor(${grupoNum},'${nomeEsc}','${setorId}')" style="background:none;border:0.5px solid var(--border);border-radius:6px;width:30px;height:30px;flex-shrink:0;color:var(--text2);cursor:pointer;font-size:14px">✎</button>
+            <button onclick="excluirSetor(${grupoNum},'${nomeEsc}','${setorId}')" style="background:none;border:0.5px solid var(--border);border-radius:6px;width:30px;height:30px;flex-shrink:0;color:#E05050;cursor:pointer;font-size:14px">🗑️</button>
           </div>
-          <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:.4rem;font-size:13px;color:var(--text2);font-family:var(--ff-body)">
-            <span>Total: <strong>${s.totalColaboradores}</strong></span>
-            <span>Participantes cadastrados: <strong>${s.matriculados}</strong></span>
-            <span>Cobertura: <strong>${s.coberturaPct}%</strong></span>
-            <span>${s.status}</span>
+          <div style="font-size:13px;color:var(--text2);margin-top:.3rem;font-family:var(--ff-body)">👥 Colaboradores: <strong>${cob.totalColaboradores}</strong></div>
+
+          <div style="margin-top:.5rem">
+            <div style="font-size:12.5px;font-weight:700;letter-spacing:.4px;color:var(--text3);text-transform:uppercase;font-family:var(--ff-body)">📚 Pequenos Grupos</div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:2px;font-size:13.5px;color:var(--text2);font-family:var(--ff-body)">
+              <span>Matriculados: <strong>${cob.matriculados}</strong></span>
+              <span style="font-weight:700">${cob.coberturaPct}% ${cob.status}</span>
+            </div>
+            ${renderBarraIndicador(cob.coberturaPct, cob.metaPct, cob.status)}
           </div>
-        </div>`).join('')
+
+          <div style="margin-top:.6rem">
+            <div style="display:flex;justify-content:space-between;align-items:baseline">
+              <div style="font-size:12.5px;font-weight:700;letter-spacing:.4px;color:var(--text3);text-transform:uppercase;font-family:var(--ff-body)">🌟 Embaixadores (${embMonthLabel(monthKey)})</div>
+              <button onclick="iniciarEditarEmbaixadoresPg(${grupoNum},'${nomeEsc}','${setorId}')" style="background:none;border:none;color:var(--teal);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--ff-body)">editar externos ›</button>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:2px;font-size:13.5px;color:var(--text2);font-family:var(--ff-body)">
+              <span>Participantes: <strong>${emb.totalParticipantes}</strong></span>
+              <span style="font-weight:700">${emb.coberturaPct}% ${emb.status}</span>
+            </div>
+            ${renderBarraIndicador(emb.coberturaPct, emb.metaPct, emb.status)}
+          </div>
+        </div>`;
+      }).join('')
     : '<div style="font-size:14px;color:var(--text3);padding:.4rem 0;font-family:var(--ff-body)">Nenhum setor cadastrado ainda.</div>';
 
   return `
     <div class="panel-section">
-      <div class="panel-title">🏢 Cobertura Setorial</div>
-      <p style="font-size:14px;color:var(--text3);margin-bottom:.4rem;font-family:var(--ff-body)">Setores da instituição representados por este Pequeno Grupo. Atribua o setor de cada participante na lista abaixo (Participantes e Missões) — a cobertura é contada automaticamente.</p>
+      <div class="panel-title">📈 Indicadores por Setor</div>
+      <p style="font-size:14px;color:var(--text3);margin-bottom:.4rem;font-family:var(--ff-body)">Setores da instituição acompanhados por este Pequeno Grupo. Atribua o setor de cada participante na lista abaixo (Participantes e Missões) — os dois indicadores são contados automaticamente.</p>
       ${listaHtml}
       <button onclick="iniciarAdicionarSetor(${grupoNum},'${nomeEsc}')" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.6rem 1rem;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body);margin-top:.5rem">➕ Adicionar setor</button>
     </div>`;
@@ -5239,8 +5287,8 @@ function calcularEmbaixadoresPorSetor(monthKey) {
     const participantesExternos = registroExterno ? (registroExterno.participantesExternos || 0) : 0;
     const totalParticipantes = participantesPg + participantesExternos;
     const coberturaPct = totalColaboradores > 0 ? Math.round(totalParticipantes / totalColaboradores * 100) : 0;
-    const status = coberturaPct >= 40 ? '🟢' : coberturaPct >= 30 ? '🟡' : '🔴';
-    return { setorId: sm.setorId, nome: sm.nome, totalColaboradores, participantesPg, participantesExternos, totalParticipantes, coberturaPct, status };
+    const status = coberturaPct >= EMBAIXADORES_META_PCT ? '🟢' : coberturaPct >= EMBAIXADORES_META_PCT * 0.75 ? '🟡' : '🔴';
+    return { setorId: sm.setorId, nome: sm.nome, totalColaboradores, participantesPg, participantesExternos, totalParticipantes, coberturaPct, metaPct: EMBAIXADORES_META_PCT, status };
   });
 }
 
@@ -10485,8 +10533,8 @@ function renderRankingPgs(nome) {
 // mesmo portão de acesso do Ranking dos PGs (qualquer Tutor/Coordenador, não é PG-específico).
 // RC4.8.3B (redefinição, 2026-07-27): a tela institucional deixa de ser onde se trabalha —
 // vira só consulta/consolidação para o ADV-E ("o ADV-E consulta, não alimenta"). Lançar
-// participantes externos passa a acontecer de dentro do próprio PG (renderEmbaixadoresPgSection
-// + iniciarEditarEmbaixadoresPg, abaixo) — o coordenador nunca mais precisa sair do seu PG.
+// participantes externos passa a acontecer de dentro do próprio PG (renderPainelIndicadoresPorSetor
+// + iniciarEditarEmbaixadoresPg) — o coordenador nunca mais precisa sair do seu PG.
 // O detalhamento por PG dentro de cada setor (ex.: "PG Manancial / PG Esperança / PG Vida")
 // fica para a RC4.8.4 (Painel ADV-E) — aqui continua um total por setor, só leitura.
 function renderEmbaixadoresInstitucional(nome, monthKey) {
@@ -10546,40 +10594,6 @@ function salvarParticipantesExternos(setorId, monthKey, valorBruto, usuario) {
   return { ok: true };
 }
 
-// ── Nível operacional (dentro do PG) — bloco irmão da Cobertura Setorial, mesmos setores
-// acompanhados (g.setores). Mostra os dois indicadores lado a lado; tocar em "Embaixadores"
-// abre o detalhamento e o campo de participantes externos, sem sair do PG.
-function renderEmbaixadoresPgSection(g, grupoNum, nome) {
-  if (!(g.setores || []).length) return '';
-  const monthKey = embMonthKey();
-  const cobertura = calcularCoberturaSetorial(grupoNum);
-  const embaixadores = calcularEmbaixadoresPorSetor(monthKey);
-  const nomeEsc = nome.replace(/'/g,"\\'");
-
-  const linhas = g.setores.map(setorId => {
-    const cob = cobertura.find(c => c.setorId === setorId);
-    const emb = embaixadores.find(e => e.setorId === setorId);
-    if (!cob || !emb) return '';
-    return `
-      <div style="padding:.6rem 0;border-bottom:0.5px solid var(--border)">
-        <div style="font-size:15px;font-weight:700;color:var(--text);font-family:var(--ff-body)">${sanitize(cob.nome)}</div>
-        <div style="display:flex;justify-content:space-between;font-size:13.5px;color:var(--text2);margin-top:.3rem;font-family:var(--ff-body)">
-          <span>📊 Cobertura PG</span><strong>${cob.coberturaPct}% ${cob.status}</strong>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;font-size:13.5px;color:var(--text2);margin-top:.2rem;font-family:var(--ff-body)">
-          <span>🌟 Embaixadores (${embMonthLabel(monthKey)})</span>
-          <button onclick="iniciarEditarEmbaixadoresPg(${grupoNum},'${nomeEsc}','${setorId}')" style="background:none;border:none;color:var(--teal);font-weight:700;font-size:13.5px;cursor:pointer;font-family:var(--ff-body)">${emb.coberturaPct}% ${emb.status} ›</button>
-        </div>
-      </div>`;
-  }).join('');
-
-  return `
-    <div class="panel-section">
-      <div class="panel-title">🌟 Embaixadores da Esperança</div>
-      <p style="font-size:13px;color:var(--text3);margin-bottom:.4rem;font-family:var(--ff-body)">Mesmos setores acompanhados por este PG. Toque no percentual para ver o detalhamento e informar participantes externos.</p>
-      ${linhas}
-    </div>`;
-}
 
 function iniciarEditarEmbaixadoresPg(grupoNum, nome, setorId) {
   const monthKey = embMonthKey();

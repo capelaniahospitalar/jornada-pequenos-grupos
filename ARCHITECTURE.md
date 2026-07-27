@@ -147,8 +147,8 @@ trabalho da outra.
      cadastro** (não deve contar em lugar nenhum) — ver ADR-002.
 - **Cobertura Setorial** — `calcularCoberturaSetorial(grupoNum)`. **Nunca persistida** —
   cálculo puro, recalculado ao vivo a cada abertura de tela, mesmo padrão do `getPgIMD`. Usa
-  `participanteContaParaSetor()` para contar matriculados; classifica 🟢 (≥40%) / 🟡
-  (30–39%) / 🔴 (<30%).
+  `participanteContaParaSetor()` para contar matriculados; classifica 🟢 (≥`PG_COBERTURA_META_PCT`,
+  40%) / 🟡 (≥75% da meta, 30–39%) / 🔴 (abaixo disso).
 - **Proteções de consistência (RC4.8.5A):** (a) atribuir a um participante um setor fora dos
   acompanhados pelo PG exige confirmação explícita, que já inclui adicioná-lo à lista de
   acompanhados (`atribuirSetorParticipante`); (b) remover um setor acompanhado é bloqueado
@@ -171,15 +171,23 @@ trabalho da outra.
   "participantes externos" (colaboradores do setor que não estão em nenhum PG).
 - **Dois níveis de uso (redefinição da RC4.8.3B, 2026-07-27) — "toda informação nasce no PG,
   toda consolidação nasce no Painel ADV-E":**
-  1. **Nível operacional, dentro do PG** (`renderEmbaixadoresPgSection`, dentro de
-     `renderTutorGrupoDetalhe`) — bloco irmão da Cobertura Setorial, usando exatamente os
-     mesmos setores acompanhados pelo PG (`g.setores`). É aqui que o coordenador lança
-     participantes externos (`iniciarEditarEmbaixadoresPg` /
+  1. **Nível operacional, dentro do PG** (`renderPainelIndicadoresPorSetor`, dentro de
+     `renderTutorGrupoDetalhe`) — fundido com a Cobertura Setorial num único "📈 Indicadores
+     por Setor" (RC4.8.3B, segunda revisão, 2026-07-27): para cada setor acompanhado, os dois
+     indicadores aparecem juntos (Pequenos Grupos + Embaixadores), cada um com barra de
+     progresso — o coordenador olha um setor por vez, não um módulo por vez. É aqui que ele
+     lança participantes externos (`iniciarEditarEmbaixadoresPg` /
      `confirmarParticipantesExternosPg`) — ele nunca precisa sair do seu PG.
   2. **Nível institucional, só consulta** (`renderEmbaixadoresInstitucional`) — deixou de ter
      qualquer campo editável; consolida por setor, cross-PG, para o ADV-E acompanhar. O
      detalhamento por PG dentro de cada setor (quanto cada PG específico contribuiu) fica
      para a RC4.8.4 (Painel ADV-E) — hoje mostra só o total consolidado.
+- **Meta institucional própria:** `EMBAIXADORES_META_PCT = 20` (confirmada na homologação da
+  RC4.8.5A), classifica 🟢 (≥20%) / 🟡 (≥15%, 75% da meta — **suposição desta RC, nunca
+  especificada explicitamente**, mesma proporção usada em `PG_COBERTURA_META_PCT`) / 🔴
+  (abaixo disso). Achado ao implementar o painel único: os limiares originais (copiados da
+  Cobertura Setorial, 30–40%) marcariam 25% como 🔴, contradizendo o próprio exemplo dado
+  para esta RC (25% → 🟢) — corrigido para usar a meta própria do Embaixadores.
 - **Solução transitória e deliberadamente simples (ver ADR-002):** `EMBAIXADORES_EXTERNOS`
   guarda só a quantidade por `{setorId, monthKey}` — nunca nome, nunca lista de pessoas,
   nunca histórico individual. Isolado de propósito, sem nenhuma referência a
@@ -701,16 +709,21 @@ institucionais ao mesmo tempo, em vez de um mecanismo de histórico por RC.
   Embaixadores, obrigatório para qualquer indicador futuro que cruze participante e setor —
   e duas proteções de consistência: confirmação ao atribuir setor fora dos acompanhados pelo
   PG, e bloqueio ao tentar remover um setor acompanhado com participantes ainda vinculados.
-- **RC4.8.3B — Painel Operacional do Coordenador do PG (redefinida, parcialmente concluída).**
-  Objetivo ampliado de "só Interface de Cobertura" para reunir, dentro de
-  `renderTutorGrupoDetalhe`, os dois blocos irmãos que usam os mesmos setores acompanhados
-  pelo PG: **Cobertura Setorial** (já existia) e **Embaixadores da Esperança** (migrado da
-  tela institucional nesta redefinição — ver "Participação Institucional no Embaixadores da
-  Esperança", acima). Ainda em aberto: barras de progresso visuais, resumo consolidado do PG
-  e mensagens de meta atingida — hoje os números aparecem em texto/percentual, sem
-  gamificação visual (mesmo princípio do Painel do Tutor — Ranking dos PGs: "sem medalha
-  animada, barra, gráfico ou efeito", a confirmar se vale aqui também). Segue a **diretriz de
+- **RC4.8.3B — Painel de Indicadores por Setor (redefinida duas vezes, em andamento).**
+  Objetivo ampliado de "só Interface de Cobertura" (1ª redefinição: reunir Cobertura Setorial
+  + Embaixadores como blocos irmãos dentro de `renderTutorGrupoDetalhe`; 2ª redefinição,
+  2026-07-27: fundir os dois num único "📈 Indicadores por Setor" — um cartão por setor,
+  mostrando Pequenos Grupos e Embaixadores juntos, cada um com barra de progresso). Ainda em
+  aberto: resumo consolidado do PG e mensagens de meta atingida. Segue a **diretriz de
   relatório** abaixo (decisão da RC4.9, aplicada retroativamente a este relatório).
+  **Oportunidade futura registrada (ainda não implementada):** uma vez que o modelo
+  estabilizar, extrair uma estrutura única `IndicadorSetorial` (setorId, totalColaboradores,
+  matriculadosPG, percentualPG, statusPG, participantesEmbaixadores, percentualEmbaixadores,
+  statusEmbaixadores) que alimente Painel do PG, Painel ADV-E e os futuros renderizadores da
+  RC4.9 (impressão, WhatsApp, PDF) a partir da mesma fonte — coerente com a decisão já
+  registrada de separar modelo de dados de apresentação. Não antecipada nesta RC pelo mesmo
+  motivo da RC4.9: só vale a pena generalizar depois de existir mais de um consumidor real
+  (hoje só o Painel do PG existe; o Painel ADV-E, RC4.8.4, é o segundo candidato natural).
 - **RC4.8.4 — Painel ADV-E (planejada).** Dashboard institucional cross-PG: por setor (nome,
   total, matriculados, cobertura, meta, status) + indicadores gerais (total de setores,
   setores acima/abaixo da meta, cobertura institucional) + gráficos. Inclui também o

@@ -14,11 +14,17 @@
   conta para um setor se o próprio PG dele o acompanha) e duas proteções de consistência
   (confirmação ao atribuir setor fora dos acompanhados; bloqueio ao excluir setor acompanhado
   com participantes vinculados).
-- RC4.8.3B (redefinição parcial) — Embaixadores migrou da tela institucional para dentro do
-  PG (`renderEmbaixadoresPgSection`, bloco irmão da Cobertura Setorial, mesmos setores
-  acompanhados); painel institucional (`renderEmbaixadoresInstitucional`) virou consulta
-  só leitura. Princípio adotado: "toda informação nasce no PG, toda consolidação nasce no
-  Painel ADV-E" — vale para qualquer indicador institucional futuro com lançamento manual.
+- RC4.8.3B (1ª redefinição) — Embaixadores migrou da tela institucional para dentro do PG;
+  painel institucional (`renderEmbaixadoresInstitucional`) virou consulta só leitura.
+  Princípio adotado: "toda informação nasce no PG, toda consolidação nasce no Painel ADV-E"
+  — vale para qualquer indicador institucional futuro com lançamento manual.
+- RC4.8.3B (2ª redefinição) — Cobertura Setorial e Embaixadores fundidos num único painel
+  "📈 Indicadores por Setor" (`renderPainelIndicadoresPorSetor`, substitui
+  `renderSetoresSection`/`renderEmbaixadoresPgSection`): um cartão por setor, os dois
+  indicadores juntos, cada um com barra de progresso. Corrigida, no processo, uma meta
+  errada do Embaixadores (usava os limiares da Cobertura de PG, 40%, em vez da meta própria
+  de 20% já confirmada) — nova constante `EMBAIXADORES_META_PCT`, faixa 🟡 (15–19%) marcada
+  como suposição a confirmar.
   Ver `CHANGELOG.md` (entradas `[2026-07-27]`) para o detalhe técnico completo e
   `ARCHITECTURE.md` (seção "Cobertura Setorial Institucional" + "Participação Institucional
   no Embaixadores da Esperança" + ADR-001/ADR-002) para o modelo de dados e o raciocínio das
@@ -28,13 +34,15 @@
   nunca "setores que o PG tem hoje".
 
 **Próxima RC**
-- RC4.8.3B (continuação) — "Painel Operacional do Coordenador do PG". Ainda em aberto:
-  barras de progresso visuais, resumo consolidado do PG, mensagens de meta atingida — hoje
-  Cobertura Setorial e Embaixadores aparecem em texto/percentual dentro do PG, sem
-  gamificação visual. Avaliar se o mesmo princípio do Ranking dos PGs ("sem medalha animada,
-  barra, gráfico ou efeito") deve valer aqui, ou se este painel é diferente por natureza.
-  Segue a diretriz de relatório (separar modelo de dados / apresentação) já registrada no
-  `ARCHITECTURE.md`, mesmo antes do motor genérico da RC4.9 existir.
+- RC4.8.3B (continuação) — "Painel de Indicadores por Setor". Ainda em aberto: resumo
+  consolidado do PG e mensagens de meta atingida. Confirmar (ou corrigir) a faixa 🟡 do
+  Embaixadores (15–19%, suposição desta RC). Segue a diretriz de relatório (separar modelo
+  de dados / apresentação) já registrada no `ARCHITECTURE.md`, mesmo antes do motor
+  genérico da RC4.9 existir.
+- Registrado como oportunidade futura, não implementado: extrair `IndicadorSetorial` (uma
+  estrutura única alimentando Painel do PG, Painel ADV-E, e os renderizadores da RC4.9) —
+  deliberadamente adiado até existir um segundo consumidor real (RC4.8.4), mesmo raciocínio
+  já usado para a RC4.9 em si.
 
 **Depois**
 - RC4.8.4 — Painel ADV-E (dashboard institucional cross-PG: por setor + indicadores gerais

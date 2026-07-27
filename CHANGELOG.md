@@ -1,5 +1,35 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-27] — RC4.8.3B (2ª redefinição): Painel único de Indicadores por Setor + correção de meta do Embaixadores
+
+Funde os dois blocos irmãos (Cobertura Setorial + Embaixadores da Esperança) num único
+painel "📈 Indicadores por Setor" — para cada setor acompanhado, o coordenador vê os dois
+indicadores juntos (um setor por vez, em vez de um módulo por vez), cada um com barra de
+progresso visual.
+
+**`renderPainelIndicadoresPorSetor`** substitui `renderSetoresSection` +
+`renderEmbaixadoresPgSection` (removida, absorvida na nova função) — mesmos dois motores de
+cálculo (`calcularCoberturaSetorial`, `calcularEmbaixadoresPorSetor`), nenhuma fórmula
+alterada, só a apresentação. Mantém intactos os controles de gestão do setor (↑↓✎🗑️,
+"➕ Adicionar setor") e o link para editar participantes externos.
+
+**Correção de meta encontrada durante a implementação:** o Embaixadores usava os mesmos
+limiares da Cobertura Setorial (🟢≥40%/🟡30–39%), mas a meta institucional confirmada na
+RC4.8.5A é 20% — sob os limiares antigos, 25% seria 🔴, contradizendo o próprio exemplo dado
+para este painel (25% → 🟢). Corrigido com `EMBAIXADORES_META_PCT = 20` (nova constante
+nomeada, junto de `PG_COBERTURA_META_PCT = 40`), faixa 🟡 proporcional (75% da meta, ≥15%).
+**A faixa 🟡 do Embaixadores é uma suposição desta RC** — só a meta de 20% foi confirmada
+explicitamente; sinalizado para revisão se incorreta.
+
+**Testado:** painel renderizando corretamente com dois setores (RH 50%🟢/15%🟡, Jurídico
+0%🔴/0%🔴); barras de progresso com cor correspondente ao status; editar externos a partir
+do novo painel continua funcionando e retornando à tela do próprio PG; exemplo do usuário
+(25% → 🟢 no Embaixadores) reproduzido exatamente após a correção de meta.
+
+**Registrado, não implementado:** abstração futura `IndicadorSetorial` unificando os dois
+cálculos — deliberadamente adiada até existir um segundo consumidor real (Painel ADV-E,
+RC4.8.4), mesmo raciocínio já aplicado à RC4.9.
+
 ## [2026-07-27] — RC4.8.3B (redefinição): Embaixadores migra para dentro do PG; painel institucional vira consulta
 
 Correção de arquitetura, achada em revisão antes da interface de Cobertura Setorial: a tela
