@@ -1,5 +1,45 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-27] — RC4.8.2A: Cadastro Mestre de Setores + Efetivo Institucional (homologada)
+
+Reestrutura a base de dados da Cobertura Setorial (RC4.8.2) em três responsabilidades
+separadas, evitando que o mesmo defeito de identificação por nome já corrigido na RC-REST-02
+(tutor/coordenador) se repetisse para setores institucionais.
+
+**Cadastro Mestre de Setores** (`SETORES_MESTRE`) — só identidade: `setorId` (estável, nunca
+reaproveitado), `nome` (só exibição, nunca usado como referência) e `ativo`. Campo
+`departamentoPaiId` reservado para agrupamento futuro por grande área (Assistência,
+Administrativo, Apoio etc.) — sem nenhuma tela ou regra usando-o ainda.
+
+**Efetivo Institucional dos Setores** (`SETORES_EFETIVO`) — componente compartilhado (não
+exclusivo de PG ou do ADV-E): `totalColaboradores`/`atualizadoEm` como "ponteiro atual", mais
+um `historico[]` **append-only** — editar o total nunca sobrescreve uma entrada anterior,
+sempre empilha um registro novo (`registroId, setorId, totalColaboradores, atualizadoEm,
+origem, usuario, observacao`).
+
+**Cobertura Setorial** (`calcularCoberturaSetorial`) — continua 100% calculada ao vivo, nunca
+persistida, mesmo padrão do `getPgIMD`. Passou a ler o total de colaboradores do Efetivo em
+vez do antigo objeto local ao PG.
+
+**Migração:** `migrarSetoresParaMestre()` — idempotente, converte o formato antigo da
+RC4.8.2 (setor como objeto local ao PG) para o novo modelo, remapeando o `setorId` de cada
+participante já atribuído, sem perder nenhuma atribuição.
+
+**Testado:** limites exatos de classificação (29%🔴/30%🟡/39%🟡/40%🟢), total zero sem
+divisão por zero, referência órfã descartada sem quebrar a tela, deduplicação por nome,
+exclusão de participante removido, reaproveitamento do mesmo setor por dois PGs diferentes
+(mesmo total institucional, matriculados contados independentemente), edição do total
+preservando o histórico anterior, migração rodada duas vezes sem duplicar.
+
+**Documentação:** `ARCHITECTURE.md` atualizado com a descrição dos três componentes, o
+ADR-001 (problema, alternativas consideradas, decisão, consequências, limitações) e a
+decisão de postergar a RC4.9 (Motor Institucional de Relatórios) até existirem pelo menos
+dois relatórios concretos implementados.
+
+**Pendente para produção:** adicionar `setoresMestre` e `setoresEfetivo` na allowlist da
+regra do Firestore (`hasOnly([...])`) — sem isso, a sincronização entre aparelhos desses
+dois campos falha silenciosamente (mesmo padrão de bug já visto com `convites`).
+
 ## [2026-07-24] — RC-REST-02: Correção de identificação de Tutor/Coordenador por nome abreviado
 
 Corrige a identificação de tutor/coordenador quando existem grafias abreviadas e completas do

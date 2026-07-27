@@ -1,10 +1,42 @@
-# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-07-24)
+# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-07-27)
 
 > Documento para retomar o trabalho em outra máquina/sessão. Cole o conteúdo de volta
 > para o assistente ao recomeçar — a "memória" do assistente **não viaja entre máquinas**;
 > só este arquivo (via GitHub) viaja. **Nenhuma alteração de código sem aprovação do desenho.**
 
-## ⭐ SESSÃO 2026-07-24 — retomar por aqui
+## ⭐ SESSÃO 2026-07-27 — retomar por aqui
+
+**Concluído**
+- RC4.8.2A — Cadastro Mestre de Setores + Efetivo Institucional dos Setores, homologada
+  conceitualmente e commitada. Ver `CHANGELOG.md` (entrada `[2026-07-27]`) para o detalhe
+  técnico completo e `ARCHITECTURE.md` (seção "Cobertura Setorial Institucional" +
+  ADR-001) para o modelo de dados e o raciocínio da decisão.
+
+**Próxima RC**
+- RC4.8.3A — Motor de Cobertura Setorial. O motor (`calcularCoberturaSetorial`) já existe
+  no código e foi testado nesta sessão (limites de classificação, divisão por zero,
+  referência órfã, dedup, tombstone, histórico) — falta só a confirmação explícita de
+  homologação antes de avançar para a interface.
+
+**Depois**
+- RC4.8.3B — Interface da Cobertura Setorial (painel visual, indicadores, barras de
+  progresso, resumo do PG, mensagens de meta atingida). Deve seguir a diretriz de relatório
+  (separar modelo de dados / apresentação) já registrada no `ARCHITECTURE.md`, mesmo antes
+  do motor genérico da RC4.9 existir.
+- RC4.8.4 — Painel ADV-E (dashboard institucional cross-PG: por setor + indicadores gerais
+  + gráficos). Mesma diretriz de relatório.
+- RC4.9 — Motor Institucional de Relatórios (`ReportModel` + renderizadores para tela,
+  impressão, WhatsApp, e-mail) — **postergada por decisão arquitetural**: só inicia depois
+  de existirem pelo menos dois relatórios concretos implementados (Cobertura Setorial e
+  ADV-E), para evitar abstração prematura. Escopo já travado no `ARCHITECTURE.md`:
+  impressão nativa do navegador, PDF via "Imprimir → Salvar como PDF" (sem biblioteca),
+  WhatsApp em duas fases (texto agora, arquivo depois), e-mail só `mailto:` sem anexo.
+
+**Pendente para produção (não bloqueia o desenvolvimento, mas bloqueia sync entre
+aparelhos):** adicionar `setoresMestre` e `setoresEfetivo` na allowlist da regra do
+Firestore (`hasOnly([...])`) — mesmo bug já visto com `convites` em 2026-07-08.
+
+## ⭐ SESSÃO 2026-07-24
 
 **RC-REST-02 — Correção de identificação de Tutor/Coordenador por nome abreviado (concluída,
 commitada).** Sequência de auditoria disciplinada a pedido do usuário: RC-AUD-01 (congelamento,
