@@ -7,22 +7,29 @@
 ## ⭐ SESSÃO 2026-07-27 — retomar por aqui
 
 **Concluído**
-- RC4.8.2A — Cadastro Mestre de Setores + Efetivo Institucional dos Setores, homologada
-  conceitualmente e commitada. Ver `CHANGELOG.md` (entrada `[2026-07-27]`) para o detalhe
-  técnico completo e `ARCHITECTURE.md` (seção "Cobertura Setorial Institucional" +
-  ADR-001) para o modelo de dados e o raciocínio da decisão.
+- RC4.8.2A — Cadastro Mestre de Setores + Efetivo Institucional dos Setores, homologada.
+- RC4.8.3A — Motor de Cobertura Setorial (`calcularCoberturaSetorial`), homologado.
+- RC4.8.5A — Participação Institucional no Embaixadores da Esperança, homologada, incluindo
+  a correção que estabeleceu o invariante `participanteContaParaSetor()` (um participante só
+  conta para um setor se o próprio PG dele o acompanha) e duas proteções de consistência
+  (confirmação ao atribuir setor fora dos acompanhados; bloqueio ao excluir setor acompanhado
+  com participantes vinculados). Ver `CHANGELOG.md` (entradas `[2026-07-27]`) para o detalhe
+  técnico completo e `ARCHITECTURE.md` (seção "Cobertura Setorial Institucional" + "Participação
+  Institucional no Embaixadores da Esperança" + ADR-001/ADR-002) para o modelo de dados e o
+  raciocínio das decisões.
+- Esclarecimento de nomenclatura (sem mudança de código): `g.setores` = **setores
+  acompanhados pelo PG** (decisão ministerial do coordenador, válida com 0 participantes),
+  nunca "setores que o PG tem hoje".
 
 **Próxima RC**
-- RC4.8.3A — Motor de Cobertura Setorial. O motor (`calcularCoberturaSetorial`) já existe
-  no código e foi testado nesta sessão (limites de classificação, divisão por zero,
-  referência órfã, dedup, tombstone, histórico) — falta só a confirmação explícita de
-  homologação antes de avançar para a interface.
-
-**Depois**
 - RC4.8.3B — Interface da Cobertura Setorial (painel visual, indicadores, barras de
   progresso, resumo do PG, mensagens de meta atingida). Deve seguir a diretriz de relatório
   (separar modelo de dados / apresentação) já registrada no `ARCHITECTURE.md`, mesmo antes
-  do motor genérico da RC4.9 existir.
+  do motor genérico da RC4.9 existir. Boa parte da informação já é exibida hoje pelo painel
+  de Cobertura Setorial existente (Total/Matriculados/Cobertura/Status por setor) — avaliar
+  o que falta de fato (barras de progresso, resumo consolidado do PG, mensagens de meta).
+
+**Depois**
 - RC4.8.4 — Painel ADV-E (dashboard institucional cross-PG: por setor + indicadores gerais
   + gráficos). Mesma diretriz de relatório.
 - RC4.9 — Motor Institucional de Relatórios (`ReportModel` + renderizadores para tela,
@@ -33,8 +40,9 @@
   WhatsApp em duas fases (texto agora, arquivo depois), e-mail só `mailto:` sem anexo.
 
 **Pendente para produção (não bloqueia o desenvolvimento, mas bloqueia sync entre
-aparelhos):** adicionar `setoresMestre` e `setoresEfetivo` na allowlist da regra do
-Firestore (`hasOnly([...])`) — mesmo bug já visto com `convites` em 2026-07-08.
+aparelhos):** adicionar `setoresMestre`, `setoresEfetivo` e `embaixadoresExternos` na
+allowlist da regra do Firestore (`hasOnly([...])`) — mesmo bug já visto com `convites` em
+2026-07-08.
 
 ## ⭐ SESSÃO 2026-07-24
 

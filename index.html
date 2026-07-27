@@ -3307,6 +3307,7 @@ function renderTutorGruposList(nome) {
     ${cards}
     <button onclick="abrirRelatoriosMensais('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">📊 Relatórios Mensais</button>
     <button onclick="renderRankingPgs('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">🏆 Índice de Maturidade Discipular</button>
+    <button onclick="renderEmbaixadoresInstitucional('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">🌟 Embaixadores da Esperança — Institucional</button>
     ${souTutorDeAlgum ? `<button onclick="renderCriarPgForm('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body)">➕ Criar outro Pequeno Grupo</button>` : ''}
     <button onclick="renderTutorResetPassScreen('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">🔑 Trocar minha senha</button>
     <button onclick="tutorLogout()" style="width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">🚪 Sair</button>`;
@@ -3582,13 +3583,15 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
           : p.tipo === 'coordenador' ? '🤝 Coordenador'
           : '🌿 Participante';
 
-        // RC4.8.3: seletor de setor só aparece se o PG já tem setores cadastrados (RC4.8.2) —
-        // é a base do cálculo automático de Cobertura Setorial (calcularCoberturaSetorial).
-        const seletorSetorHtml = (g.setores && g.setores.length) ? `
+        // RC4.8.5A: seletor mostra TODO o Cadastro Mestre (não só g.setores) — escolher um
+        // setor que este PG ainda não acompanha dispara, em atribuirSetorParticipante, a
+        // sugestão de incluí-lo entre os setores acompanhados (evita a inconsistência de um
+        // participante contar para um setor que o próprio PG dele não declara atender).
+        const seletorSetorHtml = (SETORES_MESTRE && SETORES_MESTRE.length) ? `
           <div style="margin-top:.3rem">
             <select onchange="atribuirSetorParticipante(${grupoNum}, '${nome.replace(/'/g,"\\'")}', '${p.ts}', this.value)" style="font-size:12.5px;padding:.25rem .4rem;border:0.5px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text2);font-family:var(--ff-body)">
               <option value="">Setor: —</option>
-              ${g.setores.map(sid => { const sm = SETORES_MESTRE.find(x => x.setorId === sid); return sm ? `<option value="${sid}" ${p.setorId===sid?'selected':''}>${sanitize(sm.nome)}</option>` : ''; }).join('')}
+              ${SETORES_MESTRE.filter(sm => sm.ativo !== false).map(sm => `<option value="${sm.setorId}" ${p.setorId===sm.setorId?'selected':''}>${sanitize(sm.nome)}${(g.setores||[]).includes(sm.setorId)?'':' (não acompanhado por este PG)'}</option>`).join('')}
             </select>
           </div>` : '';
 
@@ -3775,6 +3778,17 @@ function confirmarEditarReuniaoPainel(grupoNum, nome) {
 // sem persistência (mesmo padrão de getPgIMD) — recalcula sozinho a cada render, então
 // "novo participante"/"remoção"/"mudança de setor"/"alteração do total" (critérios da
 // RC4.8.3) já disparam recálculo automaticamente, pois todos re-renderizam esta tela.
+//
+// RC4.8.5A (homologação final): invariante do sistema, não só do Embaixadores — "um
+// participante de um PG só conta para as estatísticas de um setor se esse setor estiver
+// entre os setores ACOMPANHADOS (g.setores) pelo PRÓPRIO PG do participante". Qualquer
+// função nova que precisar contar participantes por setor (Cobertura Setorial, Embaixadores,
+// futuros relatórios, Painel ADV-E) deve usar participanteContaParaSetor() — nunca
+// reimplementar esse cruzamento, para não repetir o defeito já corrigido aqui.
+function participanteContaParaSetor(g, p, setorId) {
+  return !!g && !!p && !p.removed && (g.setores || []).includes(setorId) && p.setorId === setorId;
+}
+
 function calcularCoberturaSetorial(grupoNum) {
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
   if (!g) return [];
@@ -3784,7 +3798,7 @@ function calcularCoberturaSetorial(grupoNum) {
     const efetivo = SETORES_EFETIVO.find(e => e.setorId === setorId);
     if (!mestre || !efetivo) return null; // referência órfã — não quebra a tela
     const totalColaboradores = efetivo.totalColaboradores || 0;
-    const matriculados = participantes.filter(p => p.setorId === setorId).length;
+    const matriculados = participantes.filter(p => participanteContaParaSetor(g, p, setorId)).length;
     const coberturaPct = totalColaboradores > 0 ? Math.round(matriculados / totalColaboradores * 100) : 0;
     const status = coberturaPct >= 40 ? '🟢' : coberturaPct >= 30 ? '🟡' : '🔴';
     return { setorId, nome: mestre.nome, totalColaboradores, matriculados, coberturaPct, status };
@@ -3960,11 +3974,21 @@ function confirmarEditarSetorMestre(grupoNum, nome, setorId) {
 
 // Remove só a referência deste PG — o setor institucional continua existindo no mestre
 // para qualquer outro PG que o represente.
+// RC4.8.5A (homologação final, proteção nº 3): nunca permite remover um setor acompanhado
+// enquanto existir participante deste PG vinculado a ele — senão esse participante ficaria
+// "invisível" para qualquer indicador (mesma inconsistência que a validação de atribuição
+// já evita na entrada; aqui é a mesma regra aplicada na saída).
 function excluirSetor(grupoNum, nome, setorId) {
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
   if (!g) return;
   const mestre = SETORES_MESTRE.find(sm => sm.setorId === setorId);
   const nomeSetor = mestre ? mestre.nome : 'este setor';
+  const vinculados = participantesAtivos(g).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i)
+    .filter(p => p.setorId === setorId).length;
+  if (vinculados > 0) {
+    alert(`Existem ${vinculados} participante${vinculados===1?'':'s'} deste setor neste PG.\n\nRealoque ou remova ${vinculados===1?'esse participante':'esses participantes'} antes de excluir "${nomeSetor}" da lista de setores acompanhados.`);
+    return;
+  }
   if (!confirm(`Remover "${nomeSetor}" deste Pequeno Grupo? O setor continua cadastrado institucionalmente para outros PGs.`)) return;
   g.setores = (g.setores || []).filter(id => id !== setorId);
   saveGrupos();
@@ -3990,6 +4014,19 @@ function atribuirSetorParticipante(grupoNum, nome, participanteTs, setorId) {
   if (!g) return;
   const p = (g.participantes || []).find(x => String(x.ts) === String(participanteTs));
   if (!p) return;
+  // RC4.8.5A: setor fora dos acompanhados pelo PG exige confirmação explícita — sem isso, o
+  // participante ficaria com um setor que nenhum indicador institucional desse PG contaria
+  // (mesma inconsistência que motivou esta correção: participante de setor não declarado).
+  if (setorId && !(g.setores || []).includes(setorId)) {
+    const mestre = SETORES_MESTRE.find(sm => sm.setorId === setorId);
+    const nomeSetor = mestre ? mestre.nome : 'este setor';
+    if (!confirm(`O setor "${nomeSetor}" ainda não está entre os setores acompanhados por este Pequeno Grupo.\n\nPara manter os indicadores institucionais consistentes, esse setor deve ser incluído antes da vinculação do participante.\n\nDeseja adicioná-lo agora?`)) {
+      renderTutorGrupoDetalhe(grupoNum, nome);
+      return;
+    }
+    g.setores = g.setores || [];
+    g.setores.push(setorId);
+  }
   p.setorId = setorId || null;
   p.updatedAt = Date.now();
   saveGrupos();
@@ -5144,6 +5181,66 @@ function migrarSetoresParaMestre() {
   });
   if (mudou) { saveSetoresMestreLocal(); saveGrupos(); }
   return mudou;
+}
+
+// RC4.8.5A: Participação Institucional no Embaixadores da Esperança — Fase 1.
+// Solução transitória e deliberadamente simples (ver diretriz arquitetural, ADR-002):
+// mede quantos colaboradores de cada setor participaram do evento mensal do Embaixadores,
+// somando quem já é participante de PG (calculado automaticamente) com uma quantidade
+// manual de "participantes externos" (colaboradores do setor que não estão em nenhum PG).
+// Isolado de propósito — não referencia PEQUENOS_GRUPOS na persistência, nunca guarda nome
+// de pessoa, nunca cria histórico individual. Uma futura evolução (Cadastro Institucional de
+// Colaboradores) pode substituir esta quantidade manual sem exigir migração desta estrutura.
+const EMBAIXADORES_EXTERNOS_KEY = 'jdpg_embaixadores_externos_v1';
+let EMBAIXADORES_EXTERNOS = [];
+
+function loadEmbaixadoresExternosLocal() {
+  try { const s = localStorage.getItem(EMBAIXADORES_EXTERNOS_KEY); EMBAIXADORES_EXTERNOS = s ? (JSON.parse(s) || []) : EMBAIXADORES_EXTERNOS; }
+  catch(e) { console.warn('loadEmbaixadoresExternosLocal:', e); }
+}
+function saveEmbaixadoresExternosLocal() {
+  try { localStorage.setItem(EMBAIXADORES_EXTERNOS_KEY, JSON.stringify(EMBAIXADORES_EXTERNOS)); }
+  catch(e) { console.warn('saveEmbaixadoresExternosLocal:', e); }
+}
+
+// Só a quantidade (nunca nome, nunca lista) — chave composta setorId+monthKey.
+function registrarParticipantesExternos(setorId, monthKey, qtd, usuario) {
+  let registro = EMBAIXADORES_EXTERNOS.find(e => e.setorId === setorId && e.monthKey === monthKey);
+  if (!registro) {
+    registro = { setorId, monthKey, participantesExternos: qtd, atualizadoEm: Date.now(), usuario: usuario || null };
+    EMBAIXADORES_EXTERNOS.push(registro);
+  } else {
+    registro.participantesExternos = qtd;
+    registro.atualizadoEm = Date.now();
+    registro.usuario = usuario || null;
+  }
+  saveEmbaixadoresExternosLocal();
+  return registro;
+}
+
+// Cálculo puro, sem persistência (mesmo padrão de getPgIMD/calcularCoberturaSetorial) —
+// cruza TODOS os PGs (não é um cálculo por PG), somando participantes de PG por setor com
+// a quantidade manual de externos daquele setor no mês.
+function calcularEmbaixadoresPorSetor(monthKey) {
+  return SETORES_MESTRE.filter(sm => sm.ativo !== false).map(sm => {
+    const efetivo = SETORES_EFETIVO.find(e => e.setorId === sm.setorId);
+    const totalColaboradores = efetivo ? (efetivo.totalColaboradores || 0) : 0;
+    let participantesPg = 0;
+    PEQUENOS_GRUPOS.forEach(g => {
+      // Atalho de desempenho: pula PGs que nem declaram este setor, antes de calcular a
+      // deduplicação — mas quem decide se CADA participante conta é sempre
+      // participanteContaParaSetor(), o mesmo invariante usado em calcularCoberturaSetorial.
+      if (!(g.setores || []).includes(sm.setorId)) return;
+      const semDup = participantesAtivos(g).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
+      participantesPg += semDup.filter(p => participanteContaParaSetor(g, p, sm.setorId) && p.embaixadores?.[monthKey]?.participou).length;
+    });
+    const registroExterno = EMBAIXADORES_EXTERNOS.find(e => e.setorId === sm.setorId && e.monthKey === monthKey);
+    const participantesExternos = registroExterno ? (registroExterno.participantesExternos || 0) : 0;
+    const totalParticipantes = participantesPg + participantesExternos;
+    const coberturaPct = totalColaboradores > 0 ? Math.round(totalParticipantes / totalColaboradores * 100) : 0;
+    const status = coberturaPct >= 40 ? '🟢' : coberturaPct >= 30 ? '🟡' : '🔴';
+    return { setorId: sm.setorId, nome: sm.nome, totalColaboradores, participantesPg, participantesExternos, totalParticipantes, coberturaPct, status };
+  });
 }
 
 function getAttrs() {
@@ -7851,6 +7948,7 @@ function participantesAtivos(g) {
 
 function loadGrupos() {
   loadSetoresMestreLocal();
+  loadEmbaixadoresExternosLocal();
   try {
     const s = localStorage.getItem(GRUPOS_KEY);
     if (s) {
@@ -8730,7 +8828,7 @@ function fbWarnTooLarge() {
   } catch(e) { console.warn('fbWarnTooLarge:', e); }
 }
 
-async function fbWriteGrupos(cfg, data, tutoresData, baseUpdateTime, convitesData, setoresMestreData, setoresEfetivoData) {
+async function fbWriteGrupos(cfg, data, tutoresData, baseUpdateTime, convitesData, setoresMestreData, setoresEfetivoData, embaixadoresExternosData) {
   const dadosStr = JSON.stringify(data);
   // Guarda de tamanho: a regra do Firestore rejeita "dados" >= 500 KB. Aborta antes de
   // um write fadado a falhar e avisa o usuário, evitando perda silenciosa.
@@ -8753,6 +8851,7 @@ async function fbWriteGrupos(cfg, data, tutoresData, baseUpdateTime, convitesDat
   // RC4.8.2A: campo de topo novo — precisa estar na allowlist (hasOnly) da regra do Firestore.
   if (setoresMestreData) { fields.setoresMestre = { stringValue: JSON.stringify(setoresMestreData) }; maskFields.push('setoresMestre'); }
   if (setoresEfetivoData) { fields.setoresEfetivo = { stringValue: JSON.stringify(setoresEfetivoData) }; maskFields.push('setoresEfetivo'); }
+  if (embaixadoresExternosData) { fields.embaixadoresExternos = { stringValue: JSON.stringify(embaixadoresExternosData) }; maskFields.push('embaixadoresExternos'); }
   const body = { fields };
   // COMMIT 1: pré-condição de concorrência — só grava se o documento não mudou desde a leitura
   let url = fbDocUrl(cfg) + maskFields.map(f => '&updateMask.fieldPaths=' + encodeURIComponent(f)).join('');
@@ -8885,6 +8984,10 @@ async function syncFromFirebase() {
         SETORES_EFETIVO = result.setoresEfetivo;
         saveSetoresEfetivoLocal();
       }
+      if (Array.isArray(result.embaixadoresExternos) && result.embaixadoresExternos.length > 0) {
+        EMBAIXADORES_EXTERNOS = result.embaixadoresExternos;
+        saveEmbaixadoresExternosLocal();
+      }
       migrarSetoresParaMestre();
       try { localStorage.setItem(GRUPOS_KEY, JSON.stringify(result.dados)); } catch(e) { console.warn('sync localStorage:', e); }
       fbLastSyncTime = Date.now();
@@ -8934,7 +9037,7 @@ async function trySaveGrupos(cfg, baseUpdateTime) {
     pgRanking: g.pgRanking || null,
     setores: g.setores || [],
   }));
-  return fbWriteGrupos(cfg, payload, TUTORS.length ? TUTORS : undefined, baseUpdateTime, undefined, SETORES_MESTRE.length ? SETORES_MESTRE : undefined, SETORES_EFETIVO.length ? SETORES_EFETIVO : undefined);
+  return fbWriteGrupos(cfg, payload, TUTORS.length ? TUTORS : undefined, baseUpdateTime, undefined, SETORES_MESTRE.length ? SETORES_MESTRE : undefined, SETORES_EFETIVO.length ? SETORES_EFETIVO : undefined, EMBAIXADORES_EXTERNOS.length ? EMBAIXADORES_EXTERNOS : undefined);
 }
 
 // Orquestra: prepara → grava → em conflito, backoff aleatório e tenta de novo (até 3x).
@@ -9103,6 +9206,7 @@ async function salvarFbConfig() {
       if (Array.isArray(result.tutores) && result.tutores.length > 0) TUTORS = result.tutores;
       if (Array.isArray(result.setoresMestre) && result.setoresMestre.length > 0) { SETORES_MESTRE = result.setoresMestre; saveSetoresMestreLocal(); }
       if (Array.isArray(result.setoresEfetivo) && result.setoresEfetivo.length > 0) { SETORES_EFETIVO = result.setoresEfetivo; saveSetoresEfetivoLocal(); }
+      if (Array.isArray(result.embaixadoresExternos) && result.embaixadoresExternos.length > 0) { EMBAIXADORES_EXTERNOS = result.embaixadoresExternos; saveEmbaixadoresExternosLocal(); }
       migrarSetoresParaMestre();
       fbLastKnownTs = result.ts;
       try { localStorage.setItem(GRUPOS_KEY, JSON.stringify(result.dados)); } catch(_) {}
@@ -10374,6 +10478,79 @@ function renderRankingPgs(nome) {
     ${renderDistribuicaoIndicadoresV2(entradas)}
     ${voltarBtn}`;
   resetScroll();
+}
+
+// RC4.8.5A: painel institucional (cross-PG) do Embaixadores da Esperança por setor —
+// mesmo portão de acesso do Ranking dos PGs (qualquer Tutor/Coordenador, não é PG-específico).
+function renderEmbaixadoresInstitucional(nome, monthKey) {
+  const nomeEsc = nome.replace(/'/g,"\\'");
+  monthKey = monthKey || embMonthKey();
+  const hoje = new Date();
+  const meses = [];
+  for (let i = 0; i < 6; i++) meses.push(embMonthKey(new Date(hoje.getFullYear(), hoje.getMonth() - i, 1)));
+  const monthOptions = meses.map(mk => `<option value="${mk}" ${mk===monthKey?'selected':''}>${embMonthLabel(mk)}</option>`).join('');
+
+  const dados = calcularEmbaixadoresPorSetor(monthKey);
+  const voltarBtn = `<button onclick="renderTutorGruposList('${nomeEsc}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Voltar aos meus grupos</button>`;
+
+  const linhas = dados.length ? dados.map(d => `
+    <div style="padding:.7rem 0;border-bottom:0.5px solid var(--border)">
+      <div style="font-size:15px;font-weight:700;color:var(--text);font-family:var(--ff-body)">${sanitize(d.nome)}</div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:.3rem;font-size:13px;color:var(--text2);font-family:var(--ff-body)">
+        <span>Colaboradores do setor: <strong>${d.totalColaboradores}</strong></span>
+        <span>Participantes do PG: <strong>${d.participantesPg}</strong></span>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:8px;margin-top:.5rem">
+        <div style="flex:1">
+          <label style="font-size:12px;color:var(--text3);display:block;margin-bottom:2px">Participantes externos</label>
+          <input type="number" min="0" id="emb-ext-${d.setorId}" value="${d.participantesExternos || ''}" placeholder="0"
+            style="width:100%;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.5rem .7rem;font-size:15px;font-family:var(--ff-body);background:var(--bg);color:var(--text)">
+        </div>
+        <button onclick="confirmarParticipantesExternos('${nomeEsc}','${monthKey}','${d.setorId}')" style="background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);padding:.55rem .9rem;font-size:14px;cursor:pointer;font-family:var(--ff-body);white-space:nowrap">Salvar</button>
+      </div>
+      <div id="emb-ext-erro-${d.setorId}" style="color:#E05050;font-size:13px;margin-top:.3rem;min-height:16px"></div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:.4rem;font-size:13px;color:var(--text2);font-family:var(--ff-body)">
+        <span>Total participantes: <strong>${d.totalParticipantes}</strong></span>
+        <span>Cobertura: <strong>${d.coberturaPct}%</strong></span>
+        <span>${d.status}</span>
+      </div>
+    </div>`).join('')
+    : '<div style="font-size:14px;color:var(--text3);padding:.4rem 0;font-family:var(--ff-body)">Nenhum setor institucional cadastrado ainda.</div>';
+
+  document.getElementById('tutorpanel-body').innerHTML = `
+    <div class="content-card">
+      <div class="phase-tag tag-content">🌟 Embaixadores da Esperança — Participação Institucional</div>
+      <p class="body-text">Participantes do PG são contados automaticamente. Informe só a quantidade de colaboradores do setor que participaram do evento sem estar em nenhum PG.</p>
+      <label style="display:block;font-size:14px;color:var(--text3);margin:.6rem 0 4px">Mês</label>
+      <select onchange="renderEmbaixadoresInstitucional('${nomeEsc}', this.value)" style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box">${monthOptions}</select>
+    </div>
+    <div class="panel-section">
+      ${linhas}
+    </div>
+    ${voltarBtn}`;
+  resetScroll();
+}
+
+function confirmarParticipantesExternos(nome, monthKey, setorId) {
+  const input = document.getElementById('emb-ext-' + setorId);
+  const erroEl = document.getElementById('emb-ext-erro-' + setorId);
+  const bruto = (input?.value || '').trim();
+  const qtd = Number(bruto);
+  if (erroEl) erroEl.textContent = '';
+  if (bruto === '' || !Number.isInteger(qtd) || qtd < 0) { if (erroEl) erroEl.textContent = 'Informe um número inteiro, zero ou maior.'; return; }
+
+  const dados = calcularEmbaixadoresPorSetor(monthKey);
+  const setor = dados.find(d => d.setorId === setorId);
+  if (!setor) return;
+  const maximoPermitido = Math.max(0, setor.totalColaboradores - setor.participantesPg);
+  if (qtd > maximoPermitido) {
+    if (erroEl) erroEl.textContent = `Máximo permitido: ${maximoPermitido} (${setor.totalColaboradores} colaboradores no setor − ${setor.participantesPg} já participando pelo PG).`;
+    return;
+  }
+
+  registrarParticipantesExternos(setorId, monthKey, qtd, nome);
+  saveGrupos(); // aciona a sincronização geral — inclui EMBAIXADORES_EXTERNOS no payload
+  renderEmbaixadoresInstitucional(nome, monthKey);
 }
 
 function getISOWeekPg() {

@@ -1,5 +1,65 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-27] — RC4.8.5A: Participação Institucional no Embaixadores da Esperança (homologada)
+
+Introduz o indicador institucional do Embaixadores da Esperança por setor (participantes do
+PG + externos informados manualmente ÷ efetivo do setor, meta 20%) e corrige um invariante do
+sistema que a primeira versão desta RC violava.
+
+**Painel institucional (cross-PG):** nova tela `renderEmbaixadoresInstitucional`, mesmo
+portão de acesso do Ranking dos PGs (qualquer Tutor/Coordenador). Para cada setor, por mês:
+colaboradores do setor, participantes do PG (automático), participantes externos (campo
+editável), total e cobertura com status 🟢/🟡/🔴.
+
+**`EMBAIXADORES_EXTERNOS`** — estrutura isolada e deliberadamente simples: só
+`{setorId, monthKey, participantesExternos}`, nunca nome, nunca histórico individual, sem
+nenhuma referência a `PEQUENOS_GRUPOS` — uma futura evolução (Cadastro Institucional de
+Colaboradores) pode substituir esta quantidade manual sem migração desta estrutura (ver
+ADR-002 no `ARCHITECTURE.md`). Sincronizada como campo de topo próprio
+(`embaixadoresExternos`).
+
+**Validação:** quantidade de externos nunca negativa, sempre inteira (achado e corrigido
+durante o teste: um valor decimal como "2.7" estava sendo truncado silenciosamente em vez de
+rejeitado), e nunca deixa o total ultrapassar o efetivo do setor — mensagem explica o máximo
+permitido e o porquê.
+
+**Correção de arquitetura (achada em revisão, antes da homologação final):** a primeira
+versão do cálculo (`calcularEmbaixadoresPorSetor`) cruzava participantes de **todos** os PGs
+com cada setor, sem checar se aquele setor está entre os setores que o **próprio PG do
+participante** declara acompanhar (`g.setores`) — um participante de um setor não
+acompanhado pelo seu PG inflaria indevidamente o indicador de outro setor. Corrigido extraindo
+um invariante único, `participanteContaParaSetor(g, p, setorId)`, agora usado tanto por
+`calcularEmbaixadoresPorSetor` quanto por `calcularCoberturaSetorial` — nenhuma função nova,
+presente ou futura, deve reimplementar esse cruzamento.
+
+**Duas proteções de consistência adicionadas:**
+- Atribuir a um participante um setor fora dos acompanhados pelo PG exige confirmação
+  explícita, que já propõe incluir o setor na lista de acompanhados.
+- Remover um setor acompanhado é bloqueado enquanto existir participante do PG vinculado a
+  ele — mensagem informa quantos participantes e pede para realocá-los antes.
+
+**Esclarecimento de nomenclatura (sem mudança de código):** `g.setores` não representa "os
+setores que o PG tem" — representa **setores acompanhados pelo PG**, uma decisão ministerial
+do coordenador, válida mesmo com 0 participantes (é assim que o ADV-E consegue ver um setor-alvo
+ainda sem nenhum matriculado, em vez de ele simplesmente não aparecer).
+
+**Testado:** cenário completo com PG "Manancial" acompanhando RH/DP/Jurídico/NCP — João/Maria
+(RH) e Carlos (Jurídico) contam corretamente; Ana (Enfermagem, setor não acompanhado por
+Manancial) corretamente excluída de todos os indicadores, mesmo participando do evento.
+Fluxo de sugestão testado nos dois caminhos (aceitar adiciona o setor às acompanhados;
+cancelar não altera nada). Proteção de exclusão testada (bloqueia com 2 participantes
+vinculados; permite com 0).
+
+**Documentação:** `ARCHITECTURE.md` atualizado — "Setores Acompanhados pelo PG" e
+"Participantes do PG" registrados como responsabilidades distintas do Cadastro Mestre e do
+Efetivo Institucional (agora quatro componentes, não três); novo componente "Participação
+Institucional no Embaixadores da Esperança"; ADR-002 completo (problema, alternativas,
+decisão, consequências, limitações).
+
+**Pendente para produção:** adicionar `embaixadoresExternos` (além de `setoresMestre` e
+`setoresEfetivo`, já pendentes da RC4.8.2A) na allowlist da regra do Firestore
+(`hasOnly([...])`).
+
 ## [2026-07-27] — RC4.8.2A: Cadastro Mestre de Setores + Efetivo Institucional (homologada)
 
 Reestrutura a base de dados da Cobertura Setorial (RC4.8.2) em três responsabilidades

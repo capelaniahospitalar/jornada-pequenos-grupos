@@ -110,13 +110,13 @@ trabalho da outra.
 - **Sem gamificação visual:** sem medalha animada, barra, gráfico, nível ou efeito — só os
   números que o motor já calcula, mais o emoji de posição (🥇🥈🥉) para os 3 primeiros.
 
-### Cobertura Setorial Institucional (RC4.8.2 / RC4.8.2A / RC4.8.3)
+### Cobertura Setorial Institucional (RC4.8.2 / RC4.8.2A / RC4.8.3 / RC4.8.5A)
 
 - **Descrição:** mede quanto de cada setor institucional (RH, Jurídico, DP, NCP etc.) está
   coberto por colaboradores matriculados nos PGs — indicador oficial do ADV-E. Um PG pode
   representar um ou vários setores.
-- **Três responsabilidades deliberadamente separadas** (ver ADR-001, seção "Registro de
-  Decisões Arquiteturais"):
+- **Quatro responsabilidades deliberadamente separadas** (ver ADR-001 e ADR-002, seção
+  "Registro de Decisões Arquiteturais"):
   1. **Cadastro Mestre de Setores** (`SETORES_MESTRE`) — só identidade institucional:
      `{setorId, nome, ativo, departamentoPaiId}`. `setorId` é estável e nunca reaproveitado;
      `nome` é só exibição, nunca usado como chave de referência (mesma diretriz já adotada
@@ -131,18 +131,59 @@ trabalho da outra.
      atual"; `historico[]` é **append-only** (editar nunca sobrescreve uma entrada, sempre
      empilha uma nova), com cada entrada já no formato de registro versionado: `{registroId,
      setorId, totalColaboradores, atualizadoEm, origem, usuario, observacao}`.
-  3. **Cobertura Setorial** — `calcularCoberturaSetorial(grupoNum)`. **Nunca persistida** —
-     cálculo puro, recalculado ao vivo a cada abertura de tela, mesmo padrão do `getPgIMD`.
-     Cruza participantes ativos do PG (por `p.setorId`) com o efetivo atual do setor;
-     classifica 🟢 (≥40%) / 🟡 (30–39%) / 🔴 (<30%).
+  3. **Setores Acompanhados pelo PG** (`g.setores`) — **não é "os setores que este PG tem"**;
+     é uma **decisão ministerial do coordenador**: quais setores institucionais este PG se
+     propõe a atender, declarada mesmo antes de existir qualquer participante daquele setor
+     (por isso um setor pode aparecer com 0 matriculados — é um alvo de cobertura, não um
+     resumo do que já existe). Continua sendo, internamente, um array de `setorId`
+     (referência ao Cadastro Mestre), mas nenhuma documentação ou código novo deve tratá-lo
+     como sinônimo de "setores presentes entre os participantes".
+  4. **Participantes do PG** — só contam para as estatísticas de um setor se pertencerem a um
+     dos setores acompanhados pelo próprio PG (item 3). Este é um **invariante do sistema**,
+     não uma regra local do Embaixadores: `participanteContaParaSetor(g, p, setorId)` é a
+     única função que qualquer código (presente ou futuro) deve usar para essa checagem —
+     nunca cruzar participante e setor "por fora" dela. Um participante cujo `setorId` não
+     está entre os setores acompanhados pelo seu próprio PG é uma **inconsistência de
+     cadastro** (não deve contar em lugar nenhum) — ver ADR-002.
+- **Cobertura Setorial** — `calcularCoberturaSetorial(grupoNum)`. **Nunca persistida** —
+  cálculo puro, recalculado ao vivo a cada abertura de tela, mesmo padrão do `getPgIMD`. Usa
+  `participanteContaParaSetor()` para contar matriculados; classifica 🟢 (≥40%) / 🟡
+  (30–39%) / 🔴 (<30%).
+- **Proteções de consistência (RC4.8.5A):** (a) atribuir a um participante um setor fora dos
+  acompanhados pelo PG exige confirmação explícita, que já inclui adicioná-lo à lista de
+  acompanhados (`atribuirSetorParticipante`); (b) remover um setor acompanhado é bloqueado
+  enquanto existir participante do PG vinculado a ele (`excluirSetor`) — nunca deixa um
+  participante "órfão" de setor por trás de uma exclusão.
 - **Migração:** `migrarSetoresParaMestre()` — idempotente, normaliza o formato antigo
-  (RC4.8.2: setor como objeto local ao PG) para o modelo de três componentes, sem perder a
+  (RC4.8.2: setor como objeto local ao PG) para o modelo de componentes atual, sem perder a
   atribuição de setor já feita por participante.
 - **Sincronização:** `g.setores` (lista de `setorId` por PG) sincroniza como qualquer campo
   de grupo; `SETORES_MESTRE`/`SETORES_EFETIVO` sincronizam como campos de topo próprios
   (`setoresMestre`/`setoresEfetivo`), mesmo padrão de `TUTORS`/`tutores` — **exigem entrar na
   allowlist da regra do Firestore (`hasOnly([...])`)** antes de irem para produção, senão a
   gravação falha com 403 silencioso (mesmo bug já visto com o campo `convites`).
+
+### Participação Institucional no Embaixadores da Esperança (RC4.8.5A)
+
+- **Descrição:** mede, por setor, quantos colaboradores participaram do evento mensal do
+  Embaixadores da Esperança — somando quem já é participante de PG (calculado
+  automaticamente, via `participanteContaParaSetor()`) com uma quantidade manual de
+  "participantes externos" (colaboradores do setor que não estão em nenhum PG).
+- **Solução transitória e deliberadamente simples (ver ADR-002):** `EMBAIXADORES_EXTERNOS`
+  guarda só a quantidade por `{setorId, monthKey}` — nunca nome, nunca lista de pessoas,
+  nunca histórico individual. Isolado de propósito, sem nenhuma referência a
+  `PEQUENOS_GRUPOS` — uma futura evolução (Cadastro Institucional de Colaboradores) pode
+  substituir esta quantidade manual sem exigir migração desta estrutura.
+- **Cálculo:** `calcularEmbaixadoresPorSetor(monthKey)` — cruza todos os PGs (não é um
+  cálculo por PG, ao contrário da Cobertura Setorial), mas cada participante só conta se
+  `participanteContaParaSetor()` for verdadeiro para o PG dele — nunca conta participante de
+  setor fora dos acompanhados pelo seu próprio PG.
+- **Validação:** quantidade de externos nunca negativa, sempre inteira, e nunca deixa o total
+  (PG + externos) ultrapassar o efetivo do setor — mensagem explica o máximo permitido.
+- **Acesso:** mesmo portão do Ranking dos PGs — qualquer Tutor/Coordenador, não é
+  PG-específico (o app não tem papel de admin separado).
+- **Sincronização:** campo de topo próprio (`embaixadoresExternos`), mesmo padrão dos demais
+  — também precisa entrar na allowlist da regra do Firestore.
 
 ### Persistência
 
@@ -157,6 +198,7 @@ Campos por grupo (`PEQUENOS_GRUPOS[n]`), sincronizados como qualquer outro dado 
 | `g.setores` | `confirmarAdicionarSetor()`/`excluirSetor()`/`moverSetor()` | Lista de `setorId` — referências ao Cadastro Mestre, nunca objetos completos. |
 | `SETORES_MESTRE` (campo de topo `setoresMestre`) | `confirmarAdicionarSetor()`/`confirmarEditarSetorMestre()` | Identidade institucional de setor — nunca contém total de colaboradores. |
 | `SETORES_EFETIVO` (campo de topo `setoresEfetivo`) | `registrarEfetivoSetor()` | Estado operacional com histórico append-only — nunca sobrescreve uma entrada existente. |
+| `EMBAIXADORES_EXTERNOS` (campo de topo `embaixadoresExternos`) | `registrarParticipantesExternos()` | Só quantidade por `{setorId, monthKey}` — nunca nome, nunca histórico individual (RC4.8.5A). |
 
 ---
 
@@ -272,6 +314,66 @@ sujeito a ser sobrescrito.
   exigem atualização manual da allowlist da regra de segurança (`hasOnly([...])`) antes de
   produção — sem isso, a sincronização entre aparelhos desses dois campos falha
   silenciosamente (mesmo padrão de bug já visto com o campo `convites`, 2026-07-08).
+
+### ADR-002 — Participante só conta para um setor se o PG dele o acompanha; Embaixadores como solução transitória isolada
+
+**Data:** 2026-07-27 · **Status:** Aceito (RC4.8.5A)
+
+**Problema:** ao desenhar o indicador institucional do Embaixadores da Esperança por setor
+(RC4.8.5A), a primeira implementação cruzou participantes de **todos** os PGs com cada setor
+do Cadastro Mestre, usando só `p.setorId === setorId`. Isso reabriu, por um caminho novo, o
+mesmo tipo de inconsistência que a RC4.8.2A resolveu para o total de colaboradores: um
+participante cujo setor não faz parte dos setores que o **próprio PG dele** declara
+acompanhar (`g.setores`) era contado mesmo assim — por exemplo, um participante de
+Enfermagem, cadastrado num PG que só acompanha RH/DP/Jurídico/NCP, inflaria indevidamente o
+indicador de Enfermagem, mesmo sem nenhuma relação real entre aquele PG e aquele setor.
+
+**Alternativas consideradas:**
+1. Corrigir só o cálculo do Embaixadores (checar `g.setores` só ali) — descartada: a regra é
+   um invariante do domínio, não uma particularidade de um indicador. Corrigir num só lugar
+   deixaria a mesma armadilha aberta para o próximo relatório institucional (Painel ADV-E,
+   Escola Sabatina, treinamentos) que algum dia precisar cruzar participante e setor.
+2. Extrair uma função única (`participanteContaParaSetor`) que expressa o invariante uma
+   única vez, usada por todo cálculo presente e futuro que cruze participante e setor —
+   **adotada**.
+
+**Decisão:** um participante só conta para as estatísticas de um setor quando (a) está
+matriculado num PG, (b) esse setor está entre os setores que o **próprio PG dele** acompanha
+(`g.setores`), e (c) satisfaz o critério específico do indicador (ex.: `embaixadores[mês]
+.participou` para o Embaixadores). As condições (a)+(b) são o invariante genérico
+(`participanteContaParaSetor`); (c) é responsabilidade de cada indicador. Duas proteções
+adicionais fecham o ciclo: atribuir um participante a um setor fora dos acompanhados pelo PG
+exige confirmação explícita (que já propõe incluir o setor); remover um setor acompanhado é
+bloqueado enquanto existir participante do PG vinculado a ele.
+
+Separadamente, a estrutura de dados dos "participantes externos" do Embaixadores
+(`EMBAIXADORES_EXTERNOS`) foi deliberadamente modelada como **solução transitória isolada**:
+só guarda uma quantidade por `{setorId, monthKey}`, nunca nome nem histórico individual, sem
+nenhuma referência a `PEQUENOS_GRUPOS`. Uma futura evolução (Cadastro Institucional de
+Colaboradores) pode substituir essa quantidade manual sem exigir migração desta estrutura.
+
+**Consequências positivas:**
+- O mesmo bug (participante contado fora do escopo do seu PG) não pode mais ser reintroduzido
+  silenciosamente por uma tela nova — `participanteContaParaSetor` é o único caminho correto,
+  e seu nome documenta a regra no próprio código.
+- `g.setores` ganha um significado inequívoco na documentação: **setores acompanhados pelo
+  PG** (uma decisão ministerial do coordenador, inclusive antes de existir qualquer
+  participante daquele setor), nunca "setores que o PG tem hoje" — evita que uma futura
+  derivação automática (cogitada e descartada na RC4.8.3B) apague setores-alvo com 0
+  matriculados, que são justamente os mais relevantes para o ADV-E acompanhar.
+- Testado com o cenário real que motivou a correção: participante de Enfermagem num PG que só
+  acompanha RH/DP/Jurídico/NCP não conta em nenhum dos dois indicadores (Cobertura Setorial
+  nem Embaixadores) até a inconsistência ser resolvida.
+
+**Limitações conhecidas:**
+- A confirmação de "incluir setor" usa `confirm()` nativo do navegador — os botões ficam com
+  os rótulos padrão do navegador (não é possível renomear para "Adicionar setor"/"Cancelar"
+  sem construir um modal próprio, o que não existe hoje em nenhuma parte do app).
+- `EMBAIXADORES_EXTERNOS` é deliberadamente menos preciso que um cadastro individual (não
+  sabe quem são os externos, só quantos) — aceito como suficiente para o indicador
+  institucional agregado, não para qualquer relatório nominal futuro.
+- Mais um campo de topo novo no Firestore (`embaixadoresExternos`) exige a mesma atualização
+  manual de allowlist já registrada no ADR-001.
 
 ---
 
@@ -550,20 +652,27 @@ institucionais ao mesmo tempo, em vez de um mecanismo de histórico por RC.
 
 > Sequência homologada: RC4.8.1 (auditoria arquitetural, sem código) → RC4.8.2 (cadastro dos
 > setores do PG) → RC4.8.2A (Cadastro Mestre + Efetivo Institucional, ver ADR-001) → RC4.8.3A
-> (motor de cálculo, em andamento) → RC4.8.3B (interface, planejada) → RC4.8.4 (Painel ADV-E,
-> planejada) → RC4.9 (Motor Institucional de Relatórios, **deliberadamente postergada** — ver
-> abaixo).
+> (motor de cálculo, concluído) → RC4.8.5A (Participação Institucional no Embaixadores +
+> invariante `participanteContaParaSetor`, ver ADR-002, **homologada**) → RC4.8.3B (interface
+> de Cobertura Setorial, planejada) → RC4.8.4 (Painel ADV-E, planejada) → RC4.9 (Motor
+> Institucional de Relatórios, **deliberadamente postergada** — ver abaixo).
 
 - **RC4.8.1 — Diagnóstico arquitetural (concluído).** Auditoria de como modelar Cobertura
   Setorial sem repetir o defeito de comparação por nome já corrigido na RC-REST-02.
 - **RC4.8.2 — Cadastro dos Setores do PG (concluído).** Bloco "Cobertura Setorial" no Painel
   do Tutor/Coordenador: adicionar/editar/excluir/reordenar, só cadastro, sem cálculo.
-- **RC4.8.2A — Cadastro Mestre de Setores + Efetivo Institucional (homologada conceitualmente).**
+- **RC4.8.2A — Cadastro Mestre de Setores + Efetivo Institucional (homologada).**
   Ver "Cobertura Setorial Institucional" nos Componentes Homologados e ADR-001, acima.
-- **RC4.8.3A — Motor de Cobertura Setorial (em andamento).** Só cálculo: leitura do Efetivo
+- **RC4.8.3A — Motor de Cobertura Setorial (concluído).** Só cálculo: leitura do Efetivo
   Institucional, contagem automática de participantes por setor, percentual, classificação
-  🟢/🟡/🔴 — `calcularCoberturaSetorial()`. Nenhuma alteração visual além do indispensável para
-  validar o motor.
+  🟢/🟡/🔴 — `calcularCoberturaSetorial()`.
+- **RC4.8.5A — Participação Institucional no Embaixadores da Esperança (homologada).** Painel
+  cross-PG por setor (participantes do PG + externos informados manualmente), ver
+  "Participação Institucional no Embaixadores da Esperança" acima e ADR-002. Estabeleceu o
+  invariante `participanteContaParaSetor()` — usado agora por Cobertura Setorial e
+  Embaixadores, obrigatório para qualquer indicador futuro que cruze participante e setor —
+  e duas proteções de consistência: confirmação ao atribuir setor fora dos acompanhados pelo
+  PG, e bloqueio ao tentar remover um setor acompanhado com participantes ainda vinculados.
 - **RC4.8.3B — Interface de Cobertura (planejada, depois do motor homologado).** Painel
   visual, indicadores, barras de progresso, resumo do PG, mensagens de meta atingida —
   consome só o que o motor da RC4.8.3A já calcula, nunca recalcula nada (mesmo princípio já
@@ -583,9 +692,9 @@ compartilhado da RC4.9) de **apresentação** (tela, impressão, resumo para Wha
 para e-mail). Objetivo: quando a RC4.9 for iniciada, grande parte da estrutura já vai estar
 organizada dessa forma, em vez de precisar ser desmontada de uma implementação monolítica.
 
-**Checklist de implantação desta RC (antes de produção):** adicionar `setoresMestre` e
-`setoresEfetivo` na allowlist da regra do Firestore (`hasOnly([...])`) — ver ADR-001,
-"Limitações conhecidas".
+**Checklist de implantação desta RC (antes de produção):** adicionar `setoresMestre`,
+`setoresEfetivo` e `embaixadoresExternos` na allowlist da regra do Firestore
+(`hasOnly([...])`) — ver ADR-001 e ADR-002, "Limitações conhecidas".
 
 ### RC4.9 — Motor Institucional de Relatórios (deliberadamente postergada)
 
