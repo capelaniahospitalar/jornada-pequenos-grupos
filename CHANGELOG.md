@@ -1,5 +1,40 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-07-27] — RC4.8.3B (redefinição): Embaixadores migra para dentro do PG; painel institucional vira consulta
+
+Correção de arquitetura, achada em revisão antes da interface de Cobertura Setorial: a tela
+institucional do Embaixadores (RC4.8.5A) obrigava o coordenador a sair do seu PG e navegar
+por uma lista de **todos** os setores da instituição — a maioria irrelevante para ele — só
+para lançar um número do seu próprio contexto.
+
+**Princípio adotado:** toda informação nasce no PG; toda consolidação nasce no Painel ADV-E.
+
+**Nível operacional (novo):** `renderEmbaixadoresPgSection`, dentro de
+`renderTutorGrupoDetalhe` — bloco irmão da Cobertura Setorial, mesmos setores acompanhados
+pelo PG (`g.setores`). Mostra Cobertura PG e Embaixadores lado a lado por setor; tocar no
+percentual do Embaixadores abre o detalhamento (`iniciarEditarEmbaixadoresPg`) com
+participantes de PG, campo de externos e percentual — sem sair da tela do PG.
+
+**Nível institucional (simplificado):** `renderEmbaixadoresInstitucional` perdeu todo campo
+editável — vira consolidação só leitura por setor (colaboradores, participantes de PG,
+externos, total, cobertura). O detalhamento por PG dentro de cada setor fica para a RC4.8.4
+(Painel ADV-E).
+
+**Refatoração:** `confirmarParticipantesExternos` virou `salvarParticipantesExternos`
+(validação + persistência pura, sem decidir o que renderizar) + `confirmarParticipantesExternosPg`
+(wrapper usado pelo novo nível operacional). `EMBAIXADORES_EXTERNOS` continua sendo dado
+institucional por `{setorId, monthKey}` — se dois PGs acompanham o mesmo setor, ambos
+leem/gravam o mesmo registro, mesmo editando de dentro de PGs diferentes.
+
+**Testado:** bloco operacional exibido corretamente dentro do PG "Manancial" (Cobertura PG e
+Embaixadores por setor); editar externos a partir do PG retorna para a tela do próprio PG
+(nunca para a institucional); tela institucional confirmada sem nenhum input ou botão de
+salvar; valor gravado num PG aparece corretamente consolidado na tela institucional.
+
+**Documentação:** `ARCHITECTURE.md` atualizado — nota de redefinição no ADR-002, seção de
+componente reescrita com os dois níveis de uso, Roadmap RC4.8.3B renomeado para "Painel
+Operacional do Coordenador do PG".
+
 ## [2026-07-27] — RC4.8.5A: Participação Institucional no Embaixadores da Esperança (homologada)
 
 Introduz o indicador institucional do Embaixadores da Esperança por setor (participantes do

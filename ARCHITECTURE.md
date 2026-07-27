@@ -163,25 +163,39 @@ trabalho da outra.
   allowlist da regra do Firestore (`hasOnly([...])`)** antes de irem para produção, senão a
   gravação falha com 403 silencioso (mesmo bug já visto com o campo `convites`).
 
-### Participação Institucional no Embaixadores da Esperança (RC4.8.5A)
+### Participação Institucional no Embaixadores da Esperança (RC4.8.5A, redefinida na RC4.8.3B)
 
 - **Descrição:** mede, por setor, quantos colaboradores participaram do evento mensal do
   Embaixadores da Esperança — somando quem já é participante de PG (calculado
   automaticamente, via `participanteContaParaSetor()`) com uma quantidade manual de
   "participantes externos" (colaboradores do setor que não estão em nenhum PG).
+- **Dois níveis de uso (redefinição da RC4.8.3B, 2026-07-27) — "toda informação nasce no PG,
+  toda consolidação nasce no Painel ADV-E":**
+  1. **Nível operacional, dentro do PG** (`renderEmbaixadoresPgSection`, dentro de
+     `renderTutorGrupoDetalhe`) — bloco irmão da Cobertura Setorial, usando exatamente os
+     mesmos setores acompanhados pelo PG (`g.setores`). É aqui que o coordenador lança
+     participantes externos (`iniciarEditarEmbaixadoresPg` /
+     `confirmarParticipantesExternosPg`) — ele nunca precisa sair do seu PG.
+  2. **Nível institucional, só consulta** (`renderEmbaixadoresInstitucional`) — deixou de ter
+     qualquer campo editável; consolida por setor, cross-PG, para o ADV-E acompanhar. O
+     detalhamento por PG dentro de cada setor (quanto cada PG específico contribuiu) fica
+     para a RC4.8.4 (Painel ADV-E) — hoje mostra só o total consolidado.
 - **Solução transitória e deliberadamente simples (ver ADR-002):** `EMBAIXADORES_EXTERNOS`
   guarda só a quantidade por `{setorId, monthKey}` — nunca nome, nunca lista de pessoas,
   nunca histórico individual. Isolado de propósito, sem nenhuma referência a
   `PEQUENOS_GRUPOS` — uma futura evolução (Cadastro Institucional de Colaboradores) pode
-  substituir esta quantidade manual sem exigir migração desta estrutura.
+  substituir esta quantidade manual sem exigir migração desta estrutura. Continua sendo um
+  dado institucional (por `setorId`, não por PG) mesmo sendo editado de dentro de um PG —
+  se dois PGs acompanham o mesmo setor, ambos leem/gravam o mesmo registro.
 - **Cálculo:** `calcularEmbaixadoresPorSetor(monthKey)` — cruza todos os PGs (não é um
   cálculo por PG, ao contrário da Cobertura Setorial), mas cada participante só conta se
   `participanteContaParaSetor()` for verdadeiro para o PG dele — nunca conta participante de
-  setor fora dos acompanhados pelo seu próprio PG.
+  setor fora dos acompanhados pelo seu próprio PG. `salvarParticipantesExternos()` é o
+  validador/persistidor puro, compartilhado pelos dois níveis de uso.
 - **Validação:** quantidade de externos nunca negativa, sempre inteira, e nunca deixa o total
   (PG + externos) ultrapassar o efetivo do setor — mensagem explica o máximo permitido.
-- **Acesso:** mesmo portão do Ranking dos PGs — qualquer Tutor/Coordenador, não é
-  PG-específico (o app não tem papel de admin separado).
+- **Acesso ao nível institucional:** mesmo portão do Ranking dos PGs — qualquer
+  Tutor/Coordenador, não é PG-específico (o app não tem papel de admin separado).
 - **Sincronização:** campo de topo próprio (`embaixadoresExternos`), mesmo padrão dos demais
   — também precisa entrar na allowlist da regra do Firestore.
 
@@ -374,6 +388,19 @@ Colaboradores) pode substituir essa quantidade manual sem exigir migração dest
   institucional agregado, não para qualquer relatório nominal futuro.
 - Mais um campo de topo novo no Firestore (`embaixadoresExternos`) exige a mesma atualização
   manual de allowlist já registrada no ADR-001.
+
+**Nota (redefinição da RC4.8.3B, 2026-07-27):** a primeira versão desta RC concentrou toda a
+edição de participantes externos numa tela institucional separada. Revisão posterior
+identificou que isso contrariava a própria lógica de "setores acompanhados pelo PG" — um
+coordenador precisaria sair do seu PG e navegar por uma lista de setores da instituição
+inteira (a maioria irrelevante pra ele) só para lançar um número do seu próprio contexto.
+Corrigido com um princípio explícito: **toda informação nasce no PG; toda consolidação nasce
+no Painel ADV-E.** A edição de `EMBAIXADORES_EXTERNOS` migrou para dentro de
+`renderTutorGrupoDetalhe` (`renderEmbaixadoresPgSection`), ao lado da Cobertura Setorial,
+usando os mesmos setores acompanhados; a tela institucional (`renderEmbaixadoresInstitucional`)
+perdeu todo campo editável e virou consolidação somente leitura. Este princípio passa a valer
+para qualquer indicador institucional futuro que precise de lançamento manual: o lançamento
+mora no PG, a consolidação mora no painel institucional — nunca o contrário.
 
 ---
 
@@ -653,8 +680,9 @@ institucionais ao mesmo tempo, em vez de um mecanismo de histórico por RC.
 > Sequência homologada: RC4.8.1 (auditoria arquitetural, sem código) → RC4.8.2 (cadastro dos
 > setores do PG) → RC4.8.2A (Cadastro Mestre + Efetivo Institucional, ver ADR-001) → RC4.8.3A
 > (motor de cálculo, concluído) → RC4.8.5A (Participação Institucional no Embaixadores +
-> invariante `participanteContaParaSetor`, ver ADR-002, **homologada**) → RC4.8.3B (interface
-> de Cobertura Setorial, planejada) → RC4.8.4 (Painel ADV-E, planejada) → RC4.9 (Motor
+> invariante `participanteContaParaSetor`, ver ADR-002, **homologada**) → RC4.8.3B (Painel
+> Operacional do Coordenador do PG — Cobertura Setorial + Embaixadores, redefinida, em
+> andamento) → RC4.8.4 (Painel ADV-E, planejada) → RC4.9 (Motor
 > Institucional de Relatórios, **deliberadamente postergada** — ver abaixo).
 
 - **RC4.8.1 — Diagnóstico arquitetural (concluído).** Auditoria de como modelar Cobertura
@@ -673,14 +701,22 @@ institucionais ao mesmo tempo, em vez de um mecanismo de histórico por RC.
   Embaixadores, obrigatório para qualquer indicador futuro que cruze participante e setor —
   e duas proteções de consistência: confirmação ao atribuir setor fora dos acompanhados pelo
   PG, e bloqueio ao tentar remover um setor acompanhado com participantes ainda vinculados.
-- **RC4.8.3B — Interface de Cobertura (planejada, depois do motor homologado).** Painel
-  visual, indicadores, barras de progresso, resumo do PG, mensagens de meta atingida —
-  consome só o que o motor da RC4.8.3A já calcula, nunca recalcula nada (mesmo princípio já
-  usado no Painel do Tutor — Ranking dos PGs). Já deve seguir a **diretriz de relatório**
-  abaixo (decisão da RC4.9, aplicada retroativamente a este relatório).
+- **RC4.8.3B — Painel Operacional do Coordenador do PG (redefinida, parcialmente concluída).**
+  Objetivo ampliado de "só Interface de Cobertura" para reunir, dentro de
+  `renderTutorGrupoDetalhe`, os dois blocos irmãos que usam os mesmos setores acompanhados
+  pelo PG: **Cobertura Setorial** (já existia) e **Embaixadores da Esperança** (migrado da
+  tela institucional nesta redefinição — ver "Participação Institucional no Embaixadores da
+  Esperança", acima). Ainda em aberto: barras de progresso visuais, resumo consolidado do PG
+  e mensagens de meta atingida — hoje os números aparecem em texto/percentual, sem
+  gamificação visual (mesmo princípio do Painel do Tutor — Ranking dos PGs: "sem medalha
+  animada, barra, gráfico ou efeito", a confirmar se vale aqui também). Segue a **diretriz de
+  relatório** abaixo (decisão da RC4.9, aplicada retroativamente a este relatório).
 - **RC4.8.4 — Painel ADV-E (planejada).** Dashboard institucional cross-PG: por setor (nome,
   total, matriculados, cobertura, meta, status) + indicadores gerais (total de setores,
-  setores acima/abaixo da meta, cobertura institucional) + gráficos. Consome
+  setores acima/abaixo da meta, cobertura institucional) + gráficos. Inclui também o
+  detalhamento por PG dentro de cada setor do Embaixadores (ex.: "PG Manancial / PG
+  Esperança / PG Vida"), deliberadamente deixado fora da RC4.8.3B por ser consolidação, não
+  operação (ver "toda consolidação nasce no Painel ADV-E"). Consome
   `SETORES_MESTRE`/`SETORES_EFETIVO` diretamente (fonte única), sem agregação por nome.
   Também segue a diretriz de relatório abaixo.
 

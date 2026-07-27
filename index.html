@@ -3307,7 +3307,7 @@ function renderTutorGruposList(nome) {
     ${cards}
     <button onclick="abrirRelatoriosMensais('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">📊 Relatórios Mensais</button>
     <button onclick="renderRankingPgs('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">🏆 Índice de Maturidade Discipular</button>
-    <button onclick="renderEmbaixadoresInstitucional('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">🌟 Embaixadores da Esperança — Institucional</button>
+    <button onclick="renderEmbaixadoresInstitucional('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">🌟 Embaixadores da Esperança — Painel Institucional (consulta)</button>
     ${souTutorDeAlgum ? `<button onclick="renderCriarPgForm('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body)">➕ Criar outro Pequeno Grupo</button>` : ''}
     <button onclick="renderTutorResetPassScreen('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">🔑 Trocar minha senha</button>
     <button onclick="tutorLogout()" style="width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">🚪 Sair</button>`;
@@ -3657,6 +3657,7 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
     <button onclick="iniciarEditarNomeGrupo(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">✎ Editar nome do grupo</button>
     <button onclick="iniciarEditarReuniaoPainel(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">🗓️ Editar dia e horário</button>
     ${renderSetoresSection(g, grupoNum, nome)}
+    ${renderEmbaixadoresPgSection(g, grupoNum, nome)}
     <div class="panel-section">
       <div class="panel-title">Progresso semanal do grupo</div>
       <div class="panel-stat"><span>🙏 Pedidos de oração</span><strong>${grpW.oracoes}/${metas.oracoes.meta}</strong></div>
@@ -10482,6 +10483,12 @@ function renderRankingPgs(nome) {
 
 // RC4.8.5A: painel institucional (cross-PG) do Embaixadores da Esperança por setor —
 // mesmo portão de acesso do Ranking dos PGs (qualquer Tutor/Coordenador, não é PG-específico).
+// RC4.8.3B (redefinição, 2026-07-27): a tela institucional deixa de ser onde se trabalha —
+// vira só consulta/consolidação para o ADV-E ("o ADV-E consulta, não alimenta"). Lançar
+// participantes externos passa a acontecer de dentro do próprio PG (renderEmbaixadoresPgSection
+// + iniciarEditarEmbaixadoresPg, abaixo) — o coordenador nunca mais precisa sair do seu PG.
+// O detalhamento por PG dentro de cada setor (ex.: "PG Manancial / PG Esperança / PG Vida")
+// fica para a RC4.8.4 (Painel ADV-E) — aqui continua um total por setor, só leitura.
 function renderEmbaixadoresInstitucional(nome, monthKey) {
   const nomeEsc = nome.replace(/'/g,"\\'");
   monthKey = monthKey || embMonthKey();
@@ -10498,19 +10505,9 @@ function renderEmbaixadoresInstitucional(nome, monthKey) {
       <div style="font-size:15px;font-weight:700;color:var(--text);font-family:var(--ff-body)">${sanitize(d.nome)}</div>
       <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:.3rem;font-size:13px;color:var(--text2);font-family:var(--ff-body)">
         <span>Colaboradores do setor: <strong>${d.totalColaboradores}</strong></span>
-        <span>Participantes do PG: <strong>${d.participantesPg}</strong></span>
-      </div>
-      <div style="display:flex;align-items:flex-end;gap:8px;margin-top:.5rem">
-        <div style="flex:1">
-          <label style="font-size:12px;color:var(--text3);display:block;margin-bottom:2px">Participantes externos</label>
-          <input type="number" min="0" id="emb-ext-${d.setorId}" value="${d.participantesExternos || ''}" placeholder="0"
-            style="width:100%;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.5rem .7rem;font-size:15px;font-family:var(--ff-body);background:var(--bg);color:var(--text)">
-        </div>
-        <button onclick="confirmarParticipantesExternos('${nomeEsc}','${monthKey}','${d.setorId}')" style="background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);padding:.55rem .9rem;font-size:14px;cursor:pointer;font-family:var(--ff-body);white-space:nowrap">Salvar</button>
-      </div>
-      <div id="emb-ext-erro-${d.setorId}" style="color:#E05050;font-size:13px;margin-top:.3rem;min-height:16px"></div>
-      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:.4rem;font-size:13px;color:var(--text2);font-family:var(--ff-body)">
-        <span>Total participantes: <strong>${d.totalParticipantes}</strong></span>
+        <span>Participantes de PG: <strong>${d.participantesPg}</strong></span>
+        <span>Externos: <strong>${d.participantesExternos}</strong></span>
+        <span>Total: <strong>${d.totalParticipantes}</strong></span>
         <span>Cobertura: <strong>${d.coberturaPct}%</strong></span>
         <span>${d.status}</span>
       </div>
@@ -10519,8 +10516,8 @@ function renderEmbaixadoresInstitucional(nome, monthKey) {
 
   document.getElementById('tutorpanel-body').innerHTML = `
     <div class="content-card">
-      <div class="phase-tag tag-content">🌟 Embaixadores da Esperança — Participação Institucional</div>
-      <p class="body-text">Participantes do PG são contados automaticamente. Informe só a quantidade de colaboradores do setor que participaram do evento sem estar em nenhum PG.</p>
+      <div class="phase-tag tag-content">🌟 Embaixadores da Esperança — Painel Institucional (consulta)</div>
+      <p class="body-text">Consolidação institucional, só leitura. Para lançar participantes externos, abra o seu Pequeno Grupo → Embaixadores da Esperança.</p>
       <label style="display:block;font-size:14px;color:var(--text3);margin:.6rem 0 4px">Mês</label>
       <select onchange="renderEmbaixadoresInstitucional('${nomeEsc}', this.value)" style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box">${monthOptions}</select>
     </div>
@@ -10531,26 +10528,97 @@ function renderEmbaixadoresInstitucional(nome, monthKey) {
   resetScroll();
 }
 
-function confirmarParticipantesExternos(nome, monthKey, setorId) {
-  const input = document.getElementById('emb-ext-' + setorId);
-  const erroEl = document.getElementById('emb-ext-erro-' + setorId);
-  const bruto = (input?.value || '').trim();
+// Valida e persiste a quantidade de externos (setor, mês) — não decide o que renderizar
+// depois; quem chama escolhe a tela de retorno (hoje, só o contexto do PG).
+function salvarParticipantesExternos(setorId, monthKey, valorBruto, usuario) {
+  const bruto = (valorBruto || '').trim();
   const qtd = Number(bruto);
-  if (erroEl) erroEl.textContent = '';
-  if (bruto === '' || !Number.isInteger(qtd) || qtd < 0) { if (erroEl) erroEl.textContent = 'Informe um número inteiro, zero ou maior.'; return; }
-
+  if (bruto === '' || !Number.isInteger(qtd) || qtd < 0) return { ok: false, erro: 'Informe um número inteiro, zero ou maior.' };
   const dados = calcularEmbaixadoresPorSetor(monthKey);
   const setor = dados.find(d => d.setorId === setorId);
-  if (!setor) return;
+  if (!setor) return { ok: false, erro: 'Setor não encontrado.' };
   const maximoPermitido = Math.max(0, setor.totalColaboradores - setor.participantesPg);
   if (qtd > maximoPermitido) {
-    if (erroEl) erroEl.textContent = `Máximo permitido: ${maximoPermitido} (${setor.totalColaboradores} colaboradores no setor − ${setor.participantesPg} já participando pelo PG).`;
-    return;
+    return { ok: false, erro: `Máximo permitido: ${maximoPermitido} (${setor.totalColaboradores} colaboradores no setor − ${setor.participantesPg} já participando pelo PG).` };
   }
-
-  registrarParticipantesExternos(setorId, monthKey, qtd, nome);
+  registrarParticipantesExternos(setorId, monthKey, qtd, usuario);
   saveGrupos(); // aciona a sincronização geral — inclui EMBAIXADORES_EXTERNOS no payload
-  renderEmbaixadoresInstitucional(nome, monthKey);
+  return { ok: true };
+}
+
+// ── Nível operacional (dentro do PG) — bloco irmão da Cobertura Setorial, mesmos setores
+// acompanhados (g.setores). Mostra os dois indicadores lado a lado; tocar em "Embaixadores"
+// abre o detalhamento e o campo de participantes externos, sem sair do PG.
+function renderEmbaixadoresPgSection(g, grupoNum, nome) {
+  if (!(g.setores || []).length) return '';
+  const monthKey = embMonthKey();
+  const cobertura = calcularCoberturaSetorial(grupoNum);
+  const embaixadores = calcularEmbaixadoresPorSetor(monthKey);
+  const nomeEsc = nome.replace(/'/g,"\\'");
+
+  const linhas = g.setores.map(setorId => {
+    const cob = cobertura.find(c => c.setorId === setorId);
+    const emb = embaixadores.find(e => e.setorId === setorId);
+    if (!cob || !emb) return '';
+    return `
+      <div style="padding:.6rem 0;border-bottom:0.5px solid var(--border)">
+        <div style="font-size:15px;font-weight:700;color:var(--text);font-family:var(--ff-body)">${sanitize(cob.nome)}</div>
+        <div style="display:flex;justify-content:space-between;font-size:13.5px;color:var(--text2);margin-top:.3rem;font-family:var(--ff-body)">
+          <span>📊 Cobertura PG</span><strong>${cob.coberturaPct}% ${cob.status}</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:13.5px;color:var(--text2);margin-top:.2rem;font-family:var(--ff-body)">
+          <span>🌟 Embaixadores (${embMonthLabel(monthKey)})</span>
+          <button onclick="iniciarEditarEmbaixadoresPg(${grupoNum},'${nomeEsc}','${setorId}')" style="background:none;border:none;color:var(--teal);font-weight:700;font-size:13.5px;cursor:pointer;font-family:var(--ff-body)">${emb.coberturaPct}% ${emb.status} ›</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="panel-section">
+      <div class="panel-title">🌟 Embaixadores da Esperança</div>
+      <p style="font-size:13px;color:var(--text3);margin-bottom:.4rem;font-family:var(--ff-body)">Mesmos setores acompanhados por este PG. Toque no percentual para ver o detalhamento e informar participantes externos.</p>
+      ${linhas}
+    </div>`;
+}
+
+function iniciarEditarEmbaixadoresPg(grupoNum, nome, setorId) {
+  const monthKey = embMonthKey();
+  const dados = calcularEmbaixadoresPorSetor(monthKey);
+  const setor = dados.find(d => d.setorId === setorId);
+  const body = document.getElementById('tutorpanel-body');
+  if (!setor || !body) return;
+  const nomeEsc = nome.replace(/'/g,"\\'");
+
+  const formHtml = `
+    <div class="panel-section" id="form-embaixadores-pg">
+      <div class="panel-title">🌟 ${sanitize(setor.nome)} — Embaixadores (${embMonthLabel(monthKey)})</div>
+      <div class="panel-stat"><span>Colaboradores do setor</span><strong>${setor.totalColaboradores}</strong></div>
+      <div class="panel-stat"><span>Participantes de todos os PGs que acompanham este setor</span><strong>${setor.participantesPg}</strong></div>
+      <div style="margin-top:.5rem">
+        <label style="font-size:12px;color:var(--text3);display:block;margin-bottom:2px">Participantes externos</label>
+        <input type="number" min="0" id="emb-pg-ext-${setorId}" value="${setor.participantesExternos || ''}" placeholder="0"
+          style="width:100%;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.5rem .7rem;font-size:15px;font-family:var(--ff-body);background:var(--bg);color:var(--text)">
+      </div>
+      <div id="emb-pg-ext-erro-${setorId}" style="color:#E05050;font-size:13px;margin-top:.3rem;min-height:16px"></div>
+      <div class="panel-stat" style="margin-top:.4rem"><span>Total participantes</span><strong>${setor.totalParticipantes}</strong></div>
+      <div class="panel-stat"><span>Cobertura Embaixadores</span><strong>${setor.coberturaPct}% ${setor.status}</strong></div>
+      <div style="display:flex;gap:8px;margin-top:.6rem">
+        <button class="insc-submit-btn" style="margin:0;flex:1" onclick="confirmarParticipantesExternosPg(${grupoNum},'${nomeEsc}','${setorId}')">✓ Salvar</button>
+        <button onclick="renderTutorGrupoDetalhe(${grupoNum},'${nomeEsc}')" style="background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">Cancelar</button>
+      </div>
+    </div>`;
+  const existing = document.getElementById('form-embaixadores-pg');
+  if (existing) existing.remove();
+  body.insertAdjacentHTML('afterbegin', formHtml);
+}
+
+function confirmarParticipantesExternosPg(grupoNum, nome, setorId) {
+  const monthKey = embMonthKey();
+  const input = document.getElementById('emb-pg-ext-' + setorId);
+  const erroEl = document.getElementById('emb-pg-ext-erro-' + setorId);
+  const resultado = salvarParticipantesExternos(setorId, monthKey, input?.value, nome);
+  if (!resultado.ok) { if (erroEl) erroEl.textContent = resultado.erro; return; }
+  renderTutorGrupoDetalhe(grupoNum, nome);
 }
 
 function getISOWeekPg() {
