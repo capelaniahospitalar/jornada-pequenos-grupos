@@ -3422,6 +3422,16 @@ function removerEncontroPg(grupoNum, monthKey, encontroId, nome) {
   gerarRelatorioMensal(nome, grupoNum, monthKey);
 }
 
+// Soma os participantes externos (EMBAIXADORES_EXTERNOS) dos setores que este PG
+// acompanha (g.setores) — mesmo dado já editável em "Indicadores por Setor" dentro do
+// próprio painel do PG, só reaproveitado aqui para o Relatório Mensal.
+function externosDoGrupoNoMes(g, monthKey) {
+  return (g.setores || []).reduce((soma, setorId) => {
+    const registro = EMBAIXADORES_EXTERNOS.find(e => e.setorId === setorId && e.monthKey === monthKey);
+    return soma + (registro ? (registro.participantesExternos || 0) : 0);
+  }, 0);
+}
+
 function gerarRelatorioMensal(nome, grupoNumParam, monthKeyParam) {
   loadGrupos();
   const grupoNum = grupoNumParam != null ? grupoNumParam : parseInt(document.getElementById('rel-grupo').value, 10);
@@ -3460,6 +3470,8 @@ function gerarRelatorioMensal(nome, grupoNumParam, monthKeyParam) {
   const total = participantesSemDup.length;
   const participaram = participantesSemDup.filter(p => p.embaixadores && p.embaixadores[monthKey] && p.embaixadores[monthKey].participou).length;
   const pct = total ? Math.round(participaram / total * 100) : 0;
+  const externos = externosDoGrupoNoMes(g, monthKey);
+  const totalPresentes = participaram + externos;
 
   document.getElementById('tutorpanel-body').innerHTML = `
     <div class="content-card">
@@ -3475,6 +3487,8 @@ function gerarRelatorioMensal(nome, grupoNumParam, monthKeyParam) {
       <div class="panel-stat"><span>Participantes</span><strong>${total}</strong></div>
       <div class="panel-stat"><span>Participaram</span><strong>${participaram}</strong></div>
       ${renderMeterHtml('Percentual de participação', total ? pct : null)}
+      ${externos ? `<div class="panel-stat"><span>Participantes externos (setor)</span><strong>${externos}</strong></div>
+      <div class="panel-stat"><span>Total presentes (grupo + externos)</span><strong>${totalPresentes}</strong></div>` : ''}
     </div>
     <button onclick="enviarRelatorioWhatsApp(${grupoNum}, '${monthKey}')" style="margin-top:.5rem;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:#25D366;color:#fff;border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;cursor:pointer;font-family:var(--ff-body)">📤 Enviar por WhatsApp</button>
     <button onclick="abrirRelatoriosMensais('${nomeEsc}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Escolher outro mês/grupo</button>
@@ -3497,6 +3511,8 @@ function montarTextoRelatorioMensal(grupoNum, monthKey) {
   const total = participantesSemDup.length;
   const participaram = participantesSemDup.filter(p => p.embaixadores && p.embaixadores[monthKey] && p.embaixadores[monthKey].participou).length;
   const pct = total ? Math.round(participaram / total * 100) : 0;
+  const externos = externosDoGrupoNoMes(g, monthKey);
+  const totalPresentes = participaram + externos;
 
   return `📊 *Relatório Mensal — ${monthLabel}*\n`
     + `*${g.nome || 'Grupo ' + grupoNum}*\n`
@@ -3506,7 +3522,8 @@ function montarTextoRelatorioMensal(grupoNum, monthKey) {
     + `*Embaixadores da Esperança*\n`
     + `Participantes: ${total}\n`
     + `Participaram: ${participaram}\n`
-    + `Percentual: ${pct}%`;
+    + `Percentual: ${pct}%`
+    + (externos ? `\nParticipantes externos (setor): ${externos}\nTotal presentes (grupo + externos): ${totalPresentes}` : '');
 }
 
 function enviarRelatorioWhatsApp(grupoNum, monthKey) {
