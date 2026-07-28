@@ -1536,6 +1536,13 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
     <div class="xp-hint" id="h-xphint">0 / 300 XP para próximo nível</div>
   </div>
 
+  <!-- Some sozinho se o app já estiver instalado (modo standalone) — ver isAppInstalado() -->
+  <div id="h-install-banner" style="margin:.85rem 1rem 0">
+    <button onclick="instalarApp()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--gold);border:none;border-radius:var(--radius-sm);padding:.8rem;font-size:16.5px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body)">
+      📲 Instalar o app na tela inicial
+    </button>
+  </div>
+
   <!-- ═══ BLOCO 1 — Meu Caminho Hoje ═══ -->
   <div class="stats">
     <div class="scard"><div class="scard-v" id="h-xp">0</div><div class="scard-l">XP Total</div></div>
@@ -2820,6 +2827,10 @@ function mostrarInstrucoesInstalacao() {
     ? 'No Safari, toque em Compartilhar e depois em "Adicionar à Tela de Início".'
     : 'Toque no menu do navegador (⋮) e depois em "Instalar app" (ou "Adicionar à tela inicial").';
   alert('📲 Instalar na Tela Inicial\n\n' + instrucao);
+}
+
+function isAppInstalado() {
+  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 }
 
 // ── SHARE / INVITE ────────────────────────────────────────────────────────────
@@ -5638,6 +5649,8 @@ function getLevel() {
 // ══════════════════════════════════════
 function renderHome() {
   updStreak();
+  const installBanner = document.getElementById('h-install-banner');
+  if (installBanner) installBanner.style.display = isAppInstalado() ? 'none' : '';
   // Reinicia o timer de countdown da home (evita timers duplicados)
   if (window._homeCountdownTimer) clearInterval(window._homeCountdownTimer);
   const lock0 = getReflectionLock();
