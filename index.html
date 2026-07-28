@@ -3885,6 +3885,16 @@ function renderPainelIndicadoresPorSetor(g, grupoNum, nome) {
     </div>`;
 }
 
+// BUG-SCROLL-01: inserir o formulário no topo do painel (afterbegin) some da tela quando o
+// Tutor clicou o botão rolado mais abaixo — a "âncora de rolagem" do navegador cancela um
+// scrollIntoView comum logo após essa inserção. Desligar overflow-anchor por um instante
+// evita esse cabo de guerra.
+function scrollFormIntoView(id) {
+  document.documentElement.style.overflowAnchor = 'none';
+  document.getElementById(id)?.scrollIntoView({ behavior: 'auto', block: 'start' });
+  document.documentElement.style.overflowAnchor = '';
+}
+
 // "Adicionar" oferece escolher um setor institucional já existente (que este PG ainda não
 // representa) ou criar um novo, que passa a existir no Cadastro Mestre para qualquer outro
 // PG reaproveitar.
@@ -3929,6 +3939,7 @@ function iniciarAdicionarSetor(grupoNum, nome) {
   const existing = document.getElementById('form-setor');
   if (existing) existing.remove();
   body.insertAdjacentHTML('afterbegin', formHtml);
+  scrollFormIntoView('form-setor');
 }
 
 function toggleNovoSetorCampos(valor) {
@@ -4004,6 +4015,7 @@ function iniciarEditarSetor(grupoNum, nome, setorId) {
   const existing = document.getElementById('form-setor');
   if (existing) existing.remove();
   body.insertAdjacentHTML('afterbegin', formHtml);
+  scrollFormIntoView('form-setor');
 }
 
 function confirmarEditarSetorMestre(grupoNum, nome, setorId) {
@@ -10624,6 +10636,7 @@ function iniciarEditarEmbaixadoresPg(grupoNum, nome, setorId) {
   const existing = document.getElementById('form-embaixadores-pg');
   if (existing) existing.remove();
   body.insertAdjacentHTML('afterbegin', formHtml);
+  scrollFormIntoView('form-embaixadores-pg');
 }
 
 function confirmarParticipantesExternosPg(grupoNum, nome, setorId) {
