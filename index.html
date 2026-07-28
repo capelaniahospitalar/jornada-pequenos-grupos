@@ -4690,9 +4690,16 @@ function renderEmbaixadoresMissoes() {
 
   const embMonth = embMonthKey();
   const embLabel = embMonthLabel(embMonth);
+  const meuGrupo = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
   const euEmb = getMeuEmbaixadoresParticipante();
   const embRegistro = euEmb && euEmb.embaixadores ? euEmb.embaixadores[embMonth] : null;
-  const embRow = !euEmb ? '' : (embRegistro && embRegistro.participou ? `
+  // BUG-VINCULO-01: meuGrupo existe (o aparelho acha que pertence a um PG) mas euEmb não —
+  // o aparelho perdeu o vínculo com o próprio registro de participante ali dentro (nome/
+  // WhatsApp não bateram na migração, troca de aparelho sem convite novo, etc.). Sem este
+  // aviso, o cartão inteiro sumia da tela sem nenhuma explicação. A saída (pedir novo convite
+  // ao Coordenador com o MESMO nome/WhatsApp) já existe e recupera os dados via IDENT-01
+  // (buscarCadastroExistente) — só faltava apontar pra ela.
+  const embRow = euEmb ? (embRegistro && embRegistro.participou ? `
       <div class="mission-item">
         <div class="mission-check done">✓</div>
         <div class="mission-info">
@@ -4709,7 +4716,11 @@ function renderEmbaixadoresMissoes() {
           </div>
         </div>
         <button onclick="confirmarEmbaixadores()" style="margin-top:.5rem;width:100%;background:var(--teal);color:#fff;border:none;border-radius:var(--radius-sm);padding:.5rem;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--ff-body)">✅ Confirmar participação</button>
-      </div>`);
+      </div>`) : (meuGrupo ? `
+      <div style="background:#FDECEA;border:0.5px solid #F3B8B4;border-radius:var(--radius-sm);padding:.6rem .75rem;margin:.2rem 0">
+        <div style="font-weight:700;font-size:14px;color:#E05050;margin-bottom:2px">⚠️ Não conseguimos confirmar seu vínculo com o Pequeno Grupo "${sanitize(meuGrupo.grupoNome || ('Grupo ' + meuGrupo.grupoNum))}" neste aparelho.</div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.4">Peça ao seu Coordenador um novo link de convite. Ao aceitar com o mesmo nome e WhatsApp de antes, seu progresso é recuperado automaticamente — nada se perde.</div>
+      </div>` : '');
 
   const weekKey = getISOWeek();
   const weekNum = parseInt(weekKey.split('-W')[1], 10) || 1;
