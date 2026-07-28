@@ -11215,6 +11215,15 @@ function renderComunidade() {
     return;
   }
 
+  // BUG-RASCUNHO-01: renderComunidade() reconstrói o composer inteiro (innerHTML) — chamado
+  // tanto pela publicação própria quanto pelo poll de sincronização (a cada 30s ou ao voltar
+  // a ficar visível). Sem isso, um pedido/gratidão de OUTRO participante publicado no meio da
+  // digitação apagava o texto que este participante ainda não tinha enviado.
+  const inputAtual = document.getElementById('grat-input');
+  const rascunho = inputAtual ? inputAtual.value : '';
+  const tinhaFoco = !!inputAtual && inputAtual === document.activeElement;
+  const cursorPos = tinhaFoco ? inputAtual.selectionStart : null;
+
   const lista = (g.gratidoes || []).slice().sort((a, b) => b.ts - a.ts);
 
   const cards = lista.length ? lista.map(item => {
@@ -11256,6 +11265,19 @@ function renderComunidade() {
     </div>
     <div class="mural-section-title">📋 Publicações do grupo</div>
     ${cards}`;
+
+  if (rascunho) {
+    const novoInput = document.getElementById('grat-input');
+    if (novoInput) {
+      novoInput.value = rascunho;
+      const enviarBtn = document.getElementById('grat-enviar');
+      if (enviarBtn) enviarBtn.disabled = !rascunho.trim();
+      if (tinhaFoco) {
+        novoInput.focus();
+        if (cursorPos != null) novoInput.setSelectionRange(cursorPos, cursorPos);
+      }
+    }
+  }
 }
 
 function setGratTipo(tipo) {
