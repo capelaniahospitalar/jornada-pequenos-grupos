@@ -3571,7 +3571,7 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
   const souCoordenadorDesteGrupo = !!g.coordenador && g.coordenador.trim().toLowerCase() === nome.trim().toLowerCase();
   const progresso = getOrInitPgProgress(grupoNum);
   const metas     = getPgWeekMetas(grupoNum);
-  const grpW      = (typeof getPgGroupWeek === 'function') ? getPgGroupWeek(grupoNum) : { oracoes:0, bondades:0, estudosMedia:0 };
+  const grpW      = (typeof getPgGroupWeek === 'function') ? getPgGroupWeek(grupoNum) : { oracoes:0, bondades:0, estudosTotal:0 };
   const pgLv      = getPgGrupoLevel(grupoNum);
   const nextLv    = PG_GRUPO_LEVELS[PG_GRUPO_LEVELS.indexOf(PG_GRUPO_LEVELS.find(l => l.nome === pgLv.nome)) + 1];
   const lvBarPct  = nextLv ? Math.round((pgLv.semanasCompletas - pgLv.min) / (nextLv.min - pgLv.min) * 100) : 100;
@@ -9798,8 +9798,7 @@ function getPgGroupWeek(grupoNum) {
       estudosSomados += pr.estudosConcluidos || 0;
     });
   }
-  const estudosMedia = membros ? Math.round(estudosSomados / membros) : 0;
-  return { estudos, oracoes, bondades, gratidao, engajamento, estudosMedia: Math.min(13, estudosMedia), membros };
+  return { estudos, oracoes, bondades, gratidao, engajamento, estudosTotal: estudosSomados, membros };
 }
 
 // ══════════════════════════════════════
@@ -11040,10 +11039,12 @@ function renderPgProgressHome() {
   })();
 
   const goalKeys = Object.keys(metas);
-  const grp = (typeof getPgGroupWeek === 'function') ? getPgGroupWeek(meuGrupo.grupoNum) : { oracoes:0, bondades:0, gratidao:0, engajamento:0, estudosMedia:0 };
+  const grp = (typeof getPgGroupWeek === 'function') ? getPgGroupWeek(meuGrupo.grupoNum) : { oracoes:0, bondades:0, gratidao:0, engajamento:0, estudosTotal:0 };
   const groupVals = { oracoes: grp.oracoes, bondades: grp.bondades, gratidao: grp.gratidao, engajamento: grp.engajamento };
-  // 📖 Estudos concluídos: progresso do grupo na jornada (média dos participantes), 0/13
-  const estudosJornada = grp.estudosMedia || 0;
+  // 📖 Estudos concluídos: soma em tempo real dos estudos concluídos por todos os participantes,
+  // travada em 13 (o ciclo tem 13 estudos) — não é mais média, e não passa de 13 mesmo que a
+  // soma bruta dos participantes ultrapasse isso.
+  const estudosJornada = Math.min(13, grp.estudosTotal || 0);
   const estudosJornadaPct = Math.round(estudosJornada / 13 * 100);
   const estudosBar = `
       <div class="pg-goal-row">
