@@ -11040,7 +11040,12 @@ function renderPgProgressHome() {
 
   const goalKeys = Object.keys(metas);
   const grp = (typeof getPgGroupWeek === 'function') ? getPgGroupWeek(meuGrupo.grupoNum) : { oracoes:0, bondades:0, gratidao:0, engajamento:0, estudosTotal:0 };
-  const groupVals = { oracoes: grp.oracoes, bondades: grp.bondades, gratidao: grp.gratidao, engajamento: grp.engajamento };
+  // 🌿 Gratidões compartilhadas: conta direto no Mural (g.gratidoes) em vez do contador
+  // paralelo (contrib), que pode ficar desatualizado — número real de publicações do
+  // tipo "gratidão" ainda dentro da validade de 7 dias do mural.
+  const gMural = (typeof PEQUENOS_GRUPOS !== 'undefined') ? PEQUENOS_GRUPOS.find(x => x.num === meuGrupo.grupoNum) : null;
+  const gratidoesReais = gMural ? podarGratidoesExpiradas(gMural.gratidoes || []).filter(item => item.tipo === 'gratidao').length : 0;
+  const groupVals = { oracoes: grp.oracoes, bondades: grp.bondades, gratidao: gratidoesReais, engajamento: grp.engajamento };
   // 📖 Estudos concluídos: soma em tempo real dos estudos concluídos por todos os participantes,
   // travada em 13 (o ciclo tem 13 estudos) — não é mais média, e não passa de 13 mesmo que a
   // soma bruta dos participantes ultrapasse isso.
