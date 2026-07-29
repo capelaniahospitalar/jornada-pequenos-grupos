@@ -11386,13 +11386,21 @@ function setGratTipo(tipo) {
 }
 
 function enviarGratidao() {
-  const texto = document.getElementById('grat-input')?.value.trim();
+  const inputEl = document.getElementById('grat-input');
+  const texto = inputEl?.value.trim();
   if (!texto) return;
   const meuGrupo = loadMeuGrupo();
   if (!meuGrupo) return;
   loadGrupos();
   const g = PEQUENOS_GRUPOS.find(x => x.num === meuGrupo.grupoNum);
   if (!g) return;
+  // Limpa o campo ANTES de renderComunidade() — senão a lógica de preservar rascunho
+  // (BUG-RASCUNHO-01, feita pra não apagar texto ainda não enviado quando chega publicação de
+  // outro participante) lê o texto que acabou de ser publicado e o restaura no campo,
+  // dando a impressão de que nada foi limpo e permitindo publicar a mesma gratidão de novo.
+  inputEl.value = '';
+  const enviarBtn = document.getElementById('grat-enviar');
+  if (enviarBtn) enviarBtn.disabled = true;
   g.gratidoes = podarGratidoesExpiradas(g.gratidoes || []);
   g.gratidoes.push({
     id: Date.now(),
