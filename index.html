@@ -11040,8 +11040,8 @@ function renderPgProgressHome() {
   })();
 
   const goalKeys = Object.keys(metas);
-  const grp = (typeof getPgGroupWeek === 'function') ? getPgGroupWeek(meuGrupo.grupoNum) : { oracoes:0, bondades:0, estudosMedia:0 };
-  const groupVals = { oracoes: grp.oracoes, bondades: grp.bondades };
+  const grp = (typeof getPgGroupWeek === 'function') ? getPgGroupWeek(meuGrupo.grupoNum) : { oracoes:0, bondades:0, gratidao:0, engajamento:0, estudosMedia:0 };
+  const groupVals = { oracoes: grp.oracoes, bondades: grp.bondades, gratidao: grp.gratidao, engajamento: grp.engajamento };
   // 📖 Estudos concluídos: progresso do grupo na jornada (média dos participantes), 0/13
   const estudosJornada = grp.estudosMedia || 0;
   const estudosJornadaPct = Math.round(estudosJornada / 13 * 100);
