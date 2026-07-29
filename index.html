@@ -9779,6 +9779,18 @@ function getPgWeekMetas() {
   };
 }
 
+// RC4.8.2-A — Gratidões da Semana ISO corrente, para fins de Meta Semanal. Fonte de verdade
+// continua sendo o Mural (g.gratidoes), mas o filtro temporal agora é a MESMA Semana ISO usada
+// por estudos/oração/bondade/missões (getISOWeekPg comparado ao contrib.weekKey em
+// getPgGroupWeek), não a janela móvel de 7 dias do Mural (podarGratidoesExpiradas). Retenção do
+// Mural e regra de negócio da Meta Semanal são responsabilidades independentes: esta função não
+// chama podarGratidoesExpiradas — quanto tempo um post fica arquivado no Mural (7 dias hoje) é
+// decisão só de armazenamento/exibição, e nunca deve mudar o que conta como "desta semana".
+function getGratidoesDaSemanaISO(g) {
+  const wk = getISOWeekPg();
+  return ((g && g.gratidoes) || []).filter(item => item.tipo === 'gratidao' && getISOWeekPg(item.ts) === wk);
+}
+
 // Totais do grupo (somados a partir da contribuição de cada participante) — todos veem o mesmo
 function getPgGroupWeek(grupoNum) {
   const g = (typeof PEQUENOS_GRUPOS !== 'undefined') ? PEQUENOS_GRUPOS.find(x => x.num === grupoNum) : null;
@@ -9799,6 +9811,29 @@ function getPgGroupWeek(grupoNum) {
     });
   }
   return { estudos, oracoes, bondades, gratidao, engajamento, estudosTotal: estudosSomados, membros };
+}
+
+// RC4.8.3 — Engajamento do Grupo: indicador independente da Meta Semanal. Não mede tarefas
+// (não soma nem pesa quantidades), mede PESSOAS — quantos participantes ativos fizeram ao
+// menos 1 das 5 atividades semanais válidas (as mesmas do Bloco 2 "Meta da Semana": estudo,
+// oração, bondade, gratidão, missão), sobre o total de participantes do PG. Nenhum indicador
+// acumulado (estudos concluídos, nível do PG) entra aqui.
+function getPgEngajamentoSemana(grupoNum) {
+  const g = (typeof PEQUENOS_GRUPOS !== 'undefined') ? PEQUENOS_GRUPOS.find(x => x.num === grupoNum) : null;
+  if (!g || !g.participantes) return { ativos: 0, total: 0, pct: 0 };
+  const wk = (typeof getISOWeekPg === 'function') ? getISOWeekPg() : null;
+  const participantes = participantesAtivos(g);
+  // Gratidão usa a mesma fonte real do Mural, filtrada pela Semana ISO corrente (RC4.8.2-A) —
+  // igual ao que já vale para a barra "Gratidões compartilhadas" do Bloco 2.
+  const gratidoesSemana = getGratidoesDaSemanaISO(g);
+  const total = participantes.length;
+  const ativos = participantes.filter(p => {
+    const c = (p.progresso && p.progresso.contrib && p.progresso.contrib.weekKey === wk) ? p.progresso.contrib : null;
+    const fezAtividadeContrib = !!c && ((c.estudos || 0) > 0 || (c.oracoes || 0) > 0 || (c.bondades || 0) > 0 || (c.engajamento || 0) > 0);
+    const fezGratidao = gratidoesSemana.some(item => (item.autor || '').trim().toLowerCase() === (p.nome || '').trim().toLowerCase());
+    return fezAtividadeContrib || fezGratidao;
+  }).length;
+  return { ativos, total, pct: total ? Math.round(ativos / total * 100) : 0 };
 }
 
 // ══════════════════════════════════════
@@ -10688,8 +10723,11 @@ function confirmarParticipantesExternosPg(grupoNum, nome, setorId) {
   renderTutorGrupoDetalhe(grupoNum, nome);
 }
 
-function getISOWeekPg() {
-  const now = new Date();
+// RC4.8.2-A: aceita um timestamp opcional (ex.: item.ts de uma publicação passada) para poder
+// perguntar "essa data caiu em qual Semana ISO", não só "qual é a Semana ISO de agora" — sem
+// quebrar nenhuma chamada existente, que continua sem argumento (defasa para Date.now()).
+function getISOWeekPg(ts) {
+  const now = new Date(ts != null ? ts : Date.now());
   const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
   d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
@@ -11040,12 +11078,20 @@ function renderPgProgressHome() {
 
   const goalKeys = Object.keys(metas);
   const grp = (typeof getPgGroupWeek === 'function') ? getPgGroupWeek(meuGrupo.grupoNum) : { oracoes:0, bondades:0, gratidao:0, engajamento:0, estudosTotal:0 };
-  // 🌿 Gratidões compartilhadas: conta direto no Mural (g.gratidoes) em vez do contador
-  // paralelo (contrib), que pode ficar desatualizado — número real de publicações do
-  // tipo "gratidão" ainda dentro da validade de 7 dias do mural.
+  // 🌿 Gratidões compartilhadas: conta direto no Mural (g.gratidoes), não o contador paralelo
+  // (contrib), que pode ficar desatualizado. RC4.8.2-A: filtro temporal é a Semana ISO
+  // corrente (getGratidoesDaSemanaISO), a mesma regra dos outros 4 indicadores — não mais a
+  // janela móvel de 7 dias de retenção do Mural.
   const gMural = (typeof PEQUENOS_GRUPOS !== 'undefined') ? PEQUENOS_GRUPOS.find(x => x.num === meuGrupo.grupoNum) : null;
-  const gratidoesReais = gMural ? podarGratidoesExpiradas(gMural.gratidoes || []).filter(item => item.tipo === 'gratidao').length : 0;
-  const groupVals = { oracoes: grp.oracoes, bondades: grp.bondades, gratidao: gratidoesReais, engajamento: grp.engajamento };
+  const gratidoesReais = gMural ? getGratidoesDaSemanaISO(gMural).length : 0;
+  // RC4.8.2 — Bloco 1 "Progresso do Percurso" (permanente/acumulado) e Bloco 2 "Meta da
+  // Semana" (só a semana corrente) ficam definitivamente separados: nenhum indicador
+  // acumulado entra em groupVals/valOf/totalPct, e os 5 indicadores semanais (incluindo
+  // "Estudo da semana", que antes participava do cálculo sem ter barra própria) ficam
+  // todos visíveis no Bloco 2.
+  const groupVals = { estudos: grp.estudos, oracoes: grp.oracoes, bondades: grp.bondades, gratidao: gratidoesReais, engajamento: grp.engajamento };
+
+  // ── Bloco 1 — Progresso do Percurso (acumulado, nunca entra na meta semanal) ──────────
   // 📖 Estudos concluídos: soma em tempo real dos estudos concluídos por todos os participantes,
   // travada em 13 (o ciclo tem 13 estudos) — não é mais média, e não passa de 13 mesmo que a
   // soma bruta dos participantes ultrapasse isso.
@@ -11061,7 +11107,9 @@ function renderPgProgressHome() {
           <div class="pg-goal-bar-inner" style="width:${estudosJornadaPct}%;background:#1E5F8C"></div>
         </div>
       </div>`;
-  const goalsHtml = estudosBar + goalKeys.filter(k => k !== 'estudos').map(key => {
+
+  // ── Bloco 2 — Meta da Semana (só os 5 indicadores semanais, todos visíveis) ───────────
+  const goalsHtml = goalKeys.map(key => {
     const m = metas[key];
     const val = (groupVals[key] != null) ? groupVals[key] : (data[key] || 0);
     const pct = Math.min(100, Math.round(val / m.meta * 100));
@@ -11077,9 +11125,9 @@ function renderPgProgressHome() {
       </div>`;
   }).join('');
 
-  // Verificar se todas as metas foram atingidas — gratidão usa o mesmo número real
-  // (gratidoesReais) exibido na barra, não o contador antigo/paralelo (grp.gratidao),
-  // que podia ficar desatualizado em relação ao Mural.
+  // Verificar se todas as metas foram atingidas — só os 5 indicadores semanais do Bloco 2.
+  // Gratidão usa o mesmo número real (gratidoesReais) exibido na barra, não o contador
+  // antigo/paralelo (grp.gratidao), que podia ficar desatualizado em relação ao Mural.
   const valOf = (k) => (k === 'gratidao' ? gratidoesReais : (grp[k] != null ? grp[k] : (data[k] || 0)));
   const allComplete = goalKeys.every(k => valOf(k) >= metas[k].meta);
   const totalPct = Math.round(
@@ -11089,6 +11137,16 @@ function renderPgProgressHome() {
   const weekBanner = allComplete
     ? `<div class="pg-week-banner complete">🏆 Meta semanal do grupo concluída! Parabéns, ${meuGrupo.grupoNome}!</div>`
     : `<div class="pg-week-banner">📈 ${totalPct}% da meta semanal do grupo concluída — continue participando!</div>`;
+
+  // ── Bloco 3 — Engajamento do Grupo (RC4.8.3): mede pessoas, não tarefas — 100%
+  // independente do cálculo da Meta Semanal acima (não usa metas, pesos, nem goalKeys). ──
+  const engaj = (typeof getPgEngajamentoSemana === 'function') ? getPgEngajamentoSemana(meuGrupo.grupoNum) : { ativos: 0, total: 0, pct: 0 };
+  const engajamentoHtml = `
+    <div class="pg-progress-body" style="border-top:0.5px solid var(--border)">
+      <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);font-weight:700;font-family:var(--ff-body);margin-bottom:.5rem">👥 Engajamento do Grupo</div>
+      <div style="font-size:14.5px;color:var(--text2);font-family:var(--ff-body);font-weight:600">${engaj.ativos} de ${engaj.total} membros ativos (${engaj.pct}%)</div>
+      <div style="font-size:12px;color:var(--text3);font-family:var(--ff-body);margin-top:2px">Ativo = fez pelo menos 1 atividade da Meta da Semana nesta semana.</div>
+    </div>`;
 
   // ── Nível do grupo ────────────────────────────────────────────────────────
   const pgLv = getPgGrupoLevel(meuGrupo.grupoNum);
@@ -11142,10 +11200,16 @@ function renderPgProgressHome() {
     <div class="toggle-content" style="display:none">
       ${grupoInfoHtml}
       <div class="pg-progress-body">
+        <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);font-weight:700;font-family:var(--ff-body);margin-bottom:.5rem">📘 Progresso do Percurso</div>
+        ${estudosBar}
+      </div>
+      ${nivelHtml}
+      <div class="pg-progress-body" style="border-top:0.5px solid var(--border)">
+        <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);font-weight:700;font-family:var(--ff-body);margin-bottom:.5rem">📅 Meta da Semana</div>
         ${goalsHtml}
         ${weekBanner}
       </div>
-      ${nivelHtml}
+      ${engajamentoHtml}
     </div>
     `;
 
