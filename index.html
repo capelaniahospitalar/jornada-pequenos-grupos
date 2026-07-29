@@ -11077,8 +11077,10 @@ function renderPgProgressHome() {
       </div>`;
   }).join('');
 
-  // Verificar se todas as metas foram atingidas
-  const valOf = (k) => (grp[k] != null ? grp[k] : (data[k] || 0));
+  // Verificar se todas as metas foram atingidas — gratidão usa o mesmo número real
+  // (gratidoesReais) exibido na barra, não o contador antigo/paralelo (grp.gratidao),
+  // que podia ficar desatualizado em relação ao Mural.
+  const valOf = (k) => (k === 'gratidao' ? gratidoesReais : (grp[k] != null ? grp[k] : (data[k] || 0)));
   const allComplete = goalKeys.every(k => valOf(k) >= metas[k].meta);
   const totalPct = Math.round(
     goalKeys.reduce((acc, k) => acc + Math.min(1, valOf(k) / metas[k].meta), 0) / goalKeys.length * 100
