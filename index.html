@@ -8905,10 +8905,24 @@ async function fbReadDoc(cfg) {
   const convitesStr = doc.fields?.convites?.stringValue;   // ETAPA 2: campo aditivo (como tutores)
   let convites = null;
   try { if (convitesStr) convites = JSON.parse(convitesStr); } catch { convites = null; }
+  // AUD-001 (auditoria RC5.0): fbWriteGrupos grava setoresMestre/setoresEfetivo/
+  // embaixadoresExternos desde a RC4.8.2A, mas fbReadDoc nunca tinha sido atualizada pra
+  // ler esses três campos de volta — o Cadastro Mestre de Setores e o Efetivo Institucional
+  // nunca chegavam a outro aparelho (nem de volta ao próprio, após limpar dados).
+  const setoresMestreStr = doc.fields?.setoresMestre?.stringValue;
+  const setoresEfetivoStr = doc.fields?.setoresEfetivo?.stringValue;
+  const embaixadoresExternosStr = doc.fields?.embaixadoresExternos?.stringValue;
+  let setoresMestre = null, setoresEfetivo = null, embaixadoresExternos = null;
+  try { if (setoresMestreStr) setoresMestre = JSON.parse(setoresMestreStr); } catch { setoresMestre = null; }
+  try { if (setoresEfetivoStr) setoresEfetivo = JSON.parse(setoresEfetivoStr); } catch { setoresEfetivo = null; }
+  try { if (embaixadoresExternosStr) embaixadoresExternos = JSON.parse(embaixadoresExternosStr); } catch { embaixadoresExternos = null; }
   return {
     dados: s ? JSON.parse(s) : null,
     tutores: tutoresStr ? JSON.parse(tutoresStr) : null,
     convites,
+    setoresMestre,
+    setoresEfetivo,
+    embaixadoresExternos,
     ts: t ? String(t) : null,
     updateTime: doc.updateTime || null,   // COMMIT 1: carimbo nativo do servidor (trava otimista)
   };
