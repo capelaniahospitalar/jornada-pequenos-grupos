@@ -16,11 +16,10 @@
   confirmado como feito. **Só você pode executar** (exige login na conta Google do projeto).
 - [x] **Repositório sincronizado** — verificado agora: `git fetch` + `git status -sb` →
   `main` igual a `origin/main`, sem pendências.
-- [ ] **Branch de evolução criada** — ainda não existe. Toda esta série (`ARQ-001` a
-  `PLANO-IMPLEMENTACAO-FASE-1`) foi produzida direto na `main` — sem risco, porque é só
-  documentação (nenhuma alteração em `index.html`). **A partir da Fase 1, isto muda**: a primeira
-  alteração de código deveria nascer numa branch separada, não direto na `main`. Ver pergunta ao
-  final deste documento.
+- [x] **Branch de evolução criada** — `evolucao-arquitetural-fase1`, criada localmente em
+  2026-07-30 a partir do HEAD da `main` (commit `6884b40`, "Create CHECKLIST-GATE-FASE-1.md").
+  **Só local — não publicada, `main` intocada.** Confirmado: `git status -sb` na nova branch não
+  mostra rastreamento remoto (`## evolucao-arquitetural-fase1`, sem `...origin/...`).
 
 ## Controle
 
@@ -42,12 +41,13 @@
 
 ## Processo
 
-- [ ] **RC identificada** — **não decidido ainda.** O projeto já tem um roadmap `RC5.1-RC5.5`
-  registrado (`AUDITORIA-RC5.0.md §6`), nunca iniciado, que cobria uma parte menor do que esta
-  série ARQ acabou revelando. Esta Fase 1 poderia ser tratada como `RC5.1` (continuando a
-  numeração já aberta) ou como um novo eixo `RC6.x` (reconhecendo que o escopo mudou de
-  "correções pontuais" para "evolução estrutural"). **Decisão sua, não técnica** — ver pergunta
-  ao final.
+- [x] **RC identificada** — **RC6.0 — Fundação Arquitetural.** Decidido em 2026-07-30: a RC5
+  fica formalmente encerrada como ciclo de auditoria/correções/estabilização (RC5.1-RC5.5 do
+  roadmap da RC5.0 continuam registrados, mas não fazem mais parte do eixo desta evolução); a
+  partir daqui, todo trabalho de identidade/persistência/migração/auditoria desta série passa a
+  ser rastreado como RC6.0. Objetivo formal registrado: *"Implementar a fundação necessária para
+  transformar o aplicativo de um modelo monolítico local/documental para uma arquitetura
+  orientada a entidades, mantendo compatibilidade, reversibilidade e zero perda de dados."*
 - [ ] **Changelog preparado** — nenhuma entrada rascunhada ainda no `CHANGELOG.md`; natural
   que isso só aconteça quando a RC (item acima) for identificada.
 - [x] **Auditoria antes/depois planejada** — o próprio mecanismo de painel de diagnóstico
@@ -57,14 +57,32 @@
 
 ## Resultado da verificação
 
-**9 de 13 itens concluídos.** Os 4 pendentes se dividem em dois grupos:
+**11 de 13 itens concluídos.** Restam 2 pendentes, e os dois são **bloqueadores obrigatórios**
+para o primeiro código da RC6.0, por decisão explícita de 2026-07-30 — não itens "recomendados",
+itens que travam o início:
 
-1. **Dependem só de você, fora do meu alcance** (não são ações de código nem de repositório):
-   segundo administrador Firebase, cópia do backup para um local externo seguro (Drive/OneDrive
-   — o arquivo hoje só existe no seu computador local).
-2. **Dependem de uma decisão sua antes de eu prosseguir** (branch e numeração de RC) — ver
-   perguntas a seguir. Não vou criar a branch nem atribuir um número de RC sem essa confirmação,
-   porque ambos afetam convenções já estabelecidas neste projeto.
+1. **Backup externo do `BACKUP-PRE-ARQ-001`** — hoje o arquivo só existe em
+   `C:\Users\wladimir.souza\Documents\Backups-JornadaPG\`, no computador local. Precisa ser
+   copiado para um local externo (Google Drive/OneDrive) antes de qualquer alteração estrutural.
+   Só você pode fazer isso.
+2. **Segundo administrador Firebase** (`ARQ-005.1`) — só você pode executar, exige login na
+   conta Google do projeto.
+
+**Enquanto esses dois itens não forem resolvidos, nenhum código da RC6.0 deve ser escrito** —
+mesmo já existindo a branch `evolucao-arquitetural-fase1` pronta para recebê-lo.
+
+## Decisão de Governança Registrada (2026-07-30)
+
+```
+Autorizado:
+1. Branch local "evolucao-arquitetural-fase1" criada a partir da main — não publicada.
+2. Ciclo renomeado: RC6.0 — Fundação Arquitetural (RC5 encerrada como auditoria/correção/
+   estabilização).
+3. Backup externo + segundo administrador Firebase seguem como pendências obrigatórias
+   antes de qualquer código.
+4. Após a branch, aguardar definição do primeiro escopo da RC6.0.
+```
 
 **Este documento é um checklist de governança — não contém nem autoriza nenhuma alteração de
-código, repositório ou infraestrutura por si só.**
+código além da criação da branch (ação de repositório local, reversível, já executada e
+registrada acima).**
