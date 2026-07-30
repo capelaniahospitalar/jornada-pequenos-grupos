@@ -61,10 +61,10 @@
 para o primeiro código da RC6.0, por decisão explícita de 2026-07-30 — não itens "recomendados",
 itens que travam o início:
 
-1. **Backup externo do `BACKUP-PRE-ARQ-001`** — hoje o arquivo só existe em
-   `C:\Users\wladimir.souza\Documents\Backups-JornadaPG\`, no computador local. Precisa ser
-   copiado para um local externo (Google Drive/OneDrive) antes de qualquer alteração estrutural.
-   Só você pode fazer isso.
+1. **Backup externo do `BACKUP-PRE-ARQ-001`** — pacote local completo (dado + metadados +
+   `README-BACKUP.md` explicando o conteúdo e como verificar a integridade), pronto em
+   `C:\Users\wladimir.souza\Documents\Backups-JornadaPG\`. **Falta só a cópia da pasta inteira**
+   para um local externo (Google Drive/OneDrive) — essa parte só você pode fazer.
 2. **Segundo administrador Firebase** (`ARQ-005.1`) — só você pode executar, exige login na
    conta Google do projeto.
 
