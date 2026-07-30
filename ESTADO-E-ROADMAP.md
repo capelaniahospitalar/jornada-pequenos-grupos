@@ -1,10 +1,55 @@
-# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-07-27)
+# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-07-30)
 
 > Documento para retomar o trabalho em outra máquina/sessão. Cole o conteúdo de volta
 > para o assistente ao recomeçar — a "memória" do assistente **não viaja entre máquinas**;
 > só este arquivo (via GitHub) viaja. **Nenhuma alteração de código sem aprovação do desenho.**
 
-## ⭐ SESSÃO 2026-07-27 — retomar por aqui
+## 🛑 PONTO DE PARADA — 2026-07-30 — retomar por aqui
+
+**Estado:** Pré-RC6.0. **Última atividade:** preparação de governança para a evolução
+arquitetural. **Nenhum código foi alterado** — `index.html` idêntico ao início desta série.
+
+**O que foi concluído nesta sessão (série de diagnóstico e planejamento, não implementação):**
+- Auditoria arquitetural completa: `AUDITORIA-ARQ-001.md` → `ARQ-002` (Modelo Conceitual do
+  Domínio, 18 entidades) → `ARQ-002.1` (decisão: `Pessoa` ganha `personId` próprio, `memberId`
+  não é identidade universal) → `ADR-003` → `ARQ-003` (Identidade e Autenticação: `personId` ×
+  `authUid`, recuperação por WhatsApp) → `ARQ-004` (achado central: todo o app vive num único
+  documento Firestore, `jdpg/grupos`, com teto de 500 KB já ativo em produção) → `ARQ-004.1`
+  (estratégia de migração progressiva, ancorada em dois precedentes reais do próprio código:
+  `migrarSetoresParaMestre()` e o motor IMD v2) → `ADR-004` → `ARQ-005`/`ARQ-005.1`
+  (Recuperação/Backup — projeto não tinha nenhum backup nem governança de acesso; achado extra:
+  conta Firebase é pessoal, sem 2º administrador) → `ARQ-006` (Observabilidade/Auditoria —
+  Event Log de domínio, Princípio de Auditoria, LGPD) → `ARQ-007` (Hardening + roadmap mestre).
+- `MARCO-001-BASELINE-ARQUITETURAL-2026-07-30.md` — baseline formal registrado.
+- `PLANO-IMPLEMENTACAO-FASE-1.md` e `CHECKLIST-GATE-FASE-1.md` — plano de execução e portão de
+  governança antes do primeiro código.
+- **Ciclo renomeado:** RC5 encerrada como auditoria/correção/estabilização (roadmap RC5.1-RC5.5
+  da RC5.0 continua registrado, mas fora do eixo desta evolução). A partir de agora:
+  **RC6.0 — Fundação Arquitetural.**
+- **Branch criada:** `evolucao-arquitetural-fase1` (local, a partir da `main`, não publicada).
+- **Backups feitos:**
+  - `BACKUP-PRE-ARQ-001` — dado real do Firestore (`jdpg/grupos`), em
+    `Documents\Backups-JornadaPG\` (JSON + metadados + SHA-256 + `README-BACKUP.md`).
+  - Cópia do código-fonte (`index.html`) + todos os 16 documentos desta série, em
+    `Desktop\Backup-JornadaPG_2026-07-30\`.
+
+**Gates bloqueadores pendentes antes de qualquer código da RC6.0 (só o usuário pode resolver):**
+1. Copiar a pasta `Backup-JornadaPG` (Documents) para um armazenamento externo (Drive/OneDrive)
+   — hoje só existe local.
+2. Adicionar um segundo administrador à conta Firebase do projeto (hoje é conta pessoal, sem
+   redundância de acesso).
+
+**Próxima ação, assim que os dois gates acima forem fechados:** iniciar **RC6.0.1 — Fundação
+Técnica** — escopo já definido em `PLANO-IMPLEMENTACAO-FASE-1.md` (Fase 1): convenção de
+`schemaVersion`/`migrationVersion`, `FB_FLAGS` novas criadas **desligadas**, instrumentação
+aproveitando `APP_VERSION`/`syncId` já existentes, teste de escrita/leitura controlada num
+caminho novo — **sem migrar nenhum dado real ainda, sem mudar nenhuma tela**. Todos os 17
+documentos desta série (`ARQ-001` a `CHECKLIST-GATE-FASE-1`) ficam no repositório como
+referência obrigatória antes de qualquer linha de código.
+
+---
+
+## ⭐ SESSÃO 2026-07-27
 
 **Concluído**
 - RC4.8.2A — Cadastro Mestre de Setores + Efetivo Institucional dos Setores, homologada.
