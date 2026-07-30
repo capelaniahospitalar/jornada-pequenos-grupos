@@ -214,6 +214,35 @@ não técnica, deliberadamente não fixada aqui.
 
 ---
 
+## 14. Princípio de Auditoria (elevado a princípio permanente do sistema)
+
+> Adicionado a pedido do usuário, na revisão deste documento — não é um achado técnico, é uma
+> regra que passa a valer para toda evolução futura do sistema, no mesmo nível dos "Invariantes
+> Arquiteturais" já registrados no `ARCHITECTURE.md`.
+
+**Nenhuma alteração relevante de domínio deve ocorrer sem gerar um evento correspondente.**
+
+Não basta o estado final existir (`g.tutor = 'João'`); precisa existir o registro de como se
+chegou até ali:
+
+```
+{
+  evento: 'TUTOR_ALTERADO',
+  entidade: 'PG040',
+  antes: 'Maria',
+  depois: 'João',
+  realizadoPor: personId,
+  data: timestamp
+}
+```
+
+Este princípio não se aplica retroativamente (não recria história que já aconteceu sem log) —
+vale para toda escrita de domínio nova, a partir do momento em que o Event Log (seção 2) entrar
+em operação, respeitando o sequenciamento já definido na seção 11 (depois da Fase 3 da migração
+de persistência, nunca antes).
+
+---
+
 ## Deliverables consolidados
 
 - **Arquitetura recomendada:** duas trilhas separadas — log técnico (curta retenção, sem
