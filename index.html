@@ -3302,11 +3302,12 @@ function renderTutorGruposList(nome) {
             <div class="tutor-grupo-nome">${sanitize(g.nome || 'Grupo ' + g.num)}</div>
             <span class="tutor-grupo-papel-tag">${meuPapel}</span>
           </div>
+          <div style="font-size:22px;color:var(--text3);flex-shrink:0">›</div>
         </div>
         <div class="tutor-grupo-info-line">🤝 Coordenador: <strong>${sanitize(g.coordenador || '— não definido —')}</strong></div>
         <div class="tutor-grupo-info-line">📖 Último estudo concluído: <strong>${ultimoEstudoNome}</strong> (${progresso.estudos || 0}/13)</div>
         <div class="tutor-grupo-info-line">🗓️ Reunião: <strong>${reuniao}</strong></div>
-        <div class="tutor-grupo-info-line">👥 ${participantesAtivos(g).length} participante${participantesAtivos(g).length===1?'':'s'} — toque para ver detalhes</div>
+        <div class="tutor-grupo-info-line">👥 ${participantesAtivos(g).length} participante${participantesAtivos(g).length===1?'':'s'} — <strong style="color:var(--teal)">toque para ver detalhes ›</strong></div>
       </div>`;
   }).join('');
 
