@@ -8444,6 +8444,7 @@ async function gerarConvite({ tipo, grupoNum, funcao, paraWa }) {
   if (!gLocal) return { ok: false, motivo: 'grupo_inexistente' };
   const eu = loadMeuGrupo() || {};
   let deNomeFinal = eu.nome || ST.userName || '';
+  let deIdFinal = getMyMemberId();
 
   if (funcao === 'coordenador') {
     const viaParticipante = getMinhaFuncaoNoGrupo(grupoNum) === 'tutor';
@@ -8452,12 +8453,24 @@ async function gerarConvite({ tipo, grupoNum, funcao, paraWa }) {
     if (viaAdmin && !viaParticipante) deNomeFinal = ST.tutorPanelAuth; // nome canônico do Tutor admin
     tipo = tipo || 'tutor->coord';
   }
-  else if (funcao === 'colaborador') { if (getMinhaFuncaoNoGrupo(grupoNum) !== 'coordenador') return { ok: false, motivo: 'sem_autoridade' }; tipo = tipo || 'coord->colab'; }
+  else if (funcao === 'colaborador') {
+    if (getMinhaFuncaoNoGrupo(grupoNum) !== 'coordenador') return { ok: false, motivo: 'sem_autoridade' };
+    tipo = tipo || 'coord->colab';
+    // BUGFIX (achado no PG 15): getMinhaFuncaoNoGrupo aceita autoridade por NOME quando o
+    // memberId deste aparelho não bate com o registro do participante (aparelho novo/dados
+    // limpos, ver IDENT-01) — mas se o convite gravasse o memberId deste aparelho mesmo assim,
+    // ninguém reconhecia esse emissor na hora da aceitação (validarConviteParaAceite exige
+    // bater por memberId, sem o mesmo fallback por nome que existe aqui). Por isso, guarda o
+    // memberId REAL do registro do participante coordenador, não o deste aparelho.
+    const emissorParticipante = (gLocal.participantes || []).find(x => x.memberId === deIdFinal)
+      || (gLocal.participantes || []).find(x => (x.nome || '').trim().toLowerCase() === deNomeFinal.trim().toLowerCase());
+    if (emissorParticipante && emissorParticipante.memberId) deIdFinal = emissorParticipante.memberId;
+  }
   else if (funcao === 'tutor')       { if (!estaNaAllowlistTutores({ nome: eu.nome || ST.userName, wa: eu.wa })) return { ok: false, motivo: 'sem_autoridade' }; tipo = tipo || 'tutor'; }
   else return { ok: false, motivo: 'funcao_invalida' };
 
   const inv = criarConviteObj({ tipo, funcao, grupoNum, grupoNome: gLocal.nome,
-    deId: getMyMemberId(), deNome: deNomeFinal, paraWa });
+    deId: deIdFinal, deNome: deNomeFinal, paraWa });
 
   return await commitConviteChange((remote) => {
     const convitesNovos = podarConvites(mergeConvites(mergeConvites(remote.convites, loadConvites()), [inv]));
