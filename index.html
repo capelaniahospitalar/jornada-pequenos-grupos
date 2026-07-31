@@ -3701,6 +3701,7 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
     ${!g.coordenador && souTutorDesteGrupo ? `<button onclick="gerarConvidarCoordenadorAutoEExibir('${nome.replace(/'/g,"\\'")}', ${grupoNum})" style="margin-top:.5rem;width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body)">🤝 Convidar Coordenador</button>` : ''}
     ${souCoordenadorDesteGrupo ? `<button onclick="sairDaFuncaoCoordenador(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">🚪 Sair da função de Coordenador</button>` : ''}
     ${souTutorDesteGrupo ? `<button onclick="iniciarTrocarTutor(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">🔄 Trocar Tutor</button>` : ''}
+    ${souTutorDesteGrupo && g.coordenador ? `<button onclick="trocarCoordenador(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">🔄 Trocar Coordenador</button>` : ''}
     <button onclick="renderTutorGruposList('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Voltar aos meus grupos</button>
 `;
 
@@ -4135,6 +4136,19 @@ function sairDaFuncaoCoordenador(grupoNum, nome) {
   if (p) p.tipo = 'colaborador';
   saveGrupos();
   renderTutorGrupoDetalhe(grupoNum, nome);
+}
+
+// ── Tutor troca o Coordenador atual por outra pessoa (o atual vira colaborador e o
+// convite do substituto já abre em seguida) ───────────────────────────────────────
+function trocarCoordenador(grupoNum, nome) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g || !g.coordenador) return;
+  if (!confirm(`Trocar o Coordenador deste Pequeno Grupo? ${g.coordenador.split(' ')[0]} deixará de ser Coordenador, e você vai gerar o convite do substituto em seguida.`)) return;
+  const p = (g.participantes || []).find(x => x.nome.trim().toLowerCase() === g.coordenador.trim().toLowerCase());
+  if (p) p.tipo = 'colaborador';
+  g.coordenador = null;
+  saveGrupos();
+  gerarConvidarCoordenadorAutoEExibir(nome, grupoNum);
 }
 
 // ── Trocar Tutor entre os autorizados na allowlist (sem digitação livre — ver BLOCKER-01) ──
