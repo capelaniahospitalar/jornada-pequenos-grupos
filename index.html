@@ -8082,6 +8082,8 @@ function loadGrupos() {
           PEQUENOS_GRUPOS[idx].gratidoes = podarGratidoesExpiradas(g.gratidoes || []);
           PEQUENOS_GRUPOS[idx].reunioesMes = filtrarReunioesMes(g.reunioesMes || {});
           PEQUENOS_GRUPOS[idx].setores = g.setores || [];
+          PEQUENOS_GRUPOS[idx].campanhas = g.campanhas || {};
+          PEQUENOS_GRUPOS[idx].pgNivel = g.pgNivel || null;
         }
       });
     }
@@ -8103,6 +8105,8 @@ function saveGruposLocal() {
       gratidoes: g.gratidoes || [],
       reunioesMes: g.reunioesMes || {},
       setores: g.setores || [],
+      campanhas: g.campanhas || {},
+      pgNivel: g.pgNivel || null,
     }));
     localStorage.setItem(GRUPOS_KEY, JSON.stringify(dadosSalvar));
   } catch(e) { console.warn('saveGrupos localStorage:', e); }
@@ -9028,6 +9032,7 @@ function applyGruposData(salvo) {
     PEQUENOS_GRUPOS[idx].pgIMD = g.pgIMD || null;
     PEQUENOS_GRUPOS[idx].pgRanking = g.pgRanking || null;
     PEQUENOS_GRUPOS[idx].setores = g.setores || [];
+    PEQUENOS_GRUPOS[idx].campanhas = g.campanhas || {};
   });
 }
 
@@ -9081,12 +9086,34 @@ function mergeGruposData(remoteList, localGroups) {
       });
       reunioesMerged[mk] = { encontros: encontrosMerged };
     });
+    // Une campanhas (missões mensais, ex.: Visita entre PGs) por id — entre os dois lados,
+    // mantém o registro mais recente (por ts) de cada campanha, evitando perder uma marcação
+    // feita num aparelho que ainda não chegou ao outro.
+    const campanhasKeys = new Set([...Object.keys(rg.campanhas || {}), ...Object.keys(lg.campanhas || {})]);
+    const campanhasMerged = {};
+    campanhasKeys.forEach(ck => {
+      const rc = (rg.campanhas || {})[ck];
+      const lc = (lg.campanhas || {})[ck];
+      campanhasMerged[ck] = !rc ? lc : !lc ? rc : ((lc.ts || 0) >= (rc.ts || 0) ? lc : rc);
+    });
+    // Une pgNivel (semanas com metas cumpridas) pela união das semanas marcadas dos dois
+    // lados — mesma lógica de reunioesMes/gratidoes, evita perder uma semana completada
+    // num aparelho que ainda não sincronizou pro outro.
+    const semanasUnidas = new Set([
+      ...((rg.pgNivel && rg.pgNivel.semanasMarcadas) || []),
+      ...((lg.pgNivel && lg.pgNivel.semanasMarcadas) || []),
+    ]);
+    const pgNivelMerged = semanasUnidas.size
+      ? { semanasMarcadas: [...semanasUnidas], semanasCompletas: semanasUnidas.size }
+      : (lg.pgNivel || rg.pgNivel || null);
     return { ...rg, participantes: merged, gratidoes: gratMerged, reunioesMes: filtrarReunioesMes(reunioesMerged),
       nome: lg.nome ?? rg.nome, tutor: lg.tutor ?? rg.tutor,
       coordenador: lg.coordenador ?? rg.coordenador,
       diaReuniao: lg.diaReuniao ?? rg.diaReuniao,
       horaReuniao: lg.horaReuniao ?? rg.horaReuniao,
       setores: lg.setores ?? rg.setores,
+      campanhas: campanhasMerged,
+      pgNivel: pgNivelMerged,
     };
   });
 }
@@ -9167,6 +9194,8 @@ async function trySaveGrupos(cfg, baseUpdateTime) {
     pgIMD: g.pgIMD || null,
     pgRanking: g.pgRanking || null,
     setores: g.setores || [],
+    campanhas: g.campanhas || {},
+    pgNivel: g.pgNivel || null,
   }));
   return fbWriteGrupos(cfg, payload, TUTORS.length ? TUTORS : undefined, baseUpdateTime, undefined, SETORES_MESTRE.length ? SETORES_MESTRE : undefined, SETORES_EFETIVO.length ? SETORES_EFETIVO : undefined, EMBAIXADORES_EXTERNOS.length ? EMBAIXADORES_EXTERNOS : undefined);
 }
