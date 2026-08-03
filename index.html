@@ -3433,6 +3433,26 @@ function externosDoGrupoNoMes(g, monthKey) {
   }, 0);
 }
 
+// Percentual de reuniões do PG realizadas no mês, contra a meta de 1 por semana (pedido do
+// usuário, 2026-08-03) — meta = quantas vezes o dia de reunião do grupo (g.diaReuniao) cai
+// naquele mês (mesma lógica de "ocorrências esperadas" já usada em calcularFidelidadeScore,
+// aqui parametrizada por monthKey pra valer em qualquer mês do Relatório Mensal, não só o
+// atual — já funciona pra julho/2026 em diante, sem precisar de nenhum dado novo). null quando
+// o PG não tem dia de reunião definido (não há meta pra comparar).
+function calcularRegularidadeReunioesMes(g, monthKey) {
+  const diasSemana = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+  const idxDiaReuniao = diasSemana.indexOf(g.diaReuniao);
+  if (idxDiaReuniao < 0) return null;
+  const [ano, mes] = monthKey.split('-').map(Number);
+  const ultimoDia = new Date(ano, mes, 0).getDate();
+  let esperadas = 0;
+  for (let d = 1; d <= ultimoDia; d++) {
+    if (new Date(ano, mes - 1, d).getDay() === idxDiaReuniao) esperadas++;
+  }
+  const realizadas = ((g.reunioesMes || {})[monthKey]?.encontros || []).length;
+  return { realizadas, esperadas, pct: pgImdPercent(realizadas, esperadas) };
+}
+
 function gerarRelatorioMensal(nome, grupoNumParam, monthKeyParam) {
   loadGrupos();
   const grupoNum = grupoNumParam != null ? grupoNumParam : parseInt(document.getElementById('rel-grupo').value, 10);
@@ -3448,6 +3468,7 @@ function gerarRelatorioMensal(nome, grupoNumParam, monthKeyParam) {
   const pctPresenca = somaTotal ? Math.round(somaPresentes / somaTotal * 100) : null;
   const totalParticipantesAtual = (g.participantes || []).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i).length;
   const { min: dataMin, max: dataMax } = limitesEncontroMes(monthKey);
+  const regularidade = calcularRegularidadeReunioesMes(g, monthKey);
 
   const listaEncontrosHtml = encontros.length ? encontros.map(e => `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem 0;border-bottom:0.5px solid var(--border)">
@@ -3458,6 +3479,8 @@ function gerarRelatorioMensal(nome, grupoNumParam, monthKeyParam) {
   const freqSection = `
       ${renderMeterHtml('Presença no mês', pctPresenca)}
       <div style="font-size:12px;color:var(--text3);margin:-.2rem 0 .5rem;font-family:var(--ff-body)">${encontros.length} encontro(s) registrado(s)</div>
+      ${regularidade ? renderMeterHtml('Reuniões realizadas no mês', regularidade.pct) : ''}
+      ${regularidade ? `<div style="font-size:12px;color:var(--text3);margin:-.2rem 0 .5rem;font-family:var(--ff-body)">${regularidade.realizadas} de ${regularidade.esperadas} esperada(s) — mínimo 1 por semana (${sanitize(g.diaReuniao)})</div>` : ''}
       ${listaEncontrosHtml}
       <div style="margin-top:.6rem;padding-top:.6rem;border-top:0.5px solid var(--border)">
         <label style="display:block;font-size:12px;color:var(--text3);margin-bottom:2px">Data do encontro</label>
@@ -3514,12 +3537,14 @@ function montarTextoRelatorioMensal(grupoNum, monthKey) {
   const pct = total ? Math.round(participaram / total * 100) : 0;
   const externos = externosDoGrupoNoMes(g, monthKey);
   const totalPresentes = participaram + externos;
+  const regularidade = calcularRegularidadeReunioesMes(g, monthKey);
 
   return `📊 *Relatório Mensal — ${monthLabel}*\n`
     + `*${g.nome || 'Grupo ' + grupoNum}*\n`
     + `Tutor: ${g.tutor || '—'} · Coordenador: ${g.coordenador || '—'}\n\n`
     + `*Frequência do Pequeno Grupo*\n`
-    + `Presença no mês: ${pctPresenca != null ? pctPresenca + '%' : 'Não informado'} (${encontros.length} encontro(s) registrado(s))\n\n`
+    + `Presença no mês: ${pctPresenca != null ? pctPresenca + '%' : 'Não informado'} (${encontros.length} encontro(s) registrado(s))\n`
+    + (regularidade ? `Reuniões realizadas: ${regularidade.realizadas} de ${regularidade.esperadas} esperada(s) — ${regularidade.pct}%\n\n` : `\n`)
     + `*Embaixadores da Esperança*\n`
     + `Participantes: ${total}\n`
     + `Participaram: ${participaram}\n`
