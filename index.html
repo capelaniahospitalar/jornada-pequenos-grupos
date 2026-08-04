@@ -3282,7 +3282,7 @@ function renderTutorGruposList(nome) {
 
   // ATIVACAO-01: só quem é Tutor de pelo menos um desses grupos pode criar outro —
   // Coordenador (mesmo autenticado neste mesmo painel) nunca cria Pequeno Grupo.
-  const souTutorDeAlgum = grupos.some(g => g.tutor && g.tutor.trim().toLowerCase() === nome.trim().toLowerCase());
+  const souTutorDeAlgum = grupos.some(g => nomesCorrespondem(g.tutor && g.tutor.trim().toLowerCase(), nome.trim().toLowerCase()));
 
   const cards = grupos.map(g => {
     const progresso = getOrInitPgProgress(g.num);
@@ -3291,7 +3291,7 @@ function renderTutorGruposList(nome) {
       ? STUDIES[ultimoEstudoIdx].title || STUDIES[ultimoEstudoIdx].titulo || `Estudo ${ultimoEstudoIdx + 1}`
       : (progresso.estudos > 0 ? `Estudo ${progresso.estudos}` : 'Nenhum ainda');
     const reuniao = g.diaReuniao ? `${g.diaReuniao}${g.horaReuniao ? ' às ' + g.horaReuniao : ''}` : 'Não definido';
-    const meuPapel = (g.tutor && g.tutor.trim().toLowerCase() === nome.trim().toLowerCase()) ? 'Tutor' : 'Coordenador';
+    const meuPapel = nomesCorrespondem(g.tutor && g.tutor.trim().toLowerCase(), nome.trim().toLowerCase()) ? 'Tutor' : 'Coordenador';
 
     const pennantCard = generatePennantSvg(g.num, g.nome || 'Grupo ' + g.num, {width:48, height:66});
     return `
@@ -3590,11 +3590,15 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
   // Item 4A: só o Tutor deste grupo específico pode (re)convidar o Coordenador — um Coordenador
   // autenticado no mesmo painel nunca vê essa ação (gerarConvite já barra no backend, isto é só
   // pra não oferecer um botão que sempre falharia).
-  const souTutorDesteGrupo = !!g.tutor && g.tutor.trim().toLowerCase() === nome.trim().toLowerCase();
+  // RC-REST-02: usa a mesma checagem "flexível" (nomesCorrespondem) da lista de grupos
+  // (getGruposDoResponsavel) — comparação estrita escondia estes botões pra quem loga com
+  // nome curto/apelido (ex.: "Uálace" em vez de "Uálace Costa"), mesmo já aparecendo certo
+  // na lista. Achado em 2026-08-04: coordenador via o PG na lista mas o botão de convidar sumia.
+  const souTutorDesteGrupo = nomesCorrespondem(g.tutor && g.tutor.trim().toLowerCase(), nome.trim().toLowerCase());
   // Só o Coordenador deste grupo específico convida Participantes (mesma autoridade já checada
   // no backend por gerarConvite) — botão vive aqui, dentro do Painel, a pedido do usuário
   // (2026-07-14; antes ficava na Home, via openShare()).
-  const souCoordenadorDesteGrupo = !!g.coordenador && g.coordenador.trim().toLowerCase() === nome.trim().toLowerCase();
+  const souCoordenadorDesteGrupo = nomesCorrespondem(g.coordenador && g.coordenador.trim().toLowerCase(), nome.trim().toLowerCase());
   const progresso = getOrInitPgProgress(grupoNum);
   const metas     = getPgWeekMetas(grupoNum);
   const grpW      = (typeof getPgGroupWeek === 'function') ? getPgGroupWeek(grupoNum) : { oracoes:0, bondades:0, estudosTotal:0 };
