@@ -2952,6 +2952,11 @@ function tutorHasPass(nome) {
   return p !== undefined && p !== null && p !== '';
 }
 
+// Remove acentos pra comparação de nome — "Ualace" e "Uálace" são a mesma pessoa (achado em
+// 2026-08-04: coordenador digitando sem acento no Painel não era reconhecido).
+function removerAcentos(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
 // RC-REST-02: só aceita como "mesma pessoa" se um nome for o outro por completo, ou um dos
 // dois for um PREFIXO de palavra inteira do outro (ex.: "Renan" casa com "Renan Fernando
 // Castro Silva", mas "Ana" não casa com "Mariana") — cobre o caso real de alguém logar com
@@ -2959,6 +2964,8 @@ function tutorHasPass(nome) {
 // coincidência de substring no meio da palavra.
 function nomesCorrespondem(a, b) {
   if (!a || !b) return false;
+  a = removerAcentos(a);
+  b = removerAcentos(b);
   if (a === b) return true;
   return a.startsWith(b + ' ') || b.startsWith(a + ' ');
 }
