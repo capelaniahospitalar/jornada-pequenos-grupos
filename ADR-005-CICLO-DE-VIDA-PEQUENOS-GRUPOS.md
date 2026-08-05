@@ -1,7 +1,7 @@
 # ADR-005 — Ciclo de Vida dos Pequenos Grupos
 
-**Data:** 2026-08-05 · **Status:** Proposto (decisão conceitual — ainda não implementado, não
-homologado)
+**Data:** 2026-08-05 · **Status:** Aceito (decisão conceitual aprovada em 2026-08-05 — ainda não
+implementado, não homologado; implementação inicial planejada em RC6.0.1A)
 
 > **Nota de numeração:** foi sugerido nomear este documento "ADR-008". A série de ADR avulsos
 > deste repositório, porém, vai até `ADR-004` — `ADR-001` e `ADR-002` já estão embutidos no
@@ -108,6 +108,17 @@ matriz de transições abaixo, e os ajustes de tela/relatório correspondentes.
 | `INATIVO` | `ATIVO` | Tutor ou Coordenador do próprio PG | Ação explícita "Reativar" |
 | `ATIVO` ou `INATIVO` | `ARQUIVADO` | Só papel institucional (Administrador/allowlist de Tutores) — não o Tutor comum do PG | Ação explícita, com confirmação — não reversível pela própria pessoa |
 | `ARQUIVADO` | `LIVRE` | **Nunca automático, e restrito — ver reserva abaixo** | — |
+
+### Princípio: Imutabilidade da identidade canônica
+
+> Acrescentado na revisão de 2026-08-05, a pedido explícito do usuário, para transformar a
+> reserva técnica abaixo em regra normativa do domínio, não só numa recomendação de projeto.
+
+O campo `num` identifica permanentemente um Pequeno Grupo a partir do momento em que esse PG
+atinge o estado `ATIVO` pela primeira vez. A partir desse instante, o número torna-se histórico:
+não pode ser reatribuído a outro grupo, mesmo depois de `ARQUIVADO`. Esta regra tem prioridade
+sobre qualquer conveniência de aproveitamento de slot — nenhuma implementação futura deste modelo
+pode violá-la sem abrir um novo ADR que reavalie explicitamente esta decisão.
 
 ### Reserva sobre "ARQUIVADO → reutilizado"
 
