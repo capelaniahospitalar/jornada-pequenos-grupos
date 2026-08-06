@@ -79,6 +79,27 @@ edição que dispare a prévia com código que grava dado no carregamento) ficam
 própria — deliberadamente não implementadas agora, para não misturar infraestrutura de processo
 com o fechamento da RC6.0.1A.
 
+**Atualização (2026-08-06) — o campo `status` não persistiu:** leitura direta do Firestore (só
+GET, sem escrita) confirmou que o campo `status` não existe mais em nenhum dos 50 grupos —
+`updateTime` avançou de `2026-08-05T20:00:58Z` (gravação da migração) para
+`2026-08-06T11:59:24Z`. Os demais dados permanecem íntegros (PG1 "PG - Capelania" com tutor/
+coordenador/6 participantes, PG38 "Foco no Alto", PG45 "Fortaleza" — todos conferidos). **Não é um
+incidente novo:** o commit `d2ce789` (código da RC6.0.1A) só existe localmente, nunca foi
+publicado — o app publicado em produção ainda roda o código anterior, que não conhece o campo
+`status`. A primeira gravação normal feita por qualquer usuário real através do app publicado
+reescreveu o array `dados` sem esse campo, porque a rotina de persistência da versão anterior não
+o serializa. Nenhum dado de negócio foi perdido — só o atributo novo, ainda não suportado pela
+versão em produção.
+
+**Implicação para a homologação:** a migração e a publicação da RC6.0.1A formam um único conjunto
+lógico — enquanto só um dos lados estiver ativo (banco parcialmente migrado, app ainda na versão
+anterior), o sistema não preserva o atributo novo. **Publicar o código passa a ser pré-condição
+objetiva** para considerar a RC6.0.1A homologada, não apenas o commit local. Homologação estrutural
+(código, auditoria de leitura, revisão estática) segue concluída; a homologação da RC6.0.1A como um
+todo fica pendente até: (1) push do commit `d2ce789`, (2) confirmação de que o GitHub Pages serviu
+a nova versão, (3) nova leitura confirmando que `status` foi recriado pela migração e permanece
+presente após uso normal do app.
+
 ---
 
 ## ⭐ SESSÃO 2026-07-30
