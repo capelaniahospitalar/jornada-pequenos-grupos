@@ -3221,6 +3221,40 @@ async function gerarConvidarCoordenadorAutoEExibir(nomeTutor, grupoNum) {
   else renderPgCriadoSemConvite(nomeTutor, grupoNum, res.motivo, res.detalhe);
 }
 
+// RC6.0.1A/ADR-005: devolve o slot a LIVRE — só permitido em EM_FORMACAO (nunca para um PG que
+// já foi ATIVO, ver ADR-005 "Imutabilidade da identidade canônica"). Revoga também o convite de
+// Coordenador pendente deste PG, se existir, senão ele continuaria válido apontando para um
+// slot que já voltou a LIVRE.
+async function cancelarCriacaoPg(grupoNum, nomeTutor) {
+  loadGrupos();
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return { ok: false, motivo: 'grupo_inexistente' };
+  if (g.status !== 'EM_FORMACAO') return { ok: false, motivo: 'nao_cancelavel' };
+  if (!nomesCorrespondem(g.tutor && g.tutor.trim().toLowerCase(), (nomeTutor || '').trim().toLowerCase())) {
+    return { ok: false, motivo: 'sem_autoridade' };
+  }
+
+  const pendente = loadConvites().find(c =>
+    c.grupoNum === grupoNum && c.funcao === 'coordenador' && c.status === 'pendente');
+  if (pendente) await revogarConvite(pendente.inviteId).catch(() => {});
+
+  g.nome = null;
+  g.tutor = null;
+  g.coordenador = null;
+  g.diaReuniao = null;
+  g.horaReuniao = null;
+  g.status = 'LIVRE';
+  await saveGrupos();
+  return { ok: true };
+}
+
+async function cancelarCriacaoPgEConfirmar(grupoNum, nomeTutor) {
+  if (!confirm('Cancelar a criação deste Pequeno Grupo? O nome, dia e horário serão apagados, e o número ficará livre para um novo cadastro.')) return;
+  const r = await cancelarCriacaoPg(grupoNum, nomeTutor);
+  if (!r.ok) { alert('Não foi possível cancelar agora. Tente novamente.'); return; }
+  renderTutorGruposList(nomeTutor);
+}
+
 function renderPgCriadoComConvite(nomeTutor, grupoNum, res) {
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
   const texto = textoConviteWhatsApp(res.invite) + '\n\n' + res.link;
@@ -3301,6 +3335,13 @@ function renderTutorGruposList(nome) {
     const meuPapel = nomesCorrespondem(g.tutor && g.tutor.trim().toLowerCase(), nome.trim().toLowerCase()) ? 'Tutor' : 'Coordenador';
 
     const pennantCard = generatePennantSvg(g.num, g.nome || 'Grupo ' + g.num, {width:48, height:66});
+    // RC6.0.1A/ADR-005: botão fica FORA da div clicável do card (evita precisar de
+    // event.stopPropagation, sem precedente neste arquivo) — some assim que o Coordenador
+    // aceitar o convite (g.status deixa de ser 'EM_FORMACAO').
+    const cancelarBtn = g.status === 'EM_FORMACAO' ? `
+      <button onclick="cancelarCriacaoPgEConfirmar(${g.num}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:none;border:0.5px solid #E05050;color:#E05050;border-radius:var(--radius-sm);padding:.55rem;font-size:13.5px;cursor:pointer;font-family:var(--ff-body);margin:-0.35rem 0 .6rem">
+        ✕ Cancelar criação — aguardando Coordenador
+      </button>` : '';
     return `
       <div class="tutor-grupo-card" onclick="renderTutorGrupoDetalhe(${g.num}, '${nome.replace(/'/g,"\\'")}')">
         <div class="tutor-grupo-card-hdr" style="display:flex;align-items:center;gap:10px">
@@ -3315,7 +3356,7 @@ function renderTutorGruposList(nome) {
         <div class="tutor-grupo-info-line">📖 Último estudo concluído: <strong>${ultimoEstudoNome}</strong> (${progresso.estudos || 0}/13)</div>
         <div class="tutor-grupo-info-line">🗓️ Reunião: <strong>${reuniao}</strong></div>
         <div class="tutor-grupo-info-line">👥 ${participantesAtivos(g).length} participante${participantesAtivos(g).length===1?'':'s'} — <strong style="color:var(--teal)">toque para ver detalhes ›</strong></div>
-      </div>`;
+      </div>${cancelarBtn}`;
   }).join('');
 
   document.getElementById('tutorpanel-body').innerHTML = `
@@ -5382,6 +5423,9 @@ function calcularEmbaixadoresPorSetor(monthKey) {
       // deduplicação — mas quem decide se CADA participante conta é sempre
       // participanteContaParaSetor(), o mesmo invariante usado em calcularCoberturaSetorial.
       if (!(g.setores || []).includes(sm.setorId)) return;
+      // RC6.0.1A/ADR-005: com a flag ligada, só soma PG com status 'ATIVO' — evita contar
+      // slot residual (nome preenchido, zero participante) na cobertura institucional.
+      if (FB_FLAGS.pgStatusFiltros && g.status !== 'ATIVO') return;
       const semDup = participantesAtivos(g).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
       participantesPg += semDup.filter(p => participanteContaParaSetor(g, p, sm.setorId) && p.embaixadores?.[monthKey]?.participou).length;
     });
@@ -8060,6 +8104,7 @@ const PEQUENOS_GRUPOS = Array.from({length:50}, (_, i) => ({
   reunioesMes: {},    // frequência do PG por mês: {'2026-07': {encontros: [{id, data, presentes, total, marcadoPor, ts}]}}
   maxParticipantes: null, // null = ilimitado
   setores: [],        // RC4.8.2: cadastro dos setores institucionais cobertos por este PG — {id, nome, totalColaboradores}
+  status: null,        // RC6.0.1A/ADR-005: 'LIVRE'|'EM_FORMACAO'|'ATIVO'|'INATIVO'|'ARQUIVADO' — populado por migrarStatusPg(), null até a primeira migração rodar
 }));
 
 // A frequência do PG só passou a valer de fato a partir de julho/2026 — meses
@@ -8120,11 +8165,13 @@ function loadGrupos() {
           PEQUENOS_GRUPOS[idx].setores = g.setores || [];
           PEQUENOS_GRUPOS[idx].campanhas = g.campanhas || {};
           PEQUENOS_GRUPOS[idx].pgNivel = g.pgNivel || null;
+          PEQUENOS_GRUPOS[idx].status = g.status || null;
         }
       });
     }
   } catch(e) { console.warn('loadGrupos:', e); }
   migrarSetoresParaMestre();
+  migrarStatusPg();
 }
 
 // Persiste os grupos apenas em localStorage (sem tocar na nuvem).
@@ -8143,6 +8190,7 @@ function saveGruposLocal() {
       setores: g.setores || [],
       campanhas: g.campanhas || {},
       pgNivel: g.pgNivel || null,
+      status: g.status || null,
     }));
     localStorage.setItem(GRUPOS_KEY, JSON.stringify(dadosSalvar));
   } catch(e) { console.warn('saveGrupos localStorage:', e); }
@@ -8870,6 +8918,7 @@ const FB_FLAGS = Object.freeze({
   identidadeUuid  : true,   // (Etapa 1) memberId UUID + Meus Vínculos / Grupo Aberto (false = volta ao meuGrupo antigo)
   convitesV2      : true,   // (Etapa 2) convites de uso único (false = só ?pg= antigo)
   imdV2           : true,   // (RC3.5.5) IMD v2/Capilaridade é o índice oficial em produção — false = rollback de contingência ao algoritmo antigo (getPgIMD/classificarPgs, preservados intocados só para esse cenário durante a Fase 1; remoção definitiva prevista no encerramento da RC3.6)
+  pgStatusFiltros : false,  // (RC6.0.1A/ADR-005) Ranking/Painel/criação passam a filtrar por g.status em vez da combinação nome+tutor+coordenador — false = comportamento atual (RC6.0.1A só prepara a migração/infra; RC6.0.1B liga esta flag após homologação)
 });
 
 // Versão lógica + data de build (registrada na telemetria/log p/ auditoria futura)
@@ -9082,6 +9131,7 @@ function applyGruposData(salvo) {
     PEQUENOS_GRUPOS[idx].pgRanking = g.pgRanking || null;
     PEQUENOS_GRUPOS[idx].setores = g.setores || [];
     PEQUENOS_GRUPOS[idx].campanhas = g.campanhas || {};
+    PEQUENOS_GRUPOS[idx].status = g.status || null;
   });
 }
 
@@ -9163,6 +9213,11 @@ function mergeGruposData(remoteList, localGroups) {
       setores: lg.setores ?? rg.setores,
       campanhas: campanhasMerged,
       pgNivel: pgNivelMerged,
+      // RC6.0.1A/ADR-005: merge simples (local prevalece se definido) — mesmo padrão já usado
+      // acima para nome/tutor/coordenador/diaReuniao/horaReuniao. Não é resolução por
+      // updatedAt como participantes/gratidoes; suficiente para o escopo desta RC (infra +
+      // migração automática), revisitar se o modelo de transições (RC6.0.1B+) exigir mais.
+      status: lg.status ?? rg.status,
     };
   });
 }
@@ -9196,6 +9251,7 @@ async function syncFromFirebase() {
         saveEmbaixadoresExternosLocal();
       }
       migrarSetoresParaMestre();
+      migrarStatusPg();
       try { localStorage.setItem(GRUPOS_KEY, JSON.stringify(result.dados)); } catch(e) { console.warn('sync localStorage:', e); }
       fbLastSyncTime = Date.now();
       renderGrupoSyncBadge();
@@ -9245,6 +9301,7 @@ async function trySaveGrupos(cfg, baseUpdateTime) {
     setores: g.setores || [],
     campanhas: g.campanhas || {},
     pgNivel: g.pgNivel || null,
+    status: g.status || null,
   }));
   return fbWriteGrupos(cfg, payload, TUTORS.length ? TUTORS : undefined, baseUpdateTime, undefined, SETORES_MESTRE.length ? SETORES_MESTRE : undefined, SETORES_EFETIVO.length ? SETORES_EFETIVO : undefined, EMBAIXADORES_EXTERNOS.length ? EMBAIXADORES_EXTERNOS : undefined);
 }
@@ -9417,6 +9474,7 @@ async function salvarFbConfig() {
       if (Array.isArray(result.setoresEfetivo) && result.setoresEfetivo.length > 0) { SETORES_EFETIVO = result.setoresEfetivo; saveSetoresEfetivoLocal(); }
       if (Array.isArray(result.embaixadoresExternos) && result.embaixadoresExternos.length > 0) { EMBAIXADORES_EXTERNOS = result.embaixadoresExternos; saveEmbaixadoresExternosLocal(); }
       migrarSetoresParaMestre();
+      migrarStatusPg();
       fbLastKnownTs = result.ts;
       try { localStorage.setItem(GRUPOS_KEY, JSON.stringify(result.dados)); } catch(_) {}
     } else {
@@ -9424,6 +9482,7 @@ async function salvarFbConfig() {
         num: g.num, nome: g.nome, tutor: g.tutor,
         coordenador: g.coordenador, diaReuniao: g.diaReuniao,
         horaReuniao: g.horaReuniao, participantes: g.participantes,
+        status: g.status || null,
       }));
       await fbWriteGrupos(cfg, dadosSalvar, TUTORS.length ? TUTORS : undefined);
     }
@@ -9450,10 +9509,57 @@ function getGrupoStatus(g) {
   return 'formacao';
 }
 
+// ── RC6.0.1A / ADR-005 — Ciclo de Vida dos Pequenos Grupos ──────────────
+// Migração automática e auto-curativa (mesmo padrão de migrarSetoresParaMestre): só popula
+// g.status em quem ainda não tem. Critério de classificação inicial idêntico ao já usado em
+// getGrupoStatus()/classificarPgs() para "PG formado" — nome preenchido OU participante ativo:
+//   LIVRE        → nome, tutor e coordenador todos vazios (nunca reivindicado)
+//   ATIVO        → tem participante ativo (podarParticipantesRemovidos já aplicado)
+//   EM_FORMACAO  → tem nome (e/ou tutor/coordenador), mas zero participante ativo
+// Nunca atribui INATIVO/ARQUIVADO aqui — essas transições exigem ação humana explícita
+// (RC6.0.1B em diante), fora do escopo desta migração.
+const PG_STATUS_VALIDOS = ['LIVRE', 'EM_FORMACAO', 'ATIVO', 'INATIVO', 'ARQUIVADO'];
+function migrarStatusPg() {
+  let migrouAlgum = false;
+  PEQUENOS_GRUPOS.forEach(g => {
+    if (g.status) return;
+    if (!g.nome && !g.tutor && !g.coordenador) g.status = 'LIVRE';
+    else if (participantesAtivos(g).length > 0) g.status = 'ATIVO';
+    else g.status = 'EM_FORMACAO';
+    migrouAlgum = true;
+  });
+  if (!migrouAlgum) return;
+
+  // Auditoria da migração (ADR-005, pedido explícito): contagem por status + verificação de
+  // integridade antes de persistir. Mesmo padrão de log já usado em migrateToVinculos
+  // ("[Migração UUID]"). Se a soma não bater com os 50 slots, ou algum status ficou fora dos
+  // valores válidos, a gravação é cancelada — evita persistir uma migração quebrada.
+  const contagem = { LIVRE: 0, EM_FORMACAO: 0, ATIVO: 0, INATIVO: 0, ARQUIVADO: 0 };
+  let invalidos = 0;
+  PEQUENOS_GRUPOS.forEach(g => {
+    if (PG_STATUS_VALIDOS.includes(g.status)) contagem[g.status]++;
+    else invalidos++;
+  });
+  const total = PEQUENOS_GRUPOS.length;
+  const somaTotal = contagem.LIVRE + contagem.EM_FORMACAO + contagem.ATIVO + contagem.INATIVO + contagem.ARQUIVADO;
+  console.info('[Migração status PG] LIVRE:', contagem.LIVRE, '· EM_FORMACAO:', contagem.EM_FORMACAO,
+    '· ATIVO:', contagem.ATIVO, '· INATIVO:', contagem.INATIVO, '· ARQUIVADO:', contagem.ARQUIVADO,
+    '· total:', total, '· inválidos:', invalidos);
+  if (somaTotal !== total || invalidos > 0) {
+    console.error('[Migração status PG] Verificação falhou — gravação cancelada. soma:', somaTotal, 'esperado:', total, 'inválidos:', invalidos);
+    return;
+  }
+  saveGrupos();
+}
+
 // Próximo grupo disponível para criação = o primeiro 'vazio' da lista,
 // mas também ficam acessíveis todos os grupos em 'formacao' ou 'completo'
 // (já existem e podem receber mais participantes / completar papéis pendentes).
+// RC6.0.1A/ADR-005: com a flag ligada, "disponível" passa a ser status === 'LIVRE' — mesmo
+// resultado prático hoje (LIVRE é atribuído com o mesmo critério de 'vazio'), mas já usa a
+// fonte de verdade nova. Com a flag desligada, comportamento idêntico ao de antes desta RC.
 function getProximoGrupoVazio() {
+  if (FB_FLAGS.pgStatusFiltros) return PEQUENOS_GRUPOS.find(g => g.status === 'LIVRE');
   return PEQUENOS_GRUPOS.find(g => getGrupoStatus(g) === 'vazio');
 }
 
@@ -10364,8 +10470,12 @@ function compararPgsParaRankingV2(a, b) {
 // "PG formado" já usado em classificarPgs() (nome OU participantes, exceto PG de teste) e
 // mesmo padrão de empate esportivo (1,2,2,4 — nunca sorteio).
 function classificarPgsV2() {
-  const gruposFormados = PEQUENOS_GRUPOS.filter(g =>
-    (g.nome || participantesAtivos(g).length) && !isPgDeTeste(g.nome));
+  // RC6.0.1A/ADR-005: com a flag ligada, só PG com status 'ATIVO' entra no ranking — resolve
+  // os slots residuais (nome preenchido, zero participante) que hoje "formam par" visual no
+  // Ranking. Com a flag desligada, critério idêntico ao de antes desta RC.
+  const gruposFormados = FB_FLAGS.pgStatusFiltros
+    ? PEQUENOS_GRUPOS.filter(g => g.status === 'ATIVO')
+    : PEQUENOS_GRUPOS.filter(g => (g.nome || participantesAtivos(g).length) && !isPgDeTeste(g.nome));
   const calculatedAt = new Date().toISOString();
   const entradas = gruposFormados.map(g => {
     const v2 = getPgIMDv2(g.num);
@@ -10559,8 +10669,10 @@ function compararPgsParaRanking(a, b) {
 // PG sem nome ainda definido é identificado como "${PG_DEFAULT_NAME} N" (mesma convenção já
 // usada em outras telas, ex.: sanitize(g.nome || 'Grupo ' + g.num)) — não é excluído do ranking.
 function classificarPgs() {
-  const gruposFormados = PEQUENOS_GRUPOS.filter(g =>
-    (g.nome || participantesAtivos(g).length) && !isPgDeTeste(g.nome));
+  // RC6.0.1A/ADR-005: mesmo critério de classificarPgsV2() — ver comentário lá.
+  const gruposFormados = FB_FLAGS.pgStatusFiltros
+    ? PEQUENOS_GRUPOS.filter(g => g.status === 'ATIVO')
+    : PEQUENOS_GRUPOS.filter(g => (g.nome || participantesAtivos(g).length) && !isPgDeTeste(g.nome));
   const calculatedAt = new Date().toISOString();
   const entradas = gruposFormados.map(g => {
     const imd = getPgIMD(g.num);

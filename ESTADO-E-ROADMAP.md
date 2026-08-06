@@ -4,7 +4,84 @@
 > para o assistente ao recomeçar — a "memória" do assistente **não viaja entre máquinas**;
 > só este arquivo (via GitHub) viaja. **Nenhuma alteração de código sem aprovação do desenho.**
 
-## 🛑 PONTO DE PARADA — 2026-07-30 — retomar por aqui
+## 🛑 PONTO DE PARADA — 2026-08-05 — retomar por aqui
+
+**Estado:** RC6.0.1A implementada em código (local, ainda não commitada). ADR-005 aprovado. Campo
+`status` já existe em produção nos 50 PGs; feature flag `pgStatusFiltros` desligada (nenhuma tela
+mudou de comportamento). Incidente de processo ocorrido durante a prévia automática — ver INC-001
+logo abaixo.
+
+**O que aconteceu desde o ponto de parada anterior (2026-07-30):**
+- `ADR-005-CICLO-DE-VIDA-PEQUENOS-GRUPOS.md` — aprovado 2026-08-05 (5 estados:
+  LIVRE/EM_FORMACAO/ATIVO/INATIVO/ARQUIVADO; `num` nunca reciclado depois de `ATIVO`).
+- RC6.0.1A implementada em `index.html` (local, não commitada): campo `status`,
+  `migrarStatusPg()`, `cancelarCriacaoPg`/`cancelarCriacaoPgEConfirmar`, gate atrás de
+  `FB_FLAGS.pgStatusFiltros` (desligada).
+- **INC-001** (seção própria abaixo): a prévia automática do harness executou `migrarStatusPg()`
+  contra o Firestore de produção durante a implementação, gravando o campo `status` nos 50 PGs sem
+  aprovação prévia. Auditoria confirma a distribuição: 33 `ATIVO`, 12 `EM_FORMACAO`, 5 `LIVRE`.
+  Decisão oficial: não reverter, manter os dados, homologar a RC6.0.1A usando o estado atual do
+  banco, registrar o incidente e adiar as ações estruturais preventivas para uma RC própria.
+
+**Situação atual da base (baseline):** a partir desta decisão, o banco de produção — já com o
+campo `status` populado — passa a ser a referência oficial para a continuidade da RC6.0.1A. Não
+haverá tentativa de sincronizar o código ao estado do banco anterior à migração; esse estado
+anterior deixa de ser o referencial oficial.
+
+**Pendências herdadas da auditoria de 2026-08-04/05 (ainda não aplicadas):**
+1. PG 38 (duplicata de "Foco no Alto" com PG 2) — zerar. **Confirmado pelo usuário em 2026-08-04.**
+2. PG 32 (duplicata de "Manutenção da Fé" com PG 5) — zerar. **Achado, ainda não confirmado.**
+3. PG 7 × PG 13 ("Plantão B Hotelaria", ambos vazios) — decidir qual mantém o slot. **Pendente.**
+
+**Próxima ação:** revisar o diff do `index.html` (RC6.0.1A) → decidir commit/publicação → só
+depois considerar RC6.0.1B (ligar a flag, homologar, remover lógica antiga por trás dela). As
+ações preventivas do INC-001 (ambiente de homologação, bloqueio de migração automática) ficam
+para uma RC própria, planejada e homologada separadamente — não durante o fechamento da RC6.0.1A.
+
+---
+
+## 🚨 Incidente INC-001 — Escrita em produção durante RC6.0.1A (2026-08-05) — ACEITO, sem reversão
+
+**Contexto:** durante a implementação da RC6.0.1A, cada edição do `index.html` dispara
+automaticamente uma prévia no navegador do harness. Como este projeto não tem ambiente de dev/
+staging separado (a `apiKey`/`projectId` do Firebase de produção estão embutidos como constantes
+no próprio arquivo), essa prévia roda o app de verdade contra o Firebase real.
+
+**Causa raiz:** ausência de ambiente de homologação separado do Firebase de produção — a mesma
+lacuna estrutural já identificada no incidente de "Contaminação de produção" de 2026-07-01 (mais
+abaixo neste documento), cujo "próximo passo estrutural" (criar ambiente de homologação) nunca foi
+implementado. Agravante específico deste caso: `migrarStatusPg()`, escrita para popular o novo
+campo `status`, rodava incondicionalmente no boot — não dependia da feature flag nem de
+confirmação do usuário.
+
+**Impacto:** a prévia automática executou `migrarStatusPg()` contra a produção, gravando o campo
+`status` nos 50 documentos de PG sem aprovação prévia do usuário. Nenhum outro campo foi alterado
+e nenhuma tela mudou de comportamento (a flag que consome o campo está desligada).
+
+**Auditoria realizada:** leitura direta do Firestore confirmou que só o campo `status` foi
+adicionado. Distribuição resultante: 33 `ATIVO`, 12 `EM_FORMACAO`, 5 `LIVRE` —bate exatamente com
+o relatório de higienização feito na mesma sessão (11 slots residuais + o PG 45 novo).
+`updateTime: 2026-08-05T20:00:58Z`.
+
+**Decisão tomada (2026-08-05):** manter o campo `status` como está em produção, sem reverter.
+Reverter para gravar de novo depois só aumentaria o número de escritas em produção sem ganho de
+integridade — os dados foram auditados e conferem. A escrita ocorreu antes da homologação por
+falha de processo, não por erro de dado; a RC6.0.1A segue para homologação usando o estado atual
+do banco como baseline (ver nota de baseline no ponto de parada acima).
+
+**Lições aprendidas:** este é o segundo incidente de escrita não autorizada em produção causado
+pela mesma lacuna estrutural (ver incidente de 2026-07-01, "Regra permanente" logo abaixo) — a
+ausência de um ambiente de homologação separado continua sem solução um mês depois de identificada
+pela primeira vez. Agravante novo desta vez: uma função de migração rodando incondicionalmente no
+boot, sem gate de flag nem de confirmação explícita. Ações preventivas específicas (ambiente
+DEV/HOMOLOG/PROD; nenhuma migração automática incondicional no boot; confirmação antes de qualquer
+edição que dispare a prévia com código que grava dado no carregamento) ficam propostas para uma RC
+própria — deliberadamente não implementadas agora, para não misturar infraestrutura de processo
+com o fechamento da RC6.0.1A.
+
+---
+
+## ⭐ SESSÃO 2026-07-30
 
 **Estado:** Pré-RC6.0. **Última atividade:** preparação de governança para a evolução
 arquitetural. **Nenhum código foi alterado** — `index.html` idêntico ao início desta série.
