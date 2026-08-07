@@ -9061,6 +9061,21 @@ function fbWarnTooLarge() {
   } catch(e) { console.warn('fbWarnTooLarge:', e); }
 }
 
+// Antes desse aviso, uma gravação que esgotasse as 3 tentativas por conflito de concorrência
+// (outro aparelho gravando ao mesmo tempo neste mesmo documento) falhava em silêncio — a pessoa
+// via a mudança na tela (já salva localmente) sem saber que ela nunca chegou à nuvem, até a
+// próxima sincronização trazer o dado antigo de volta por cima. Mesmo padrão de rate-limit do
+// fbWarnTooLarge acima, pra não empilhar alertas se o conflito se repetir em sequência.
+let _fbConflitoWarnedAt = 0;
+function fbWarnConflitoPersistente() {
+  const now = Date.now();
+  if (now - _fbConflitoWarnedAt < 60000) return;
+  _fbConflitoWarnedAt = now;
+  try {
+    alert('⚠️ Não foi possível salvar sua última alteração na nuvem — outro aparelho estava gravando ao mesmo tempo neste PG. Sua alteração ficou só neste aparelho por enquanto. Tente novamente em alguns instantes.');
+  } catch(e) { console.warn('fbWarnConflitoPersistente:', e); }
+}
+
 async function fbWriteGrupos(cfg, data, tutoresData, baseUpdateTime, convitesData, setoresMestreData, setoresEfetivoData, embaixadoresExternosData) {
   const dadosStr = JSON.stringify(data);
   // Guarda de tamanho: a regra do Firestore rejeita "dados" >= 500 KB. Aborta antes de
@@ -9348,6 +9363,7 @@ async function saveGruposToFirebase() {
   logSyncConflict({ syncId, operacao: 'saveGruposToFirebase',
                     motivo: 'FAILED_PRECONDITION apos 3 tentativas',
                     tentativa: 3, updateTimeRecebido: ultimoUpdateTime });
+  fbWarnConflitoPersistente();
 }
 
 function startFbPoll() {
