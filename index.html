@@ -5798,6 +5798,27 @@ function getLevel() {
   return LEVELS[0];
 }
 
+// Compara o progresso da pessoa com a mediana de quem já começou no mesmo PG — pedido do
+// usuário (2026-08-14): quem falta uma reunião do PG fica "uma lição ou mais atrás" e não
+// percebe. Por PG (não por calendário) porque nem todo PG se reúne toda semana e a maioria
+// não registra reunião no app (ver reunioesMes não é proxy de atividade).
+function getAtrasoDoPG() {
+  const meuGrupo = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
+  if (!meuGrupo) return null;
+  const g = (typeof PEQUENOS_GRUPOS !== 'undefined') ? PEQUENOS_GRUPOS.find(x => x.num === meuGrupo.grupoNum) : null;
+  if (!g) return null;
+  const progressos = participantesAtivos(g)
+    .map(p => (p.progresso && p.progresso.estudosConcluidos) || 0)
+    .filter(n => n > 0)
+    .sort((a, b) => a - b);
+  if (progressos.length < 2) return null; // precisa de pelo menos 2 pessoas engajadas pra comparar
+  const meio = Math.floor(progressos.length / 2);
+  const mediana = progressos.length % 2 === 0 ? (progressos[meio - 1] + progressos[meio]) / 2 : progressos[meio];
+  const meuProgresso = ST.done.length;
+  if (mediana - meuProgresso >= 1) return { mediana, meuProgresso };
+  return null;
+}
+
 // ══════════════════════════════════════
 //  HOME
 // ══════════════════════════════════════
@@ -5900,6 +5921,11 @@ function renderHome() {
         </div>
       </div>`;
     } else {
+      const atraso = getAtrasoDoPG();
+      const avisoAtrasoHtml = atraso ? `
+          <div style="background:#FDECEA;border:0.5px solid #F3B8B4;border-radius:var(--radius-sm);padding:.6rem .75rem;margin-top:.6rem;font-size:13.5px;color:#C0392B;font-weight:600;line-height:1.4">
+            ⚠️ Você precisa ler este tema para ficar atualizado com o seu Pequeno Grupo.
+          </div>` : '';
       area.innerHTML = `<div class="next-card">
         <div class="next-card-top">
           <span>Próximo passo na jornada</span>
@@ -5913,6 +5939,7 @@ function renderHome() {
             <svg viewBox="0 0 16 16"><polygon points="4,2 14,8 4,14"/></svg>
             Iniciar estudo
           </button>
+          ${avisoAtrasoHtml}
         </div>
       </div>`;
     }
