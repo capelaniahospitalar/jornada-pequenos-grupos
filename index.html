@@ -8224,6 +8224,7 @@ function loadGrupos() {
           PEQUENOS_GRUPOS[idx].campanhas = g.campanhas || {};
           PEQUENOS_GRUPOS[idx].pgNivel = g.pgNivel || null;
           PEQUENOS_GRUPOS[idx].status = g.status || null;
+          PEQUENOS_GRUPOS[idx].institucional = g.institucional || false;
         }
       });
     }
@@ -8249,6 +8250,7 @@ function saveGruposLocal() {
       campanhas: g.campanhas || {},
       pgNivel: g.pgNivel || null,
       status: g.status || null,
+      institucional: g.institucional || false,
     }));
     localStorage.setItem(GRUPOS_KEY, JSON.stringify(dadosSalvar));
   } catch(e) { console.warn('saveGrupos localStorage:', e); }
@@ -9224,6 +9226,7 @@ function applyGruposData(salvo) {
     PEQUENOS_GRUPOS[idx].setores = g.setores || [];
     PEQUENOS_GRUPOS[idx].campanhas = g.campanhas || {};
     PEQUENOS_GRUPOS[idx].status = g.status || null;
+    PEQUENOS_GRUPOS[idx].institucional = g.institucional || false;
   });
 }
 
@@ -9310,6 +9313,7 @@ function mergeGruposData(remoteList, localGroups) {
       // updatedAt como participantes/gratidoes; suficiente para o escopo desta RC (infra +
       // migração automática), revisitar se o modelo de transições (RC6.0.1B+) exigir mais.
       status: lg.status ?? rg.status,
+      institucional: lg.institucional ?? rg.institucional,
     };
   });
 }
@@ -9394,6 +9398,7 @@ async function trySaveGrupos(cfg, baseUpdateTime) {
     campanhas: g.campanhas || {},
     pgNivel: g.pgNivel || null,
     status: g.status || null,
+    institucional: g.institucional || false,
   }));
   return fbWriteGrupos(cfg, payload, TUTORS.length ? TUTORS : undefined, baseUpdateTime, undefined, SETORES_MESTRE.length ? SETORES_MESTRE : undefined, SETORES_EFETIVO.length ? SETORES_EFETIVO : undefined, EMBAIXADORES_EXTERNOS.length ? EMBAIXADORES_EXTERNOS : undefined);
 }
@@ -10566,9 +10571,13 @@ function classificarPgsV2() {
   // RC6.0.1A/ADR-005: com a flag ligada, só PG com status 'ATIVO' entra no ranking — resolve
   // os slots residuais (nome preenchido, zero participante) que hoje "formam par" visual no
   // Ranking. Com a flag desligada, critério idêntico ao de antes desta RC.
-  const gruposFormados = FB_FLAGS.pgStatusFiltros
+  // g.institucional=true (ex.: PG47 "Diretoria", 2026-08-14): grupo real, mas de gestão
+  // interna do hospital, não conta como PG pastoral comum — fica fora do Ranking IMD
+  // independente da flag acima (não é o mesmo caso do slot residual que a flag resolve).
+  const gruposFormados = (FB_FLAGS.pgStatusFiltros
     ? PEQUENOS_GRUPOS.filter(g => g.status === 'ATIVO')
-    : PEQUENOS_GRUPOS.filter(g => (g.nome || participantesAtivos(g).length) && !isPgDeTeste(g.nome));
+    : PEQUENOS_GRUPOS.filter(g => (g.nome || participantesAtivos(g).length) && !isPgDeTeste(g.nome))
+  ).filter(g => !g.institucional);
   const calculatedAt = new Date().toISOString();
   const entradas = gruposFormados.map(g => {
     const v2 = getPgIMDv2(g.num);
@@ -10762,10 +10771,12 @@ function compararPgsParaRanking(a, b) {
 // PG sem nome ainda definido é identificado como "${PG_DEFAULT_NAME} N" (mesma convenção já
 // usada em outras telas, ex.: sanitize(g.nome || 'Grupo ' + g.num)) — não é excluído do ranking.
 function classificarPgs() {
-  // RC6.0.1A/ADR-005: mesmo critério de classificarPgsV2() — ver comentário lá.
-  const gruposFormados = FB_FLAGS.pgStatusFiltros
+  // RC6.0.1A/ADR-005: mesmo critério de classificarPgsV2() — ver comentário lá, inclusive a
+  // exclusão de g.institucional=true.
+  const gruposFormados = (FB_FLAGS.pgStatusFiltros
     ? PEQUENOS_GRUPOS.filter(g => g.status === 'ATIVO')
-    : PEQUENOS_GRUPOS.filter(g => (g.nome || participantesAtivos(g).length) && !isPgDeTeste(g.nome));
+    : PEQUENOS_GRUPOS.filter(g => (g.nome || participantesAtivos(g).length) && !isPgDeTeste(g.nome))
+  ).filter(g => !g.institucional);
   const calculatedAt = new Date().toISOString();
   const entradas = gruposFormados.map(g => {
     const imd = getPgIMD(g.num);
