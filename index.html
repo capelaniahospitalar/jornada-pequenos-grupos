@@ -8503,9 +8503,16 @@ function validarConviteParaAceite(inv, g, dadosPessoa) {
       String(g.tutor).trim().toLowerCase() === String(inv.deNome).trim().toLowerCase();
     if (papelParticipante !== 'tutor' && !emissorViaAdmin) return { ok: false, motivo: 'emissor_sem_papel' };
   } else {
+    // Mesmo raciocínio do ramo 'coordenador' acima: emissor autorizado por 2 vias — participante
+    // com papel 'coordenador' OU Coordenador administrativo do grupo (g.coordenador) batendo com
+    // o nome gravado no convite (inv.deNome) — cobre o caso (achado em PG1/PG2/PG10, 2026-08-14)
+    // de o Coordenador emitir o convite pela via administrativa (souCoordenadorAdminDoGrupo em
+    // gerarConvite) sem ter um registro de participante próprio com papel='coordenador'.
     const emissor = (g.participantes || []).find(p => p.memberId === inv.deId);
     const papelEmissor = emissor ? (emissor.papel || emissor.tipo) : null;
-    if (papelEmissor !== 'coordenador') return { ok: false, motivo: 'emissor_sem_papel' };
+    const emissorViaAdmin = g.coordenador && inv.deNome &&
+      String(g.coordenador).trim().toLowerCase() === String(inv.deNome).trim().toLowerCase();
+    if (papelEmissor !== 'coordenador' && !emissorViaAdmin) return { ok: false, motivo: 'emissor_sem_papel' };
   }
   return { ok: true };
 }
@@ -8553,6 +8560,15 @@ function souTutorAdminDoGrupo(gLocal) {
   return !!ST.tutorPanelAuth && !!gLocal.tutor &&
     String(ST.tutorPanelAuth).trim().toLowerCase() === String(gLocal.tutor).trim().toLowerCase();
 }
+// Mesmo raciocínio de souTutorAdminDoGrupo, para o Coordenador: cobre o caso (achado em
+// PG1/PG2/PG10, 2026-08-14) de alguém ser o Coordenador de verdade (g.coordenador) e estar
+// autenticado no Painel, mas o próprio registro de participante dele nunca ter sido marcado
+// papel/tipo='coordenador' — sem isso, getMinhaFuncaoNoGrupo() nunca reconhece essa pessoa e
+// ela fica impedida de convidar participantes mesmo sendo a Coordenadora legítima.
+function souCoordenadorAdminDoGrupo(gLocal) {
+  return !!ST.tutorPanelAuth && !!gLocal.coordenador &&
+    String(ST.tutorPanelAuth).trim().toLowerCase() === String(gLocal.coordenador).trim().toLowerCase();
+}
 
 async function gerarConvite({ tipo, grupoNum, funcao, paraWa }) {
   const gLocal = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
@@ -8569,7 +8585,10 @@ async function gerarConvite({ tipo, grupoNum, funcao, paraWa }) {
     tipo = tipo || 'tutor->coord';
   }
   else if (funcao === 'colaborador') {
-    if (getMinhaFuncaoNoGrupo(grupoNum) !== 'coordenador') return { ok: false, motivo: 'sem_autoridade' };
+    const viaParticipanteColab = getMinhaFuncaoNoGrupo(grupoNum) === 'coordenador';
+    const viaAdminColab = souCoordenadorAdminDoGrupo(gLocal);
+    if (!viaParticipanteColab && !viaAdminColab) return { ok: false, motivo: 'sem_autoridade' };
+    if (viaAdminColab && !viaParticipanteColab) deNomeFinal = ST.tutorPanelAuth; // nome canônico do Coordenador admin
     tipo = tipo || 'coord->colab';
     // BUGFIX (achado no PG 15): getMinhaFuncaoNoGrupo aceita autoridade por NOME quando o
     // memberId deste aparelho não bate com o registro do participante (aparelho novo/dados
