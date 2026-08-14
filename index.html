@@ -3647,6 +3647,9 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
   // no backend por gerarConvite) — botão vive aqui, dentro do Painel, a pedido do usuário
   // (2026-07-14; antes ficava na Home, via openShare()).
   const souCoordenadorDesteGrupo = nomesCorrespondem(g.coordenador && g.coordenador.trim().toLowerCase(), nome.trim().toLowerCase());
+  // Tutor e Coordenador do grupo podem remover um participante (ex.: pessoa que saiu do
+  // hospital e não pode mais fazer isso sozinha) — pedido do usuário, 2026-08-14.
+  const podeGerenciarParticipantes = souTutorDesteGrupo || souCoordenadorDesteGrupo;
   const progresso = getOrInitPgProgress(grupoNum);
   const metas     = getPgWeekMetas(grupoNum);
   const grpW      = (typeof getPgGroupWeek === 'function') ? getPgGroupWeek(grupoNum) : { oracoes:0, bondades:0, estudosTotal:0 };
