@@ -3704,12 +3704,17 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
             </select>
           </div>` : '';
 
+        const removerHtml = podeGerenciarParticipantes
+          ? `<div style="text-align:right;margin-top:.3rem"><button onclick="removerParticipanteDoPainel(${grupoNum}, '${p.ts}', '${nome.replace(/'/g,"\\'")}')" style="background:none;border:none;padding:0;font-size:12.5px;color:#E05050;cursor:pointer;font-family:var(--ff-body);text-decoration:underline">🗑️ Remover do grupo</button></div>`
+          : '';
+
         if (!prog) return `
           <div class="tutor-participante-row">
             <div class="tutor-participante-nome">${sanitize(p.nome)}</div>
             <div class="tutor-participante-meta">${tipoLabel} · inscrito em ${sanitize(p.dataInscricao || '—')}</div>
             <div style="font-size:13px;color:var(--text3);padding:.2rem 0">Ainda não iniciou estudos pelo app. Pode começar a qualquer momento fazendo os estudos e as missões para ganhar XP.</div>
             ${seletorSetorHtml}
+            ${removerHtml}
           </div>`;
 
         return `
@@ -3721,6 +3726,7 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
             <div class="tutor-participante-meta">${tipoLabel} · 🔥 ${prog.streak||0} dias · atualizado em ${prog.atualizado||'—'}</div>
             <div style="font-size:12px;color:var(--text3);margin-top:.2rem;font-family:var(--ff-body)">✅ ${prog.missoesConcluidas||0} missões concluídas</div>
             ${seletorSetorHtml}
+            ${removerHtml}
           </div>`;
       }).join('')
     : '<div style="font-size:15px;color:var(--text3);padding:.5rem 0">Nenhum participante inscrito ainda.</div>';
@@ -4200,6 +4206,28 @@ function atribuirSetorParticipante(grupoNum, nome, participanteTs, setorId) {
   }
   p.setorId = setorId || null;
   p.updatedAt = Date.now();
+  saveGrupos();
+  renderTutorGrupoDetalhe(grupoNum, nome);
+}
+
+// ── Tutor/Coordenador remove OUTRO participante do grupo (ex.: pessoa que saiu do hospital
+// e não está mais disponível pra cancelar a própria inscrição) — antes só existia
+// removerDoGrupoAtual(), que a própria pessoa aciona sobre si mesma. Mesmo tombstone
+// (p.removed=true) pra manter consistente com a sincronização entre aparelhos.
+function removerParticipanteDoPainel(grupoNum, participanteTs, nome) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g) return;
+  const p = (g.participantes || []).find(x => String(x.ts) === String(participanteTs));
+  if (!p) return;
+  if (!confirm(`Remover ${p.nome} deste Pequeno Grupo? Essa ação não pode ser desfeita.`)) return;
+  if (FB_FLAGS.useTombstone) {
+    p.removed = true;
+    p.updatedAt = Date.now();
+  } else {
+    g.participantes = g.participantes.filter(x => x !== p);
+  }
+  if (g.tutor && g.tutor.trim().toLowerCase() === p.nome.trim().toLowerCase()) g.tutor = null;
+  if (g.coordenador && g.coordenador.trim().toLowerCase() === p.nome.trim().toLowerCase()) g.coordenador = null;
   saveGrupos();
   renderTutorGrupoDetalhe(grupoNum, nome);
 }
