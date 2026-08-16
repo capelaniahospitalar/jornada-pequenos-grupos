@@ -151,6 +151,16 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 .pdot.done{background:var(--teal)}
 .pdot.active{background:var(--blue-mid);width:22px;border-radius:3px}
 
+/* Embaixadores da Esperança — Agosto: revelação gradual dos cartões da experiência.
+   Só apresentação (fade + subida). Respeita quem pede menos animação no sistema. */
+@keyframes embAgoIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.emb-ago-in{animation:embAgoIn .5s ease both}
+.emb-ago-rotulo{display:inline-block;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.45rem .8rem;font-size:16px;color:var(--text2);font-family:var(--ff-body);box-shadow:0 1px 3px rgba(0,0,0,0.07);max-width:85%}
+/* Botão travado até a pessoa escolher (tela do Espelho). Classe própria para não mudar
+   o comportamento de nenhum .start-btn já existente no app. */
+.emb-ago-btn:disabled{background:var(--border);color:var(--text3);cursor:default}
+@media (prefers-reduced-motion:reduce){.emb-ago-in{animation:none}}
+
 .study-body{padding:.75rem 1rem 1.5rem;display:flex;flex-direction:column;gap:.75rem;flex:1}
 
 .phase-tag{font-size:14px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:.4rem;font-family:var(--ff-body)}
@@ -1764,6 +1774,21 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
     <div id="desafios-arquitetura-vida"></div>
     <div id="desafios-obstaculos"></div>
   </div>
+</div>
+
+<!-- EMBAIXADORES DA ESPERANÇA — AGOSTO: experiência digital (tela de abertura) -->
+<!-- Tela de CONTEÚDO apenas. Não registra participação: o registro oficial continua
+     sendo o botão "Confirmar participação" (confirmarEmbaixadores) no cartão dos
+     Embaixadores, dentro de Desafios do Discipulado. -->
+<div id="screen-embaixadores-ago" class="screen">
+  <div class="study-hdr">
+    <button class="back-btn" onclick="voltarEmbaixadoresAgosto()" aria-label="Voltar">&#8592;</button>
+    <div class="sh-info">
+      <div class="sh-step" style="color:rgba(255,255,255,0.55)">Experiência digital · Agosto</div>
+      <div class="sh-title">Embaixadores da Esperança</div>
+    </div>
+  </div>
+  <div id="embaixadores-ago-body"></div>
 </div>
 
 
@@ -4873,9 +4898,565 @@ function renderEmbaixadoresMissoes() {
       <div class="mission-title">🌟 Missões dos Embaixadores de Esperança</div>
       <div style="font-size:12px;color:var(--text3);margin-bottom:.4rem;font-family:var(--ff-body);font-style:italic">"Todo mundo é alguém. E se todo mundo é alguém, todo mundo importa."</div>
       ${embRow}
+      ${embAgostoEntradaHtml()}
       ${weeklyCard(i1)}
       ${weeklyCard(i2)}
     </div>`;
+}
+
+// ── Embaixadores da Esperança — Agosto: ENTRADA da experiência digital ─────────
+// Só um caminho de acesso, dentro da área que já é dos Embaixadores. Deliberadamente
+// diferente do botão de participação (fundo navy, sem "confirmar", com seta de "abre
+// uma tela") para NUNCA ser confundido com ele: o registro oficial continua sendo
+// confirmarEmbaixadores(), e só ele. Fica fora do ternário do embRow porque a
+// experiência é conteúdo — vale para quem já confirmou, para quem ainda não confirmou
+// e para quem perdeu o vínculo com o PG.
+function embAgostoEntradaHtml() {
+  return `
+      <button onclick="abrirEmbaixadoresAgosto()" style="width:100%;display:flex;align-items:center;gap:10px;text-align:left;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);padding:.7rem .85rem;margin:.4rem 0;cursor:pointer;font-family:var(--ff-body)">
+        <span style="font-size:22px;flex-shrink:0">🌟</span>
+        <span style="flex:1;min-width:0">
+          <span style="display:block;font-size:15px;font-weight:700;line-height:1.25">Experiência digital de Agosto</span>
+          <span style="display:block;font-size:12.5px;color:rgba(255,255,255,0.6);margin-top:1px">"A esperança começa em mim."</span>
+        </span>
+        <span style="font-size:18px;color:rgba(255,255,255,0.5);flex-shrink:0">›</span>
+      </button>`;
+}
+
+// Posição dentro da experiência: 0 = abertura, 1..3 = telas da problematização.
+// EM MEMÓRIA APENAS (nunca em localStorage nem no Firebase) — a experiência é curta e
+// recomeça do início a cada abertura; nada aqui é progresso do participante.
+// EMB_AGO_SUB é a revelação em partes DENTRO da tela 2 (rótulos → consequência 1 → 2).
+let EMB_AGO_ETAPA = 0;
+let EMB_AGO_SUB = 0;
+
+// Os rótulos da tela 2, na ordem em que aparecem. Ficam aqui (e não no meio do HTML)
+// para o texto poder ser revisado sem mexer em marcação.
+const EMB_AGO_ROTULOS = [
+  'Ele é de direita.',
+  'Ela é de esquerda.',
+  'Ele é rico.',
+  'Ela é pobre.',
+  'Ele é branco.',
+  'Ele é negro.',
+  'Ele é machista.',
+  'Ele é daquele grupo.',
+  'Ela pensa diferente de mim.',
+];
+
+// NÃO grava nada — nem em localStorage, nem no Firebase. Nenhuma função de escrita
+// (saveGrupos/save/bumpPgProgress) é chamada por nenhuma tela desta experiência.
+function abrirEmbaixadoresAgosto() {
+  EMB_AGO_ETAPA = 0;
+  EMB_AGO_SUB = 0;
+  showScreen('embaixadores-ago');
+  renderEmbaixadoresAgosto();
+}
+
+// Seta do cabeçalho: dentro da experiência volta um passo; na abertura, sai.
+function voltarEmbaixadoresAgosto() {
+  if (EMB_AGO_ETAPA === 2 && EMB_AGO_SUB > 0) { EMB_AGO_SUB--; renderEmbaixadoresAgosto(); return; }
+  // Na tela das virtudes, voltar significa desfazer a dimensão escolhida e ver a lista
+  // das seis de novo — só depois disso é que se sai da tela.
+  if (EMB_AGO_ETAPA === 5 && getVirtudeEmbAgosto()) { trocarVirtudeEmbAgosto(); return; }
+  if (EMB_AGO_ETAPA > 0) {
+    EMB_AGO_ETAPA--;
+    // Voltando da tela 3 para a 2, ela reaparece inteira (não obriga a revelar os rótulos
+    // de novo, um toque de cada vez, só para reler a última frase).
+    EMB_AGO_SUB = EMB_AGO_ETAPA === 2 ? 2 : 0;
+    renderEmbaixadoresAgosto();
+    return;
+  }
+  fecharEmbaixadoresAgosto();
+}
+
+// Sai da experiência e volta de onde se entrou: o cartão dos Embaixadores em
+// Desafios do Discipulado.
+function fecharEmbaixadoresAgosto() {
+  openDesafios();
+}
+
+function avancarEmbaixadoresAgosto() {
+  // Tela 2 revela em 3 partes antes de liberar a próxima tela.
+  if (EMB_AGO_ETAPA === 2 && EMB_AGO_SUB < 2) { EMB_AGO_SUB++; renderEmbaixadoresAgosto(); return; }
+  EMB_AGO_ETAPA++;
+  EMB_AGO_SUB = 0;
+  renderEmbaixadoresAgosto();
+}
+
+// Três pontinhos de progresso (mesmo componente já usado nos estudos) — mostram que a
+// experiência é curta e onde a pessoa está.
+function embAgoDotsHtml() {
+  if (EMB_AGO_ETAPA < 1 || EMB_AGO_ETAPA > 7) return '';
+  return `<div class="phase-dots">` + [1,2,3,4,5,6,7].map(n =>
+    `<span class="pdot ${n < EMB_AGO_ETAPA ? 'done' : n === EMB_AGO_ETAPA ? 'active' : ''}"></span>`).join('') + `</div>`;
+}
+
+function embAgoBotaoHtml(rotulo, atrasoSeg) {
+  return `<button class="start-btn emb-ago-in" style="letter-spacing:1.5px;font-weight:700;animation-delay:${atrasoSeg}s" onclick="avancarEmbaixadoresAgosto()">${rotulo}</button>`;
+}
+
+// Router da experiência: escolhe o conteúdo da etapa atual e desenha. Cada etapa é um
+// cartão curto — nunca uma parede de texto.
+function renderEmbaixadoresAgosto() {
+  const el = document.getElementById('embaixadores-ago-body');
+  if (!el) return;
+  const conteudo = EMB_AGO_ETAPA === 0 ? embAgoAberturaHtml()
+                 : EMB_AGO_ETAPA === 1 ? embAgoTela1Html()
+                 : EMB_AGO_ETAPA === 2 ? embAgoTela2Html()
+                 : EMB_AGO_ETAPA === 3 ? embAgoTela3Html()
+                 : EMB_AGO_ETAPA === 4 ? embAgoTela4Html()
+                 : EMB_AGO_ETAPA === 5 ? embAgoTela5Html()
+                 : EMB_AGO_ETAPA === 6 ? embAgoTela6Html()
+                 : embAgoTela7Html();
+  el.innerHTML = conteudo;
+  resetScroll();
+}
+// Mantida por compatibilidade com a etapa anterior desta implementação.
+function renderEmbaixadoresAgostoAbertura() { renderEmbaixadoresAgosto(); }
+
+function embAgoAberturaHtml() {
+  return `
+    <div style="background:linear-gradient(160deg,var(--navy),var(--navy2));padding:2rem 1.25rem 1.75rem;text-align:center">
+      <div style="font-size:44px;line-height:1;margin-bottom:.6rem">🌟</div>
+      <div style="font-family:var(--ff-serif);font-size:30px;font-weight:500;color:#fff;line-height:1.25">Embaixadores da Esperança</div>
+      <div style="font-family:var(--ff-serif);font-style:italic;font-size:20px;color:var(--gold-mid);margin-top:.55rem">A esperança começa em mim.</div>
+    </div>
+    <div style="padding:1.25rem 1rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card">
+        <p class="body-text" style="margin:0 0 .9rem"><strong>Você pode fazer diferença na vida de alguém.</strong></p>
+        <p class="body-text" style="margin:0 0 .9rem">Em uma sociedade marcada por individualismo, conflitos e divisões, precisamos de pessoas dispostas a construir pontes em vez de muros.</p>
+        <p class="body-text" style="margin:0 0 .9rem">É disso que trata o Embaixadores da Esperança.</p>
+        <p class="body-text" style="margin:0">Você não precisa mudar o mundo inteiro.<br>Pode começar por uma pessoa.</p>
+      </div>
+      <button class="start-btn" style="letter-spacing:1.5px;font-weight:700" onclick="avancarEmbaixadoresAgosto()">COMEÇAR</button>
+    </div>`;
+}
+
+// TELA 1 — O MUNDO. As cinco diferenças entram uma a uma; a última frase (a virada)
+// só aparece depois delas.
+function embAgoTela1Html() {
+  const diferencas = ['Pensamos diferente.','Votamos diferente.','Temos culturas diferentes.','Temos histórias diferentes.','Pertencemos a grupos diferentes.'];
+  const linhas = diferencas.map((d, i) =>
+    `<div class="emb-ago-in" style="animation-delay:${(0.35 + i * 0.22).toFixed(2)}s;font-size:19px;line-height:1.6;color:var(--text2);font-family:var(--ff-body)">${d}</div>`).join('');
+  const atrasoFinal = (0.35 + diferencas.length * 0.22 + 0.25);
+  return `
+    ${embAgoDotsHtml()}
+    <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card">
+        <div class="phase-tag tag-content">O mundo</div>
+        <p class="body-text emb-ago-in" style="margin:0 0 1rem">Vivemos cercados por diferenças.</p>
+        <div style="display:flex;flex-direction:column;gap:.35rem;padding-left:.85rem;border-left:3px solid var(--blue-light)">${linhas}</div>
+        <p class="body-text emb-ago-in" style="margin:1.1rem 0 0;animation-delay:${atrasoFinal.toFixed(2)}s"><strong>A diferença, porém, não precisa produzir divisão.</strong></p>
+      </div>
+      ${embAgoBotaoHtml('CONTINUAR', (atrasoFinal + 0.3).toFixed(2))}
+    </div>`;
+}
+
+// TELA 2 — O PROBLEMA. Três momentos (EMB_AGO_SUB): os rótulos chegando um a um, depois
+// a consequência, depois o efeito prático. O que já foi revelado continua na tela — a
+// pilha de rótulos é justamente a imagem que a etapa quer deixar.
+function embAgoTela2Html() {
+  const rotulos = EMB_AGO_ROTULOS.map((r, i) => `
+        <div style="display:flex;justify-content:${i % 2 ? 'flex-end' : 'flex-start'}">
+          <span class="emb-ago-rotulo ${EMB_AGO_SUB === 0 ? 'emb-ago-in' : ''}" ${EMB_AGO_SUB === 0 ? `style="animation-delay:${(0.3 + i * 0.24).toFixed(2)}s"` : ''}>“${r}”</span>
+        </div>`).join('');
+  const fimRotulos = 0.3 + EMB_AGO_ROTULOS.length * 0.24;
+
+  const consequencia = EMB_AGO_SUB >= 1 ? `
+      <div class="content-card ${EMB_AGO_SUB === 1 ? 'emb-ago-in' : ''}" style="border-left:3px solid var(--coral)">
+        <p class="body-text" style="margin:0">Quando isso acontece, o outro deixa de ser uma pessoa e passa a ser <strong>um rótulo</strong>.</p>
+      </div>` : '';
+
+  const efeito = EMB_AGO_SUB >= 2 ? `
+      <div class="content-card emb-ago-in" style="border-left:3px solid var(--coral)">
+        <p class="body-text" style="margin:0">E quando transformamos pessoas em rótulos, fica muito mais fácil julgá-las, rejeitá-las ou entrar em conflito com elas.</p>
+      </div>` : '';
+
+  const atrasoBotao = EMB_AGO_SUB === 0 ? (fimRotulos + 0.3).toFixed(2) : '0.35';
+  return `
+    ${embAgoDotsHtml()}
+    <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card">
+        <div class="phase-tag tag-insight">O problema</div>
+        <p class="body-text" style="margin:0">O problema começa quando deixamos de enxergar <strong>a pessoa</strong> e passamos a enxergar apenas <strong>o grupo</strong> ao qual ela pertence.</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.45rem">${rotulos}</div>
+      ${consequencia}
+      ${efeito}
+      ${embAgoBotaoHtml(EMB_AGO_SUB < 2 ? 'CONTINUAR' : 'E AGORA?', atrasoBotao)}
+    </div>`;
+}
+
+// TELA 3 — A PERGUNTA. A virada do olhar: do mundo lá fora para dentro. A terceira
+// pergunta é a que fica — por isso entra por último e em destaque.
+function embAgoTela3Html() {
+  return `
+    ${embAgoDotsHtml()}
+    <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card">
+        <div class="phase-tag tag-question">A pergunta</div>
+        <p class="body-text emb-ago-in" style="margin:0 0 1rem">E se o problema não estiver apenas no mundo lá fora?</p>
+        <p class="body-text emb-ago-in" style="margin:0;animation-delay:.9s"><strong>O que existe em mim que precisa ser transformado?</strong></p>
+      </div>
+      <div class="emb-ago-in" style="animation-delay:2s;background:linear-gradient(160deg,var(--navy),var(--navy2));border-radius:var(--radius);padding:1.35rem 1.15rem;text-align:center">
+        <div style="font-size:26px;line-height:1;margin-bottom:.6rem">🙏</div>
+        <p style="font-family:var(--ff-serif);font-size:22px;line-height:1.5;color:#fff;margin:0">O que preciso entregar a Deus para servir melhor ao meu semelhante?</p>
+      </div>
+      ${embAgoBotaoHtml('OLHAR PARA MIM', '2.6')}
+    </div>`;
+}
+
+// TELA 4 — O ESPELHO. A virada do olhar se completa: sai da sociedade e chega em mim.
+// Escolha ÚNICA entre 8 alternativas; o CONTINUAR só destrava depois de escolher.
+const EMB_AGO_ESPELHO_OPCOES = [
+  { id: 'ouvir',     texto: 'Ouvir sem julgar' },
+  { id: 'paciencia', texto: 'Ter paciência' },
+  { id: 'opinioes',  texto: 'Respeitar opiniões diferentes' },
+  { id: 'reacoes',   texto: 'Controlar minhas reações' },
+  { id: 'perdoar',   texto: 'Perdoar' },
+  { id: 'empatia',   texto: 'Demonstrar empatia' },
+  { id: 'valor',     texto: 'Reconhecer o valor do outro' },
+  { id: 'refletir',  texto: 'Não sei — preciso refletir sobre isso' },
+];
+
+// A escolha vale para o mês da experiência — em uma campanha futura a pergunta volta
+// limpa, em vez de aparecer já respondida com o que a pessoa marcou meses atrás.
+function getEscolhaEspelhoEmbAgosto() {
+  const e = ST.embAgoEspelho;
+  return (e && e.monthKey === embMonthKey()) ? e : null;
+}
+
+// Guarda no ESTADO DA JORNADA (ST) — infraestrutura que já existe e é só do aparelho:
+// save() escreve em localStorage/sessionStorage/cookie e NUNCA no Firebase, e
+// syncProgressoParaFirebase() copia apenas xp/estudos/missões/streak, nunca o ST inteiro.
+// Portanto esta resposta não vai para o banco, não entra em relatório e não é
+// participação. Atualiza só os elementos que mudam, para não reiniciar as animações.
+function escolherEspelhoEmbAgosto(id) {
+  const opcao = EMB_AGO_ESPELHO_OPCOES.find(o => o.id === id);
+  if (!opcao) return;
+  ST.embAgoEspelho = { id: opcao.id, texto: opcao.texto, monthKey: embMonthKey(), ts: Date.now() };
+  save(ST);
+  document.querySelectorAll('#emb-ago-espelho-opcoes .opt-btn').forEach(b =>
+    b.classList.toggle('chosen', b.dataset.opcao === id));
+  const btn = document.getElementById('emb-ago-espelho-continuar');
+  if (btn) btn.disabled = false;
+  const dica = document.getElementById('emb-ago-espelho-dica');
+  if (dica) dica.style.display = 'none';
+}
+
+function embAgoTela4Html() {
+  const escolha = getEscolhaEspelhoEmbAgosto();
+  const opcoes = EMB_AGO_ESPELHO_OPCOES.map((o, i) => `
+        <button class="opt-btn${escolha && escolha.id === o.id ? ' chosen' : ''} emb-ago-in" data-opcao="${o.id}"
+                style="animation-delay:${(0.5 + i * 0.07).toFixed(2)}s" onclick="escolherEspelhoEmbAgosto('${o.id}')">${o.texto}</button>`).join('');
+  return `
+    ${embAgoDotsHtml()}
+    <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card">
+        <div class="phase-tag tag-decision">O espelho</div>
+        <p class="body-text emb-ago-in" style="margin:0 0 .9rem"><strong>Agora é a sua vez de olhar para o espelho.</strong></p>
+        <p class="body-text emb-ago-in" style="margin:0;animation-delay:.5s">Não pense primeiro naquilo que o outro precisa mudar.<br>Pense em você.</p>
+      </div>
+      <div class="content-card emb-ago-in" style="animation-delay:.35s">
+        <p class="body-text" style="margin:0 0 .85rem">Quando encontro alguém muito diferente de mim, qual é minha maior dificuldade?</p>
+        <div id="emb-ago-espelho-opcoes" style="display:flex;flex-direction:column;gap:.45rem">${opcoes}</div>
+      </div>
+      <div id="emb-ago-espelho-dica" style="${escolha ? 'display:none;' : ''}text-align:center;font-size:14px;color:var(--text3);font-family:var(--ff-body)">Escolha uma opção para continuar.</div>
+      <button id="emb-ago-espelho-continuar" class="start-btn emb-ago-btn" style="letter-spacing:1.5px;font-weight:700"
+              ${escolha ? '' : 'disabled'} onclick="avancarEmbaixadoresAgosto()">CONTINUAR</button>
+    </div>`;
+}
+
+// TELA 5 — VIRTUDES E FORÇAS DE CARÁTER. Dois momentos na MESMA tela: primeiro as seis
+// dimensões, depois as forças da dimensão escolhida. Sem explicação de cada uma — a
+// etapa é de escolha, não de aula. Não há sub-estado próprio: o momento é deduzido do
+// que a pessoa já escolheu.
+const EMB_AGO_VIRTUDES = [
+  { id:'sabedoria',      nome:'SABEDORIA',      icone:'💡', forcas:['Criatividade','Curiosidade','Amor ao aprendizado','Mente aberta','Perspectiva'] },
+  { id:'humanidade',     nome:'HUMANIDADE',     icone:'🤝', forcas:['Generosidade','Amor','Inteligência emocional'] },
+  { id:'justica',        nome:'JUSTIÇA',        icone:'⚖️', forcas:['Justiça','Liderança','Trabalho em equipe'] },
+  { id:'moderacao',      nome:'MODERAÇÃO',      icone:'🕊️', forcas:['Perdão','Humildade','Prudência','Autocontrole'] },
+  { id:'coragem',        nome:'CORAGEM',        icone:'🦁', forcas:['Bravura','Integridade','Perseverança','Vitalidade'] },
+  { id:'transcendencia', nome:'TRANSCENDÊNCIA', icone:'✨', forcas:['Admiração da beleza e excelência','Gratidão','Esperança','Humor','Espiritualidade'] },
+];
+
+// Mesmas regras do Espelho: vale para o mês da experiência e mora só no aparelho.
+function getVirtudeEmbAgosto() {
+  const v = ST.embAgoVirtude;
+  return (v && v.monthKey === embMonthKey()) ? v : null;
+}
+function getForcaEmbAgosto() {
+  const f = ST.embAgoForca;
+  return (f && f.monthKey === embMonthKey()) ? f : null;
+}
+
+// Resumo temporário da experiência: as três escolhas juntas (dificuldade do Espelho,
+// virtude e força). Guardado só no ESTADO DA JORNADA (ST) — localStorage do aparelho,
+// nunca no Firebase, nunca em relatório. Existe para as próximas etapas poderem ler o
+// que a pessoa escolheu; NÃO é participação e NÃO é missão.
+function getResumoEmbAgosto() {
+  return {
+    monthKey: embMonthKey(),
+    dificuldade: getEscolhaEspelhoEmbAgosto(),
+    virtude: getVirtudeEmbAgosto(),
+    forca: getForcaEmbAgosto(),
+    // Derivada da força (ver EMB_AGO_MISSOES) — não é guardada e NÃO tem estado de
+    // "realizada": receber a missão não é condição para nada.
+    missao: getMissaoEmbAgosto(),
+  };
+}
+
+function escolherVirtudeEmbAgosto(id) {
+  const v = EMB_AGO_VIRTUDES.find(x => x.id === id);
+  if (!v) return;
+  ST.embAgoVirtude = { id: v.id, nome: v.nome, monthKey: embMonthKey(), ts: Date.now() };
+  delete ST.embAgoForca; // trocar de dimensão zera a força da dimensão anterior
+  save(ST);
+  renderEmbaixadoresAgosto();
+}
+
+// Volta à lista das seis dimensões, desfazendo a escolha atual.
+function trocarVirtudeEmbAgosto() {
+  delete ST.embAgoVirtude;
+  delete ST.embAgoForca;
+  save(ST);
+  renderEmbaixadoresAgosto();
+}
+
+// Escolha única, como no Espelho: atualiza só o que muda, sem reiniciar as animações.
+function escolherForcaEmbAgosto(id) {
+  const v = getVirtudeEmbAgosto();
+  const def = v ? EMB_AGO_VIRTUDES.find(x => x.id === v.id) : null;
+  if (!def) return;
+  const idx = parseInt(String(id).split('_').pop(), 10);
+  const nome = def.forcas[idx];
+  if (!nome) return;
+  ST.embAgoForca = { id, nome, virtudeId: def.id, monthKey: embMonthKey(), ts: Date.now() };
+  save(ST);
+  document.querySelectorAll('#emb-ago-forcas-opcoes .opt-btn').forEach(b =>
+    b.classList.toggle('chosen', b.dataset.opcao === id));
+  const btn = document.getElementById('emb-ago-forcas-continuar');
+  if (btn) btn.disabled = false;
+  const dica = document.getElementById('emb-ago-forcas-dica');
+  if (dica) dica.style.display = 'none';
+}
+
+function embAgoTela5Html() {
+  const virtude = getVirtudeEmbAgosto();
+  return virtude ? embAgoForcasHtml(virtude) : embAgoVirtudesHtml();
+}
+
+function embAgoVirtudesHtml() {
+  const cartoes = EMB_AGO_VIRTUDES.map((v, i) => `
+        <button class="opt-btn emb-ago-in" style="animation-delay:${(0.45 + i * 0.09).toFixed(2)}s;display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700;letter-spacing:.5px"
+                onclick="escolherVirtudeEmbAgosto('${v.id}')">
+          <span style="font-size:22px;flex-shrink:0">${v.icone}</span><span>${v.nome}</span>
+        </button>`).join('');
+  return `
+    ${embAgoDotsHtml()}
+    <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card">
+        <div class="phase-tag tag-apply">Forças de caráter</div>
+        <p class="body-text emb-ago-in" style="margin:0 0 .9rem">Todos nós podemos desenvolver forças que nos ajudam a viver melhor e a servir melhor.</p>
+        <p class="body-text emb-ago-in" style="margin:0;animation-delay:.35s"><strong>Qual destas dimensões você gostaria de fortalecer hoje?</strong></p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.45rem">${cartoes}</div>
+    </div>`;
+}
+
+function embAgoForcasHtml(virtude) {
+  const def = EMB_AGO_VIRTUDES.find(x => x.id === virtude.id);
+  if (!def) return embAgoVirtudesHtml();
+  const escolha = getForcaEmbAgosto();
+  const opcoes = def.forcas.map((f, i) => {
+    const id = `${def.id}_${i}`;
+    return `
+        <button class="opt-btn${escolha && escolha.id === id ? ' chosen' : ''} emb-ago-in" data-opcao="${id}"
+                style="animation-delay:${(0.35 + i * 0.08).toFixed(2)}s" onclick="escolherForcaEmbAgosto('${id}')">${f}</button>`;
+  }).join('');
+  return `
+    ${embAgoDotsHtml()}
+    <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card">
+        <div class="phase-tag tag-apply">Forças de caráter</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:.85rem">
+          <span style="font-size:26px">${def.icone}</span>
+          <span style="font-size:19px;font-weight:700;letter-spacing:.5px;color:var(--navy);font-family:var(--ff-body)">${def.nome}</span>
+        </div>
+        <p class="body-text" style="margin:0 0 .85rem">Qual destas forças você gostaria de praticar hoje?</p>
+        <div id="emb-ago-forcas-opcoes" style="display:flex;flex-direction:column;gap:.45rem">${opcoes}</div>
+        <button onclick="trocarVirtudeEmbAgosto()" style="margin-top:.85rem;background:none;border:none;padding:0;color:var(--blue);font-size:14px;font-weight:600;cursor:pointer;font-family:var(--ff-body)">‹ Escolher outra dimensão</button>
+      </div>
+      <div id="emb-ago-forcas-dica" style="${escolha ? 'display:none;' : ''}text-align:center;font-size:14px;color:var(--text3);font-family:var(--ff-body)">Escolha uma força para continuar.</div>
+      <button id="emb-ago-forcas-continuar" class="start-btn emb-ago-btn" style="letter-spacing:1.5px;font-weight:700"
+              ${escolha ? '' : 'disabled'} onclick="avancarEmbaixadoresAgosto()">CONTINUAR</button>
+    </div>`;
+}
+
+// TELA 6 — A MISSÃO. Consequência da reflexão, NUNCA requisito de participação.
+//
+// REGRA DE NEGÓCIO (não alterar sem decisão do usuário): PARTICIPAÇÃO ≠ REALIZAÇÃO DA
+// MISSÃO. A pessoa pode concluir a experiência, receber a missão e nunca realizá-la — e
+// ainda assim conta como participante do Embaixadores da Esperança do mês. Por isso, de
+// propósito, esta tela NÃO tem:
+//   • botão de "missão realizada" ou "concluí";
+//   • campo `missaoFeita` (ou equivalente) em lugar nenhum;
+//   • qualquer trava ou pré-condição sobre o registro de participação.
+// O registro oficial continua sendo confirmarEmbaixadores(), pelo botão "Confirmar
+// participação" no cartão dos Embaixadores — independente desta tela.
+//
+// A missão é DERIVADA da força escolhida (mesma força → sempre a mesma missão), então
+// não precisa ser guardada em lugar nenhum. Indexada pelo NOME da força, que é único
+// entre as 24: sobrevive a reordenar as listas de EMB_AGO_VIRTUDES.
+const EMB_AGO_MISSOES = {
+  // SABEDORIA
+  'Criatividade':        'Encontre hoje um jeito novo e simples de tornar o dia de alguém mais leve — um gesto que a pessoa não espera.',
+  'Curiosidade':         'Pergunte hoje a alguém sobre algo da vida dela que você nunca perguntou antes. E escute a resposta inteira.',
+  'Amor ao aprendizado': 'Peça hoje a alguém que lhe ensine algo que essa pessoa faz bem. Aprenda com ela, sem pressa.',
+  'Mente aberta':        'Converse com alguém que pensa diferente de você. Faça uma pergunta para compreender a pessoa — não para convencê-la.',
+  'Perspectiva':         'Diante de uma situação difícil hoje, pergunte-se como ela é vista pelos olhos da outra pessoa antes de opinar.',
+  // HUMANIDADE
+  'Generosidade':          'Ofereça hoje algo seu a alguém — seu tempo, sua ajuda ou sua atenção — sem esperar nada em troca.',
+  'Amor':                  'Demonstre hoje cuidado concreto por alguém, com um gesto simples que mostre que aquela pessoa importa para você.',
+  'Inteligência emocional':'Hoje, procure alguém que normalmente passa despercebido e demonstre interesse genuíno por essa pessoa.',
+  // JUSTIÇA
+  'Justiça':           'Se hoje alguém for tratado com injustiça ou deixado de lado, fique ao lado dessa pessoa, com respeito.',
+  'Liderança':         'Ajude hoje sua equipe a incluir alguém que costuma ficar de fora das conversas ou das decisões.',
+  'Trabalho em equipe':'Ofereça ajuda hoje a um colega em algo que não é sua obrigação, apenas porque vocês estão no mesmo time.',
+  // MODERAÇÃO
+  'Perdão':      'Pense em alguém que você precisa perdoar e dê hoje um pequeno passo nessa direção.',
+  'Humildade':   'Em uma conversa hoje, permita que a outra pessoa seja ouvida sem sentir necessidade de mostrar que você está certo.',
+  'Prudência':   'Antes de falar hoje sobre alguém, pergunte-se se é verdadeiro, necessário e gentil. Se não for, guarde.',
+  'Autocontrole':'Quando surgir uma situação que normalmente provocaria uma reação negativa, faça uma pausa antes de responder.',
+  // CORAGEM
+  'Bravura':      'Diga hoje uma verdade necessária com gentileza — ou defenda alguém que não pôde se defender sozinho.',
+  'Integridade':  'Cumpra hoje exatamente o que você prometeu, mesmo que ninguém vá conferir.',
+  'Perseverança': 'Aproxime-se hoje, mais uma vez, de alguém de quem você já tinha desistido de cuidar.',
+  'Vitalidade':   'Leve hoje sua melhor energia para um lugar onde as pessoas costumam chegar cansadas.',
+  // TRANSCENDÊNCIA
+  'Admiração da beleza e excelência':'Repare hoje em algo bem-feito por alguém e diga a essa pessoa exatamente o que você viu.',
+  'Gratidão':      'Agradeça sinceramente alguém cujo trabalho, presença ou cuidado você normalmente considera garantido.',
+  'Esperança':     'Procure alguém que esteja desanimado e ofereça uma palavra verdadeira de encorajamento.',
+  'Humor':         'Traga hoje leveza a um ambiente tenso — um sorriso, uma boa risada, sem que ninguém seja alvo de piada.',
+  'Espiritualidade':'Ore hoje por alguém pelo nome. Se houver abertura, ore junto com essa pessoa.',
+};
+
+function getMissaoEmbAgosto() {
+  const f = getForcaEmbAgosto();
+  return f ? (EMB_AGO_MISSOES[f.nome] || null) : null;
+}
+
+function embAgoTela6Html() {
+  const forca = getForcaEmbAgosto();
+  const missao = getMissaoEmbAgosto();
+  // Sem força escolhida não há missão a apresentar — volta para a escolha, em vez de
+  // mostrar uma tela vazia.
+  if (!forca || !missao) return embAgoTela5Html();
+  return `
+    ${embAgoDotsHtml()}
+    <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card">
+        <div class="phase-tag tag-apply">A missão</div>
+        <p class="body-text emb-ago-in" style="margin:0 0 .9rem">Um Embaixador da Esperança não apenas pensa diferente. <strong>Ele procura agir diferente.</strong></p>
+        <p class="body-text emb-ago-in" style="margin:0;animation-delay:.5s">Esta é uma pequena missão para você praticar hoje.</p>
+      </div>
+      <div class="emb-ago-in" style="animation-delay:1.1s;background:linear-gradient(160deg,var(--navy),var(--navy2));border-radius:var(--radius);padding:1.35rem 1.15rem">
+        <div style="font-size:12.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold-mid);margin-bottom:.6rem">${sanitize(forca.nome)}</div>
+        <p style="font-family:var(--ff-serif);font-size:21px;line-height:1.55;color:#fff;margin:0">${missao}</p>
+      </div>
+      <p class="body-text emb-ago-in" style="margin:0;animation-delay:1.7s;text-align:center;color:var(--text2)">Você pode realizar esta missão quando tiver oportunidade.</p>
+      ${embAgoBotaoHtml('CONTINUAR', '2.2')}
+    </div>`;
+}
+
+// Resumo das escolhas — só leitura do que já está no estado da jornada (ST).
+function embAgoResumoHtml() {
+  const r = getResumoEmbAgosto();
+  if (!r.dificuldade && !r.virtude && !r.forca) return '';
+  const linha = (rot, val) => val ? `<div style="margin-top:3px">${rot}: <strong>${val}</strong></div>` : '';
+  return `
+      <div style="background:var(--blue-pale);border:0.5px solid var(--blue-light);border-radius:var(--radius-sm);padding:.8rem .9rem;font-size:15px;line-height:1.55;color:var(--navy2);font-family:var(--ff-body)">
+        <div style="font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text3)">Suas escolhas de hoje</div>
+        ${linha('Maior dificuldade', r.dificuldade && r.dificuldade.texto)}
+        ${linha('Dimensão', r.virtude && r.virtude.nome)}
+        ${linha('Força para praticar', r.forca && r.forca.nome)}
+        ${r.missao ? `<div style="margin-top:.5rem;font-style:italic;color:var(--text2)">"${r.missao}"</div>` : ''}
+      </div>`;
+}
+
+// TELA 7 — REGISTRO OFICIAL DE PARTICIPAÇÃO.
+//
+// NÃO existe mecanismo novo aqui. Esta tela apenas CONDUZ ao mecanismo que já existia:
+// confirmarEmbaixadores(), o mesmo que o botão "Confirmar participação" do cartão dos
+// Embaixadores (Desafios do Discipulado) sempre chamou. Mesma função, mesmo campo
+// (p.embaixadores[AAAA-MM].participou), mesma proteção contra duplicidade, mesmo caminho
+// até o Relatório Mensal do PG. Nada foi duplicado, nada foi reescrito.
+//
+// A missão NÃO entra nesta decisão: nenhuma condição aqui olha para a força escolhida nem
+// para "missão realizada" (que não existe). Quem chegou até aqui pode registrar.
+function embAgoTela7Html() {
+  const meuGrupo = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
+  const eu = getMeuEmbaixadoresParticipante();
+  const monthKey = embMonthKey();
+  const registro = eu && eu.embaixadores ? eu.embaixadores[monthKey] : null;
+  const jaRegistrado = !!(registro && registro.participou);
+
+  // ESTADO 1 — já registrado neste mês. Segunda barreira contra duplicidade, agora
+  // visível: quem já confirmou não vê botão de confirmar de novo.
+  const bloco = jaRegistrado ? `
+      <div style="background:var(--teal-light);border:0.5px solid var(--teal);border-radius:var(--radius);padding:1.35rem 1.15rem;text-align:center">
+        <div style="font-size:40px;line-height:1;margin-bottom:.5rem">✅</div>
+        <div style="font-size:19px;font-weight:700;color:#04342C;font-family:var(--ff-body);line-height:1.35">Participação registrada</div>
+        <div style="font-size:16px;color:#04342C;margin-top:.35rem;font-family:var(--ff-body)">Embaixadores da Esperança — ${embMonthLabel(monthKey)}</div>
+        <div style="font-size:14px;color:var(--text3);margin-top:.5rem;font-family:var(--ff-body)">Registrada em ${registro.data}${registro.hora ? ' às ' + registro.hora : ''}</div>
+      </div>
+      <p class="body-text" style="margin:0;font-size:17px;color:var(--text2)">Sua participação já aparece no relatório do seu Pequeno Grupo. O Coordenador o encaminha à supervisão do setor, que segue para a gerência.</p>`
+    // ESTADO 2 — pode registrar: tem vínculo e ainda não confirmou este mês.
+    : eu ? `
+      <div class="content-card">
+        <p class="body-text" style="margin:0 0 .9rem">Você concluiu a experiência de agosto.</p>
+        <p class="body-text" style="margin:0">Registre agora sua participação nos Embaixadores da Esperança. É este registro que informa ao seu Pequeno Grupo que você participou.</p>
+      </div>
+      <button onclick="registrarParticipacaoEmbAgosto()" style="width:100%;background:var(--teal);color:#fff;border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17.5px;font-weight:700;cursor:pointer;font-family:var(--ff-body)">✅ Confirmar participação</button>
+      <p style="margin:0;text-align:center;font-size:14px;color:var(--text3);font-family:var(--ff-body);line-height:1.5">Confirmar não depende de você já ter realizado a missão.</p>`
+    // ESTADO 3 — o aparelho acha que pertence a um PG, mas perdeu o vínculo com o próprio
+    // registro de participante (BUG-VINCULO-01). Sem este aviso, o botão não faria nada e a
+    // pessoa acharia que registrou. Mesma saída indicada no cartão dos Embaixadores.
+    : meuGrupo ? `
+      <div style="background:#FDECEA;border:0.5px solid #F3B8B4;border-radius:var(--radius);padding:1rem">
+        <div style="font-weight:700;font-size:16px;color:#E05050;margin-bottom:.4rem;font-family:var(--ff-body)">⚠️ Não conseguimos confirmar seu vínculo com o Pequeno Grupo "${sanitize(meuGrupo.grupoNome || ('Grupo ' + meuGrupo.grupoNum))}" neste aparelho.</div>
+        <div style="font-size:15px;color:var(--text2);line-height:1.5;font-family:var(--ff-body)">Por isso não é possível registrar sua participação agora. Peça ao seu Coordenador um novo link de convite: ao aceitar com o mesmo nome e WhatsApp de antes, seu progresso é recuperado e você poderá registrar.</div>
+      </div>`
+    // ESTADO 4 — não pertence a nenhum PG. Não há onde gravar a participação individual;
+    // o caminho institucional existente é o Coordenador lançar a pessoa como participante
+    // externa do setor (registrarParticipantesExternos), que já entra no relatório.
+    : `
+      <div style="background:var(--gold-pale);border:0.5px solid rgba(184,134,11,0.25);border-radius:var(--radius);padding:1rem">
+        <div style="font-weight:700;font-size:16px;color:var(--gold);margin-bottom:.4rem;font-family:var(--ff-body)">Você ainda não faz parte de um Pequeno Grupo neste aparelho.</div>
+        <div style="font-size:15px;color:var(--text2);line-height:1.5;font-family:var(--ff-body)">A experiência é sua e vale do mesmo jeito. Para que sua participação seja contabilizada, avise o Coordenador do Pequeno Grupo do seu setor — ele registra os participantes que ainda não estão em um PG.</div>
+      </div>`;
+
+  return `
+    ${embAgoDotsHtml()}
+    <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card">
+        <div class="phase-tag tag-close">Participação</div>
+        <p class="body-text emb-ago-in" style="margin:0"><strong>A esperança começa em mim.</strong></p>
+      </div>
+      ${bloco}
+      ${embAgoResumoHtml()}
+      <button onclick="fecharEmbaixadoresAgosto()" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">Concluir</button>
+    </div>`;
+}
+
+// Único ponto de escrita da experiência inteira — e ele NÃO escreve: apenas delega ao
+// mecanismo existente. confirmarEmbaixadores() é quem grava (e é quem já bloqueia a
+// segunda gravação no mesmo mês). Nenhum XP extra, nenhum campo extra: o que essa função
+// faz por fora dela é só redesenhar a tela para mostrar o resultado.
+function registrarParticipacaoEmbAgosto() {
+  confirmarEmbaixadores();
+  renderEmbaixadoresAgosto();
 }
 
 function confirmEmbaixadorMissao(id) {
