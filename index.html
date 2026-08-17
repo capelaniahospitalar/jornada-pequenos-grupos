@@ -1983,6 +1983,59 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 </div><!-- #app -->
 
 <script>
+// ══════════════════════════════════════════════════════════════════════════
+//  MODO DE TESTE ISOLADO — barreira de segurança (ETAPA 0)
+// ══════════════════════════════════════════════════════════════════════════
+// Criado depois do INC-001 (05/08/2026) e da constatação, em 16/08/2026, de que a prévia
+// de desenvolvimento lia a produção ao vivo (127 chamadas ao Firestore numa única sessão).
+//
+// O QUE ESTE MODO FAZ, em duas frentes que só valem JUNTAS:
+//   1) NENHUMA escrita alcança o Firestore — barrada em fbWriteGrupos(), o ponto por onde
+//      passam as TRÊS rotas de gravação do app (trySaveGrupos, commitConviteChange e
+//      salvarFbConfig). Barrar saveGruposToFirebase() deixaria duas rotas abertas.
+//   2) NENHUMA chave real de armazenamento é tocada — tudo ganha o prefixo "teste_".
+//      Sem (2), o app continuaria gravando dados falsos em jdpg_grupos_v1, e uma sessão
+//      NORMAL posterior, no mesmo navegador, os enviaria para a produção. A proteção de
+//      rede sozinha apenas adiaria o problema.
+//
+// COMO LIGAR: acrescente ?teste=1 ao endereço — no app publicado fica
+//   https://capelaniahospitalar.github.io/jornada-pequenos-grupos/?teste=1
+// O modo fica guardado em sessionStorage —
+// vale só para AQUELA ABA (nunca vaza para a aba normal) e SOBREVIVE ao reload, que é
+// justamente onde o método antigo (sobrescrever funções em memória) falhava.
+// COMO DESLIGAR: botão "Sair do modo de teste" na faixa, ou fechar a aba.
+//
+// NÃO ALTERA o modo normal: com o modo desligado, TESTE_PREFIXO é '' e todo guarda é
+// um if que não dispara. confirmarEmbaixadores(), relatórios, painel institucional, IMD
+// e ranking permanecem intocados nas duas situações.
+const MODO_TESTE_SESSAO_KEY = 'jdpg_modo_teste_sessao';   // nunca prefixado: é o próprio interruptor; e nunca em localStorage, para não vazar entre abas
+const MODO_TESTE = (function () {
+  try {
+    const porUrl = new URLSearchParams(location.search).get('teste') === '1';
+    const porSessao = sessionStorage.getItem(MODO_TESTE_SESSAO_KEY) === '1';
+    const ativo = porUrl || porSessao;
+    if (ativo) sessionStorage.setItem(MODO_TESTE_SESSAO_KEY, '1');   // sobrevive ao reload
+    return ativo;
+  } catch { return false; }
+})();
+const TESTE_PREFIXO = MODO_TESTE ? 'teste_' : '';
+function chaveTeste(k) { return TESTE_PREFIXO + k; }
+// Chave do estado da jornada (XP, estudos, missões). Era o literal 'amj3' escrito à mão em
+// save()/load(); virou constante só para poder receber o prefixo — o valor em modo normal
+// continua exatamente 'amj3'.
+const ST_KEY = chaveTeste('amj3');
+
+// Diário das saídas bloqueadas — é a evidência de que a lógica tentou gravar e a borda
+// conteve. Vive só em memória; consultável por listarEscritasBloqueadas().
+const ESCRITAS_BLOQUEADAS = [];
+function registrarEscritaBloqueada(origem, info) {
+  const reg = Object.assign({ quando: new Date().toISOString(), origem }, info || {});
+  ESCRITAS_BLOQUEADAS.push(reg);
+  console.warn('[MODO DE TESTE] saída bloqueada →', reg);
+  return reg;
+}
+function listarEscritasBloqueadas() { return ESCRITAS_BLOQUEADAS.slice(); }
+
 // Variável global usada por showScreen() e pelo módulo de inscrição em grupos
 let tipoSelecionado = null;
 
@@ -2701,6 +2754,19 @@ async function sendAI() {
 
   const loading = addAIMsg('bot', '...');
   loading.classList.add('loading');
+
+  // MODO DE TESTE: nenhuma chamada externa ao proxy de IA. Responde com texto simulado —
+  // a interface segue funcionando (mensagem, histórico e fim do "carregando") sem que uma
+  // linha da conversa saia do aparelho.
+  if (MODO_TESTE) {
+    registrarEscritaBloqueada('AI_PROXY_URL', { pergunta: question.slice(0, 80) });
+    const simulada = '[MODO DE TESTE] Resposta simulada — nenhuma chamada foi feita ao serviço de IA. '
+      + 'Em produção, aqui apareceria a resposta do Companheiro de Jornada.';
+    loading.textContent = simulada;
+    loading.classList.remove('loading');
+    aiHistory.push({ role: 'assistant', content: simulada });
+    return;
+  }
 
   // Contexto dinâmico da jornada do usuário (estudo atual + missão pendente)
   const _ctxIdx = ST.done.length;
@@ -5033,21 +5099,29 @@ function renderEmbaixadoresAgosto() {
 // Mantida por compatibilidade com a etapa anterior desta implementação.
 function renderEmbaixadoresAgostoAbertura() { renderEmbaixadoresAgosto(); }
 
+// TELA DE ACOLHIMENTO (etapa 0) — texto revisado pelo Capelão em 17/08/2026.
+// Sem animação de propósito: é a porta de entrada, e a
+// primeira impressão precisa estar inteira na tela no instante em que ela aparece.
+// Hierarquia: identificação do período (AGOSTO) → nome → frase da campanha → texto em
+// blocos curtos → o convite final destacado → um único botão.
 function embAgoAberturaHtml() {
   return `
     <div style="background:linear-gradient(160deg,var(--navy),var(--navy2));padding:2rem 1.25rem 1.75rem;text-align:center">
       <div style="font-size:44px;line-height:1;margin-bottom:.6rem">🌟</div>
+      <div style="display:inline-block;font-size:12px;font-weight:700;letter-spacing:2.5px;color:var(--gold-mid);border:1px solid rgba(212,160,23,.45);border-radius:99px;padding:3px 12px;margin-bottom:.7rem;font-family:var(--ff-body)">AGOSTO</div>
       <div style="font-family:var(--ff-serif);font-size:30px;font-weight:500;color:#fff;line-height:1.25">Embaixadores da Esperança</div>
       <div style="font-family:var(--ff-serif);font-style:italic;font-size:20px;color:var(--gold-mid);margin-top:.55rem">A esperança começa em mim.</div>
     </div>
     <div style="padding:1.25rem 1rem;display:flex;flex-direction:column;gap:1rem">
       <div class="content-card">
-        <p class="body-text" style="margin:0 0 .9rem"><strong>Você pode fazer diferença na vida de alguém.</strong></p>
-        <p class="body-text" style="margin:0 0 .9rem">Em uma sociedade marcada por individualismo, conflitos e divisões, precisamos de pessoas dispostas a construir pontes em vez de muros.</p>
-        <p class="body-text" style="margin:0 0 .9rem">É disso que trata o Embaixadores da Esperança.</p>
-        <p class="body-text" style="margin:0">Você não precisa mudar o mundo inteiro.<br>Pode começar por uma pessoa.</p>
+        <p class="body-text" style="margin:0 0 .9rem">Vivemos em um mundo marcado por diferenças, divisões e conflitos.</p>
+        <p class="body-text" style="margin:0 0 .9rem">Muitas vezes aprendemos a enxergar primeiro aquilo que separa as pessoas.</p>
+        <p class="body-text" style="margin:0">Nesta jornada, o convite é diferente: olhar para o outro, olhar para nós mesmos e descobrir como podemos nos tornar instrumentos de esperança.</p>
       </div>
-      <button class="start-btn" style="letter-spacing:1.5px;font-weight:700" onclick="avancarEmbaixadoresAgosto()">COMEÇAR</button>
+      <div class="content-card" style="border-left:3px solid var(--teal)">
+        <p class="body-text" style="margin:0"><strong>Você não precisa mudar o mundo inteiro.</strong><br>Pode começar por uma pessoa.</p>
+      </div>
+      <button class="start-btn" style="letter-spacing:1.5px;font-weight:700" onclick="avancarEmbaixadoresAgosto()">COMEÇAR A JORNADA</button>
     </div>`;
 }
 
@@ -5664,7 +5738,7 @@ function completeMission(id, xp){
   _syncMissaoParaGrupo(id);
 }
 
-const PG_MISSOES_KEY = 'jdpg_pg_missoes_v1';
+const PG_MISSOES_KEY = chaveTeste('jdpg_pg_missoes_v1');
 
 function _syncMissaoParaGrupo(missionId) {
   try {
@@ -6048,9 +6122,9 @@ let TUTORS = [];
 // mesmo padrão de TUTORS/"tutores" — IMPORTANTE: os dois precisam entrar na allowlist da
 // regra do Firestore (hasOnly([...])) para sincronizar entre aparelhos, senão gravam 403
 // silencioso (mesmo bug já visto com o campo "convites" em 2026-07-08).
-const SETORES_MESTRE_KEY = 'jdpg_setores_mestre_v1';
+const SETORES_MESTRE_KEY = chaveTeste('jdpg_setores_mestre_v1');
 let SETORES_MESTRE = [];
-const SETORES_EFETIVO_KEY = 'jdpg_setores_efetivo_v1';
+const SETORES_EFETIVO_KEY = chaveTeste('jdpg_setores_efetivo_v1');
 let SETORES_EFETIVO = [];
 
 function loadSetoresMestreLocal() {
@@ -6129,7 +6203,7 @@ function migrarSetoresParaMestre() {
 // Isolado de propósito — não referencia PEQUENOS_GRUPOS na persistência, nunca guarda nome
 // de pessoa, nunca cria histórico individual. Uma futura evolução (Cadastro Institucional de
 // Colaboradores) pode substituir esta quantidade manual sem exigir migração desta estrutura.
-const EMBAIXADORES_EXTERNOS_KEY = 'jdpg_embaixadores_externos_v1';
+const EMBAIXADORES_EXTERNOS_KEY = chaveTeste('jdpg_embaixadores_externos_v1');
 let EMBAIXADORES_EXTERNOS = [];
 
 function loadEmbaixadoresExternosLocal() {
@@ -6443,12 +6517,17 @@ function decodeState(raw) {
 
 function save(s) {
   const data = encodeState(s);
-  try { localStorage.setItem('amj3', data); }
+  try { localStorage.setItem(ST_KEY, data); }
   catch(e) {
     if (e.name === 'QuotaExceededError') console.warn('localStorage cheio — progresso pode não ser salvo.');
     else console.warn('save localStorage:', e);
   }
-  try { sessionStorage.setItem('amj3', data); } catch(_) {}
+  try { sessionStorage.setItem(ST_KEY, data); } catch(_) {}
+  // Em modo de teste o cookie NÃO é gravado, de propósito: o cookie do modo normal se chama
+  // "amj3" e a expressão de leitura (/amj3=.../) casaria também com "teste_amj3=", misturando
+  // os dois mundos. Não criando o cookie de teste, a leitura do modo normal continua idêntica
+  // ao que sempre foi — nenhuma linha dela precisou mudar.
+  if (MODO_TESTE) return;
   try {
     const exp = new Date();
     exp.setFullYear(exp.getFullYear() + 1);
@@ -6458,15 +6537,17 @@ function save(s) {
 
 function load() {
   try {
-    const ls = localStorage.getItem('amj3');
+    const ls = localStorage.getItem(ST_KEY);
     const parsed = decodeState(ls);
     if (parsed) return migrateState(parsed);
   } catch(e) { console.warn('load localStorage:', e); }
   try {
-    const ss = sessionStorage.getItem('amj3');
+    const ss = sessionStorage.getItem(ST_KEY);
     const parsed = decodeState(ss);
     if (parsed) return migrateState(parsed);
   } catch(e) { console.warn('load sessionStorage:', e); }
+  // Em teste, o cookie real nunca é lido — senão o XP verdadeiro entraria na sessão de teste.
+  if (MODO_TESTE) return {};
   try {
     const match = document.cookie.match(/amj3=([^;]+)/);
     if (match) {
@@ -7142,7 +7223,7 @@ function initApp() {
 //  ETAPA 6 — COMPANHEIRO DE JORNADA
 // ══════════════════════════════════════
 
-const COMPANION_KEY = 'jdpg_companion_v1';
+const COMPANION_KEY = chaveTeste('jdpg_companion_v1');
 
 // Estado do companheiro (persistido)
 let CP = {
@@ -8052,7 +8133,7 @@ const OBSTACULOS = [
 ];
 
 // ── Estado persistido ────────────────────────────────────────────────────
-const E7_KEY = 'jdpg_e7_v2';
+const E7_KEY = chaveTeste('jdpg_e7_v2');
 let E7 = {
   diarios: {},          // { encIdx: {0:'', 1:'', 2:'', 3:''} }
   obsAtivo: null,
@@ -8441,7 +8522,7 @@ function showE7Toast(msg){
 // ══════════════════════════════════════
 
 // ── Estado de celebrações ────────────────────────────────────────────────
-const E8_KEY = 'jdpg_e8_v1';
+const E8_KEY = chaveTeste('jdpg_e8_v1');
 let E8 = {
   lastCelebLevel: -1,       // índice do último nível celebrado
   celebs: [],               // lista de celebrações comunitárias
@@ -8892,8 +8973,8 @@ function filtrarReunioesMes(reunioesMes) {
 }
 
 // ── Storage dos grupos ──────────────────────────────────────────────────
-const GRUPOS_KEY = 'jdpg_grupos_v1';
-const MEU_GRUPO_KEY = 'jdpg_meu_grupo_v1';
+const GRUPOS_KEY = chaveTeste('jdpg_grupos_v1');
+const MEU_GRUPO_KEY = chaveTeste('jdpg_meu_grupo_v1');
 
 // Gratidões e pedidos de oração expiram 7 dias após a publicação — evita
 // acúmulo de posts antigos no mural e no documento compartilhado da nuvem.
@@ -8979,7 +9060,7 @@ function saveGrupos() {
 // Representa a PESSOA, não o aparelho: gerado 1x por instalação, guardado
 // localmente e carimbado no registro do participante ao entrar/criar/aceitar.
 // getDeviceId() continua existindo apenas como apoio técnico.
-const MEMBER_ID_KEY = 'jdpg_member_id_v1';
+const MEMBER_ID_KEY = chaveTeste('jdpg_member_id_v1');
 function getMyMemberId() {
   try {
     let id = localStorage.getItem(MEMBER_ID_KEY);
@@ -8989,7 +9070,7 @@ function getMyMemberId() {
 }
 
 // ── Meus Vínculos: TODOS os grupos dos quais faço parte (modelo de dados) ──
-const VINCULOS_KEY = 'jdpg_meus_vinculos_v1';
+const VINCULOS_KEY = chaveTeste('jdpg_meus_vinculos_v1');
 function loadMeusVinculos() {
   try { const s = localStorage.getItem(VINCULOS_KEY); return s ? (JSON.parse(s) || []) : []; }
   catch { return []; }
@@ -9052,7 +9133,7 @@ function saveMeuGrupo(dados) {
 // Carimba SÓ o MEU registro (identificado pelo ts/nome do meuGrupo antigo).
 // NÃO inventa memberId para registros de terceiros. Persiste só em localStorage
 // (o memberId chega à nuvem na próxima ação — sem corrida de sync no boot).
-const MIGRACAO_UUID_KEY = 'jdpg_migracao_uuid_v1';
+const MIGRACAO_UUID_KEY = chaveTeste('jdpg_migracao_uuid_v1');
 function migrateToVinculos() {
   if (!FB_FLAGS.identidadeUuid) return;
   try {
@@ -9109,7 +9190,7 @@ function migrateToVinculos() {
 // O LINK carrega SÓ o inviteId (?conv=<id>); toda a verdade vem da base.
 // Nada aqui é chamado ainda — geração/leitura/sync/UI vêm nos sub-commits 2.2–2.4.
 const VERSAO_CONVITE  = 2;
-const CONVITES_KEY    = 'jdpg_convites_v1';            // espelho local (cache); fonte da verdade = base
+const CONVITES_KEY    = chaveTeste('jdpg_convites_v1'); // espelho local (cache); fonte da verdade = base
 const CONVITE_TTL_MS  = 7  * 24 * 60 * 60 * 1000;      // validade padrão: 7 dias
 const CONVITE_PODA_MS = 30 * 24 * 60 * 60 * 1000;      // poda terminais após 30 dias
 
@@ -9689,7 +9770,7 @@ async function revogarEConfirmar(inviteId, grupoNum) {
 //   APIs & Services → Credentials → Restrições de aplicativo → Referenciadores HTTP
 //   Domínio autorizado: capelania.github.io (ou o domínio de produção atual)
 // Com essa restrição, a chave é inútil se copiada para outro domínio.
-const FB_CONFIG_KEY = 'jdpg_fb_config';
+const FB_CONFIG_KEY = chaveTeste('jdpg_fb_config');
 const FB_COLL = 'jdpg';
 const FB_DOC  = 'grupos';
 const FB_DEFAULT_CONFIG = {
@@ -9726,7 +9807,7 @@ function uuid() {
 }
 
 // Identidade permanente do aparelho (auditoria de conflitos)
-const DEVICE_ID_KEY = 'jdpg_device_id';
+const DEVICE_ID_KEY = chaveTeste('jdpg_device_id');
 function getDeviceId() {
   try {
     let id = localStorage.getItem(DEVICE_ID_KEY);
@@ -9736,7 +9817,7 @@ function getDeviceId() {
 }
 
 // Log LOCAL de conflitos (nunca enviado ao Firestore) — últimos 50
-const SYNC_CONFLICT_LOG_KEY = 'jdpg_sync_conflict_log';
+const SYNC_CONFLICT_LOG_KEY = chaveTeste('jdpg_sync_conflict_log');
 function logSyncConflict(info) {
   try {
     const log = JSON.parse(localStorage.getItem(SYNC_CONFLICT_LOG_KEY) || '[]');
@@ -9748,7 +9829,7 @@ function logSyncConflict(info) {
 }
 
 // Telemetria LOCAL de sincronização (taxa de sucesso, retries, tempo médio)
-const SYNC_TELEMETRY_KEY = 'jdpg_sync_telemetry';
+const SYNC_TELEMETRY_KEY = chaveTeste('jdpg_sync_telemetry');
 function loadSyncTelemetry() {
   const zero = { total:0, sucesso:0, retries:0, falhas:0, adiados:0, ultimaSync:null, ultimoRetry:null, tempoMedioMs:0, lastSuccessfulSyncVersion:null };
   try { return Object.assign(zero, JSON.parse(localStorage.getItem(SYNC_TELEMETRY_KEY) || 'null') || {}); }
@@ -9806,6 +9887,16 @@ let fbLastSyncTime = null;
 
 // Lê o documento completo e retorna { dados, tutores, ts }
 async function fbReadDoc(cfg) {
+  // ── BARREIRA DO MODO DE TESTE (lado da leitura) ──────────────────────────
+  // Ponto único de leitura do Firestore, gêmeo da barreira de fbWriteGrupos. Não basta
+  // desviar o boot: o app relê a produção sempre que a aba volta a ficar visível e a cada
+  // 30s no polling. Guardando aqui, TODAS as leituras param — boot, polling, retorno de
+  // visibilidade, telas e o laço de convites. "TESTE ISOLADO" significa isolado dos dois
+  // lados. Devolver null é o mesmo que os 5 chamadores já tratam como "documento vazio".
+  if (MODO_TESTE) {
+    registrarEscritaBloqueada('fbReadDoc (leitura)', { destinoQueSeriaUsado: cfg ? cfg.projectId : null });
+    return null;
+  }
   const r = await fetch(fbDocUrl(cfg));
   if (r.status === 404) return null;
   if (!r.ok) { const t = await r.text(); throw new Error('HTTP ' + r.status + ': ' + t.slice(0,120)); }
@@ -9871,6 +9962,30 @@ function fbWarnConflitoPersistente() {
 }
 
 async function fbWriteGrupos(cfg, data, tutoresData, baseUpdateTime, convitesData, setoresMestreData, setoresEfetivoData, embaixadoresExternosData) {
+  // ── BARREIRA DO MODO DE TESTE ────────────────────────────────────────────
+  // Primeira instrução, antes de qualquer cálculo. Este é o ÚNICO ponto do app que faz
+  // PATCH no Firestore, e as TRÊS rotas de gravação desembocam aqui:
+  //   trySaveGrupos() · commitConviteChange() · salvarFbConfig()
+  // (barrar saveGruposToFirebase() deixaria as duas últimas passando).
+  // Devolve a MESMA forma de um sucesso real — { ok, ts, updateTime } — para que o laço de
+  // 3 tentativas, a trava otimista e o commitConviteChange (que só aplica o estado local
+  // depois do ok) se comportem exatamente como em produção. A interface fica realista;
+  // apenas nada sai do aparelho.
+  if (MODO_TESTE) {
+    const dadosStr = JSON.stringify(data);
+    registrarEscritaBloqueada('fbWriteGrupos', {
+      bytes: dadosStr.length,
+      grupos: Array.isArray(data) ? data.length : null,
+      campos: ['dados', 'ts']
+        .concat(tutoresData ? ['tutores'] : [])
+        .concat(convitesData ? ['convites'] : [])
+        .concat(setoresMestreData ? ['setoresMestre'] : [])
+        .concat(setoresEfetivoData ? ['setoresEfetivo'] : [])
+        .concat(embaixadoresExternosData ? ['embaixadoresExternos'] : []),
+      destinoQueSeriaUsado: cfg ? cfg.projectId : null,
+    });
+    return { ok: true, ts: String(Date.now()), updateTime: new Date().toISOString() };
+  }
   const dadosStr = JSON.stringify(data);
   // Guarda de tamanho: a regra do Firestore rejeita "dados" >= 500 KB. Aborta antes de
   // um write fadado a falhar e avisa o usuário, evitando perda silenciosa.
@@ -11933,7 +12048,7 @@ const PG_CAMPANHAS = [
   },
 ];
 
-const PG_CAMP_KEY = 'jdpg_campanhas_v1';
+const PG_CAMP_KEY = chaveTeste('jdpg_campanhas_v1');
 
 // DB-04: campanha é dado do GRUPO, não do aparelho — mora em g.campanhas, sincronizado
 // pelo mesmo caminho de saveGrupos()/Firebase já usado pelo resto dos dados do grupo.
@@ -12260,7 +12375,7 @@ function renderPgProgressHome() {
 //  COMUNIDADE — MURAL DE GRATIDÃO
 // ══════════════════════════════════════
 
-const GRAT_KEY = 'jdpg_gratidoes_v1';
+const GRAT_KEY = chaveTeste('jdpg_gratidoes_v1');
 
 // O Mural de Gratidão começa vazio — só mostra gratidões reais
 // compartilhadas pelos participantes do Pequeno Grupo.
@@ -12299,11 +12414,181 @@ setTimeout(initE8, 100);
 
 
 
+// ══════════════════════════════════════════════════════════════════════════
+//  MODO DE TESTE — faixa, neutralizações externas, semente e saída
+// ══════════════════════════════════════════════════════════════════════════
+// Nada aqui roda quando o modo está desligado: todas as funções só são chamadas por
+// initModoTeste(), e initModoTeste() só é chamada dentro de if (MODO_TESTE).
+
+// Prévia do WhatsApp: mostra o texto que SERIA enviado, sem abrir o WhatsApp nem
+// contactar ninguém. Serve também para conferir o texto dos relatórios com calma.
+function previewWhatsAppTeste(url) {
+  let texto = '', destino = '';
+  try {
+    const u = new URL(url, location.href);
+    // searchParams.get() JÁ devolve o texto decodificado. Um decodeURIComponent() extra aqui
+    // estourava URIError em qualquer relatório com "%" literal (ex.: "Percentual: 33%"), e a
+    // prévia caía no catch mostrando a URL crua em vez da mensagem.
+    destino = u.pathname.replace(/\//g, '') || '(sem número — abriria o seletor de contatos)';
+    texto = u.searchParams.get('text') || '(sem texto)';
+  } catch { texto = url; }
+  const fundo = document.createElement('div');
+  fundo.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100000;display:flex;align-items:center;justify-content:center;padding:1rem';
+  const caixa = document.createElement('div');
+  caixa.style.cssText = 'background:#fff;border-radius:12px;max-width:520px;width:100%;max-height:80vh;overflow:auto;padding:1rem;font-family:system-ui,sans-serif';
+  const cabecalho = document.createElement('div');
+  cabecalho.style.cssText = 'font-weight:700;font-size:15px;color:#8A5A00;margin-bottom:.5rem';
+  cabecalho.textContent = '⚠️ MODO DE TESTE — o WhatsApp NÃO foi aberto';
+  const rotuloDestino = document.createElement('div');
+  rotuloDestino.style.cssText = 'font-size:13px;color:#555;margin-bottom:.5rem';
+  rotuloDestino.textContent = 'Destino: ' + destino;
+  const rotulo = document.createElement('div');
+  rotulo.style.cssText = 'font-size:13px;color:#555;margin-bottom:.25rem';
+  rotulo.textContent = 'Mensagem que seria enviada:';
+  const pre = document.createElement('pre');
+  pre.style.cssText = 'white-space:pre-wrap;word-break:break-word;background:#F5F5F5;border-radius:8px;padding:.75rem;font-size:13px;margin:0 0 .75rem';
+  pre.textContent = texto;                       // textContent: nunca interpreta HTML
+  const fechar = document.createElement('button');
+  fechar.style.cssText = 'width:100%;padding:.6rem;border:none;border-radius:8px;background:#0D2137;color:#fff;font-size:15px;cursor:pointer';
+  fechar.textContent = 'Fechar';
+  fechar.onclick = () => fundo.remove();
+  caixa.append(cabecalho, rotuloDestino, rotulo, pre, fechar);
+  fundo.appendChild(caixa);
+  document.body.appendChild(fundo);
+}
+
+// Intercepta window.open num único lugar, em vez de editar os 7 pontos que abrem wa.me —
+// menos invasivo e sem risco de esquecer um. Links que não são WhatsApp seguem normalmente.
+function instalarNeutralizacoesTeste() {
+  const abrirOriginal = window.open.bind(window);
+  window.open = function (url, ...resto) {
+    if (typeof url === 'string' && /(wa\.me|api\.whatsapp\.com)/i.test(url)) {
+      registrarEscritaBloqueada('window.open(WhatsApp)', { url: String(url).slice(0, 140) });
+      previewWhatsAppTeste(url);
+      return null;
+    }
+    return abrirOriginal(url, ...resto);
+  };
+}
+
+// Faixa fixa. Não depende de cor para comunicar: traz o símbolo ⚠️ e o texto por extenso.
+function renderFaixaModoTeste() {
+  const faixa = document.createElement('div');
+  faixa.id = 'faixa-modo-teste';
+  faixa.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#8A5A00;color:#fff;'
+    + 'font-family:system-ui,sans-serif;font-size:12.5px;line-height:1.35;padding:6px 10px;'
+    + 'display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:2px solid #FFD24A';
+  const texto = document.createElement('div');
+  texto.style.cssText = 'flex:1;min-width:200px;font-weight:700';
+  texto.textContent = '⚠️ MODO DE TESTE — DADOS FICTÍCIOS — NENHUMA ALTERAÇÃO SERÁ GRAVADA NA PRODUÇÃO';
+  const ambiente = document.createElement('div');
+  ambiente.style.cssText = 'font-size:11.5px;opacity:.95';
+  ambiente.textContent = 'Ambiente: TESTE ISOLADO · sem leitura e sem escrita na produção · dados em "teste_*"';
+  const botoes = document.createElement('div');
+  botoes.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap';
+  const bSemear = document.createElement('button');
+  bSemear.style.cssText = 'padding:4px 9px;border:1px solid #fff;border-radius:6px;background:none;color:#fff;font-size:11.5px;cursor:pointer';
+  bSemear.textContent = 'Semear dados fictícios';
+  bSemear.onclick = semearDadosDeTeste;
+  const bDiario = document.createElement('button');
+  bDiario.style.cssText = bSemear.style.cssText;
+  bDiario.textContent = 'Ver bloqueios';
+  bDiario.onclick = mostrarDiarioBloqueiosTeste;
+  const bSair = document.createElement('button');
+  bSair.style.cssText = 'padding:4px 9px;border:none;border-radius:6px;background:#fff;color:#8A5A00;font-size:11.5px;font-weight:700;cursor:pointer';
+  bSair.textContent = 'Sair do modo de teste';
+  bSair.onclick = sairDoModoTeste;
+  botoes.append(bSemear, bDiario, bSair);
+  faixa.append(texto, ambiente, botoes);
+  document.body.appendChild(faixa);
+  const ajustar = () => { document.body.style.paddingTop = faixa.offsetHeight + 'px'; };
+  ajustar();
+  window.addEventListener('resize', ajustar);
+}
+
+function mostrarDiarioBloqueiosTeste() {
+  const linhas = listarEscritasBloqueadas();
+  const texto = linhas.length
+    ? linhas.map((r, i) => `${i + 1}. [${r.quando}] ${r.origem}\n   ${JSON.stringify(r)}`).join('\n\n')
+    : 'Nenhuma saída bloqueada até agora nesta sessão.';
+  previewDiarioTeste(texto, linhas.length);
+}
+function previewDiarioTeste(texto, total) {
+  const fundo = document.createElement('div');
+  fundo.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100000;display:flex;align-items:center;justify-content:center;padding:1rem';
+  const caixa = document.createElement('div');
+  caixa.style.cssText = 'background:#fff;border-radius:12px;max-width:640px;width:100%;max-height:80vh;overflow:auto;padding:1rem;font-family:system-ui,sans-serif';
+  const t = document.createElement('div');
+  t.style.cssText = 'font-weight:700;font-size:15px;margin-bottom:.5rem';
+  t.textContent = `Diário de saídas bloqueadas (${total})`;
+  const pre = document.createElement('pre');
+  pre.style.cssText = 'white-space:pre-wrap;word-break:break-word;background:#F5F5F5;border-radius:8px;padding:.75rem;font-size:12px;margin:0 0 .75rem';
+  pre.textContent = texto;
+  const fechar = document.createElement('button');
+  fechar.style.cssText = 'width:100%;padding:.6rem;border:none;border-radius:8px;background:#0D2137;color:#fff;font-size:15px;cursor:pointer';
+  fechar.textContent = 'Fechar';
+  fechar.onclick = () => fundo.remove();
+  caixa.append(t, pre, fechar);
+  fundo.appendChild(caixa);
+  document.body.appendChild(fundo);
+}
+
+// Semente fictícia: um PG de teste com participantes inventados, só no namespace "teste_".
+// O nome usa a convenção de QA que já existia no app (isPgDeTeste) — se algum dia esses
+// dados vazassem para um ranking, seriam excluídos por ela.
+function semearDadosDeTeste() {
+  if (!MODO_TESTE) return;
+  loadGrupos();
+  const g = PEQUENOS_GRUPOS.find(x => x.num === 1);
+  if (!g) return;
+  const agora = Date.now();
+  g.nome = 'PG TESTE QA';
+  g.tutor = 'Tutor de Teste';
+  g.coordenador = 'Coordenadora de Teste';
+  g.diaReuniao = 'Quarta-feira';
+  g.horaReuniao = '15:00';
+  g.participantes = [
+    { nome: 'Colaborador de Teste', memberId: getMyMemberId(), ts: agora, whatsapp: '21999990000' },
+    { nome: 'Colega de Teste', ts: agora + 1 },
+    { nome: 'Visitante de Teste', ts: agora + 2 },
+  ];
+  ST.userName = 'Colaborador de Teste';
+  save(ST);
+  if (typeof upsertVinculo === 'function') upsertVinculo({ grupoNum: g.num, grupoNome: g.nome, ts: agora });
+  saveGrupos();          // grava no localStorage "teste_*"; a ida à nuvem é barrada e registrada
+  alert('Dados fictícios criados no namespace de teste:\n\n• PG TESTE QA (3 participantes)\n• Você = "Colaborador de Teste"\n\nNada disso existe na produção.');
+  goHome();
+}
+
+// Saída: remove só o interruptor da sessão e recarrega sem o parâmetro. NÃO apaga nada
+// real, NÃO copia dado de teste para o namespace normal. Os dados "teste_*" permanecem
+// no aparelho, inertes — só voltam a ser lidos se o modo for ligado outra vez.
+function sairDoModoTeste() {
+  try { sessionStorage.removeItem(MODO_TESTE_SESSAO_KEY); } catch (_) {}
+  try {
+    const u = new URL(location.href);
+    u.searchParams.delete('teste');
+    location.replace(u.toString());
+  } catch (_) { location.reload(); }
+}
+
+function initModoTeste() {
+  instalarNeutralizacoesTeste();
+  renderFaixaModoTeste();
+  console.warn('%c⚠️ MODO DE TESTE ISOLADO ATIVO — nenhuma escrita chega ao Firebase de produção; '
+    + 'armazenamento com prefixo "teste_". Use listarEscritasBloqueadas() para auditar.',
+    'background:#8A5A00;color:#fff;padding:2px 6px;border-radius:3px');
+}
+
 // Service Worker removido temporariamente — causava cache de versões antigas
 // durante o desenvolvimento ativo. Se desejar reativar no futuro (app em produção
 // estável), descomente o bloco abaixo e gere um service-worker.js atualizado.
 // ── Inicializar sync Firebase ao carregar ────────────────────────────────
-if (loadFbConfig()) {
+// MODO DE TESTE ISOLADO: não lê a produção e não inicia o polling de 30s. Sem este
+// desvio, abrir a aba de teste já dispararia leitura contínua do banco real.
+if (MODO_TESTE) {
+  initModoTeste();
+} else if (loadFbConfig()) {
   syncFromFirebase();
   startFbPoll();
 }
