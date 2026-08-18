@@ -1,5 +1,61 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-08-17] — Correção: Relatório Mensal não registrava encontros (relatado no PG Multibênçãos)
+
+**Defeito relatado:** o coordenador do PG Multibênçãos abria o Relatório Mensal, escolhia a
+data, informava o número de participantes, tocava em "+ Registrar encontro" — e a tela não
+reagia de forma nenhuma. Nenhum aviso, nenhum registro.
+
+**Causa (duas peças que se combinavam):**
+
+1. `abrirRelatoriosMensais` oferecia **6 meses fixos** para escolher (em agosto/2026: Agosto,
+   Julho, Junho, Maio, Abril e Março), mas `filtrarReunioesMes` **descarta** todo mês anterior
+   a `REUNIOES_MES_INICIO` (`'2026-07'`) a cada leitura dos dados — inclusive na releitura que
+   acontece logo depois de registrar. Um encontro lançado em junho ou antes era criado e
+   apagado no mesmo instante.
+2. `registrarEncontroPg` desistia **em silêncio** em todos os casos de recusa (data ausente,
+   fora do mês, no futuro, participantes em branco) — três `return` sem mensagem nenhuma.
+   Sem eles, não havia como o coordenador descobrir o motivo.
+
+**Correções:**
+
+- A lista de meses passa a oferecer só os meses que o app realmente guarda (`mk >=
+  REUNIOES_MES_INICIO`). Nenhuma regra de dados foi alterada — a trava de julho/2026, que
+  existe porque os meses anteriores eram de teste, continua valendo.
+- `mostrarErroEncontro(monthKey, texto)` (nova) + campo `#freq-erro-<mês>` abaixo do botão:
+  faixa discreta que explica a recusa ("Escolha a data do encontro.", "A data precisa estar
+  entre … e …", "Informe quantos participantes vieram ao encontro."). Some sozinha no
+  registro seguinte que der certo. Guarda de fundo para `monthKey` anterior a julho/2026,
+  caso uma tela aberta antes da correção chegue até a função.
+
+**Segunda correção, achada durante o teste — data pelo relógio de Londres:**
+`limitesEncontroMes` usava `new Date().toISOString().slice(0,10)`, que devolve a data **UTC**.
+No Brasil (UTC-3), a partir das 21h o "hoje" do app já era o dia seguinte: o campo "Data do
+encontro" abria preenchido com **amanhã** e aceitava esse dia como válido — encontro gravado
+na data errada. Nova função `dataLocalISO(d)` lê dia/mês/ano do relógio local, sem conversão;
+`limitesEncontroMes` passa a usá-la nas duas pontas (último dia do mês e hoje).
+Não foi alterado o mesmo padrão em `isObstacleActionDoneToday`/`doObstacleAction` (missão
+diária dos obstáculos) — são consistentes entre si e ficam para uma decisão à parte.
+
+**Testado** (cópia do app com o modo de teste forçado, **zero chamadas ao Firestore**
+confirmadas na aba de rede):
+- lista de meses: antes `2026-08 … 2026-03`; agora só `2026-08` e `2026-07`;
+- encontro gravado em junho, após `filtrarReunioesMes`: lista vazia — reprodução exata do
+  defeito relatado;
+- as quatro mensagens de recusa aparecem com o texto certo e somem após um registro válido;
+- registro válido (14/08, 4 de 6 presentes) aparece na lista e **sobrevive ao
+  recarregamento dos dados** — que era onde o registro sumia;
+- às 21h51 do dia 17: método antigo dizia `2026-08-18`, `dataLocalISO()` diz `2026-08-17`;
+  o campo abre em 17/08 e recusa 18/08.
+
+**Junção com o trabalho vindo do outro computador:** esta correção foi aplicada sobre os
+commits `60b3b51` (selo do mês + título maior no cartão dos Embaixadores) e `9a17841`
+(`embaixadores-agosto.html`, app dos Embaixadores externos). O conflito no cartão foi
+resolvido mantendo o bloco navy "COMEÇAR A JORNADA" (que já traz o selo do mês desenhado
+para fundo escuro) e preservando a alteração do outro PC no estado "já registrado".
+Verificado depois da junção: um único botão "COMEÇAR A JORNADA", selo "AGOSTO" presente,
+nenhum resto do antigo "Confirmar participação" no cartão.
+
 ## [2026-07-27] — RC4.8.3B (2ª redefinição): Painel único de Indicadores por Setor + correção de meta do Embaixadores
 
 Funde os dois blocos irmãos (Cobertura Setorial + Embaixadores da Esperança) num único

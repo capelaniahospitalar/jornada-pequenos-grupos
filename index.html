@@ -3469,9 +3469,16 @@ function abrirRelatoriosMensais(nome) {
   loadGrupos();
   const grupos = getGruposDoResponsavel(nome);
   const hoje = new Date();
+  // Só oferece meses que o app REALMENTE guarda: filtrarReunioesMes() descarta
+  // qualquer mês anterior a REUNIOES_MES_INICIO toda vez que os dados são lidos.
+  // Antes desta trava a lista mostrava 6 meses fixos — quem escolhesse um mês
+  // anterior conseguia digitar data e presentes, clicava em "Registrar encontro"
+  // e nada acontecia: o registro era criado e descartado no mesmo instante, sem
+  // aviso nenhum (relatado no PG Multibênçãos em 2026-08-17).
   const meses = [];
   for (let i = 0; i < 6; i++) {
-    meses.push(embMonthKey(new Date(hoje.getFullYear(), hoje.getMonth() - i, 1)));
+    const mk = embMonthKey(new Date(hoje.getFullYear(), hoje.getMonth() - i, 1));
+    if (mk >= REUNIOES_MES_INICIO) meses.push(mk);
   }
   const monthOptions = meses.map(mk => `<option value="${mk}">${embMonthLabel(mk)}</option>`).join('');
   const grupoOptions = grupos.map(g => `<option value="${g.num}">${sanitize(g.nome || 'Grupo ' + g.num)}</option>`).join('');
@@ -3492,13 +3499,25 @@ function abrirRelatoriosMensais(nome) {
   resetScroll();
 }
 
+// Data do CALENDÁRIO de quem está usando o app, no formato AAAA-MM-DD.
+// Não usar toISOString() para isto: ele converte para o horário de Londres, e no Brasil
+// (UTC-3) toda hora a partir das 21h já pertence ao dia seguinte lá. O efeito era o campo
+// "Data do encontro" abrir com a data de AMANHÃ para quem registrasse à noite — e aceitar
+// esse dia como válido. Aqui o dia é lido do relógio local, sem conversão nenhuma.
+function dataLocalISO(d) {
+  const dt = d || new Date();
+  const mes = String(dt.getMonth() + 1).padStart(2, '0');
+  const dia = String(dt.getDate()).padStart(2, '0');
+  return dt.getFullYear() + '-' + mes + '-' + dia;
+}
+
 // Limites de data válidos para registrar um encontro dentro de um mês: não deixa
 // registrar no futuro nem fora do mês do relatório que está sendo visualizado.
 function limitesEncontroMes(monthKey) {
   const [y, m] = monthKey.split('-').map(Number);
   const inicio = monthKey + '-01';
-  const fimMes = new Date(y, m, 0).toISOString().slice(0, 10);
-  const hoje = new Date().toISOString().slice(0, 10);
+  const fimMes = dataLocalISO(new Date(y, m, 0));   // new Date(ano, mês, 0) = último dia do mês
+  const hoje = dataLocalISO();
   return { min: inicio, max: fimMes < hoje ? fimMes : hoje };
 }
 function formatarDataBR(iso) {
@@ -3525,17 +3544,32 @@ function renderMeterHtml(label, pct) {
     </div>`;
 }
 
+// Mostra (ou limpa, com texto vazio) o motivo de um encontro não ter sido registrado.
+// Existe porque registrarEncontroPg desistia em silêncio: o coordenador clicava no botão
+// e a tela não reagia de forma nenhuma, sem meio de descobrir o porquê.
+function mostrarErroEncontro(monthKey, texto) {
+  const el = document.getElementById('freq-erro-' + monthKey);
+  if (!el) return;
+  el.textContent = texto || '';
+  el.style.display = texto ? 'block' : 'none';
+}
+
 function registrarEncontroPg(grupoNum, monthKey, nome) {
   const dataEl = document.getElementById('freq-data-' + monthKey);
   const presentesEl = document.getElementById('freq-presentes-' + monthKey);
   const data = dataEl ? dataEl.value : '';
   const { min, max } = limitesEncontroMes(monthKey);
-  if (!data || data < min || data > max) return;
+  mostrarErroEncontro(monthKey, '');
+  // Guarda de fundo: a lista de meses já não oferece meses descartáveis, mas uma tela
+  // aberta antes da correção (ou um relatório antigo ainda na tela) chegaria aqui.
+  if (monthKey < REUNIOES_MES_INICIO) return mostrarErroEncontro(monthKey, 'Este relatório é de um mês anterior a julho/2026 — o app não guarda encontros desse período. Gere o relatório de um mês mais recente.');
+  if (!data) return mostrarErroEncontro(monthKey, 'Escolha a data do encontro.');
+  if (data < min || data > max) return mostrarErroEncontro(monthKey, 'A data precisa estar entre ' + formatarDataBR(min) + ' e ' + formatarDataBR(max) + '. Encontros no futuro ou fora do mês deste relatório não podem ser registrados.');
   let presentes = parseInt(presentesEl ? presentesEl.value : '', 10);
-  if (isNaN(presentes)) return;
+  if (isNaN(presentes)) return mostrarErroEncontro(monthKey, 'Informe quantos participantes vieram ao encontro.');
   loadGrupos();
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
-  if (!g) return;
+  if (!g) return mostrarErroEncontro(monthKey, 'Não foi possível encontrar este Pequeno Grupo. Volte à lista de grupos e tente de novo.');
   const total = (g.participantes || []).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i).length;
   presentes = Math.max(0, Math.min(presentes, total));
   const encontro = { id: uuid(), data, presentes, total, marcadoPor: nome, ts: Date.now() };
@@ -3627,6 +3661,7 @@ function gerarRelatorioMensal(nome, grupoNumParam, monthKeyParam) {
         <label style="display:block;font-size:12px;color:var(--text3);margin-bottom:2px">Quantos participantes vieram? (de ${totalParticipantesAtual})</label>
         <input type="number" min="0" max="${totalParticipantesAtual}" id="freq-presentes-${monthKey}" placeholder="ex: 6" style="width:100%;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.5rem .7rem;font-size:15px;font-family:var(--ff-body);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:.4rem">
         <button onclick="registrarEncontroPg(${grupoNum}, '${monthKey}', '${nomeEsc}')" style="width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.65rem;font-size:15px;font-weight:600;color:#fff;cursor:pointer;font-family:var(--ff-body)">+ Registrar encontro</button>
+        <div id="freq-erro-${monthKey}" style="display:none;margin-top:.4rem;background:#FDECEA;border:0.5px solid #F3B8B4;border-radius:var(--radius-sm);padding:.5rem .65rem;font-size:13px;color:#8A2B20;line-height:1.4;font-family:var(--ff-body)"></div>
       </div>`;
 
   const participantesSemDup = (g.participantes || []).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
@@ -4922,16 +4957,16 @@ function renderEmbaixadoresMissoes() {
           <div class="mission-meta">✔ Participação registrada em ${embRegistro.data}</div>
         </div>
       </div>` : `
-      <div style="background:var(--blue-pale);border-radius:var(--radius-sm);padding:.6rem .75rem;margin:.2rem 0">
-        <div style="display:flex;align-items:center;gap:8px">
-          <div style="width:28px;height:28px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:17.5px;flex-shrink:0">🌟</div>
-          <div class="mission-info">
-            <div style="display:inline-block;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold);background:var(--gold-light);border:0.5px solid rgba(184,134,11,0.3);border-radius:4px;padding:1px 7px;margin-bottom:3px;font-family:var(--ff-body)">${embLabel}</div>
-            <div class="mission-name" style="color:var(--navy);font-size:19px;font-weight:800;line-height:1.25">Embaixadores da Esperança</div>
-            <div class="mission-meta">Você participou da ação missionária deste mês?</div>
+      <div style="background:linear-gradient(160deg,var(--navy),var(--navy2));border-radius:var(--radius);padding:1rem .9rem;margin:.35rem 0;box-shadow:0 3px 12px rgba(13,33,55,.28)">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:.6rem">
+          <div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🌟</div>
+          <div style="flex:1;min-width:0">
+            <div style="display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:2px;color:var(--gold-mid);border:1px solid rgba(212,160,23,.45);border-radius:99px;padding:1px 9px;margin-bottom:4px;font-family:var(--ff-body)">${embLabel.split('/')[0].toUpperCase()}</div>
+            <div style="font-family:var(--ff-serif);font-size:18.5px;color:#fff;line-height:1.25">Embaixadores da Esperança</div>
           </div>
         </div>
-        <button onclick="confirmarEmbaixadores()" style="margin-top:.5rem;width:100%;background:var(--teal);color:#fff;border:none;border-radius:var(--radius-sm);padding:.5rem;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--ff-body)">✅ Confirmar participação</button>
+        <div style="font-size:13.5px;color:rgba(255,255,255,.8);line-height:1.5;margin-bottom:.75rem;font-family:var(--ff-body)">Uma jornada curta para refletir, olhar para si mesmo e receber uma missão.<br><strong style="color:#fff">Sua participação é registrada ao final dela.</strong></div>
+        <button onclick="abrirEmbaixadoresAgosto()" style="width:100%;background:#fff;color:var(--navy);border:none;border-radius:var(--radius-sm);padding:.7rem;font-size:15.5px;font-weight:700;letter-spacing:.8px;cursor:pointer;font-family:var(--ff-body)">COMEÇAR A JORNADA</button>
       </div>`) : (meuGrupo ? `
       <div style="background:#FDECEA;border:0.5px solid #F3B8B4;border-radius:var(--radius-sm);padding:.6rem .75rem;margin:.2rem 0">
         <div style="font-weight:700;font-size:14px;color:#E05050;margin-bottom:2px">⚠️ Não conseguimos confirmar seu vínculo com o Pequeno Grupo "${sanitize(meuGrupo.grupoNome || ('Grupo ' + meuGrupo.grupoNum))}" neste aparelho.</div>
@@ -4966,19 +5001,20 @@ function renderEmbaixadoresMissoes() {
       <div class="mission-title">🌟 Missões dos Embaixadores de Esperança</div>
       <div style="font-size:12px;color:var(--text3);margin-bottom:.4rem;font-family:var(--ff-body);font-style:italic">"Todo mundo é alguém. E se todo mundo é alguém, todo mundo importa."</div>
       ${embRow}
-      ${embAgostoEntradaHtml()}
+      ${(euEmb && !(embRegistro && embRegistro.participou)) ? '' : embAgostoEntradaHtml()}
       ${weeklyCard(i1)}
       ${weeklyCard(i2)}
     </div>`;
 }
 
 // ── Embaixadores da Esperança — Agosto: ENTRADA da experiência digital ─────────
-// Só um caminho de acesso, dentro da área que já é dos Embaixadores. Deliberadamente
-// diferente do botão de participação (fundo navy, sem "confirmar", com seta de "abre
-// uma tela") para NUNCA ser confundido com ele: o registro oficial continua sendo
-// confirmarEmbaixadores(), e só ele. Fica fora do ternário do embRow porque a
-// experiência é conteúdo — vale para quem já confirmou, para quem ainda não confirmou
-// e para quem perdeu o vínculo com o PG.
+// 2026-08-17 (pedido do Capelão): o bloco de participação do cartão deixou de registrar
+// direto e passou a ser a PORTA da jornada — o registro acontece na última tela dela,
+// pelo mesmo confirmarEmbaixadores() de sempre, que continua intocado.
+// Por isso esta entrada separada só aparece quando NÃO é redundante: para quem já
+// registrou no mês (rever a experiência / dar retorno da missão) e para quem não tem
+// vínculo com PG. Quem ainda pode registrar entra pelo próprio bloco de participação,
+// que já leva ao mesmo lugar — dois botões para o mesmo destino confundiriam.
 function embAgostoEntradaHtml() {
   // Quem já recebeu a missão do mês e ainda não deu retorno vê o convite para responder —
   // é assim que o retorno opcional fica visível ao voltar aos Embaixadores.
@@ -5397,8 +5433,9 @@ function embAgoForcasHtml(virtude) {
 //   • botão de "missão realizada" ou "concluí";
 //   • campo `missaoFeita` (ou equivalente) em lugar nenhum;
 //   • qualquer trava ou pré-condição sobre o registro de participação.
-// O registro oficial continua sendo confirmarEmbaixadores(), pelo botão "Confirmar
-// participação" no cartão dos Embaixadores — independente desta tela.
+// O registro oficial continua sendo confirmarEmbaixadores() — desde 2026-08-17 acionado
+// só na tela 7 desta jornada (o cartão dos Embaixadores passou a ser a porta de entrada,
+// não mais o ponto de registro). A função em si segue intocada.
 //
 // A missão é DERIVADA da força escolhida (mesma força → sempre a mesma missão), então
 // não precisa ser guardada em lugar nenhum. Indexada pelo NOME da força, que é único
