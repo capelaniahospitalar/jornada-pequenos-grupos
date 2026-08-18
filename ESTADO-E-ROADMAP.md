@@ -1,10 +1,64 @@
-# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-07-30)
+# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-08-17)
 
 > Documento para retomar o trabalho em outra máquina/sessão. Cole o conteúdo de volta
 > para o assistente ao recomeçar — a "memória" do assistente **não viaja entre máquinas**;
 > só este arquivo (via GitHub) viaja. **Nenhuma alteração de código sem aprovação do desenho.**
 
-## 🛑 PONTO DE PARADA — 2026-08-05 — retomar por aqui
+## 🛑 PONTO DE PARADA — 2026-08-17 (noite) — retomar por aqui
+
+**Estado:** tudo publicado. Último commit `fc10e14`, sincronizado com `origin/main`, **nada
+pendente na pasta**. Antes de qualquer coisa no outro PC: `git fetch origin` e `git pull`.
+
+**São DOIS apps publicáveis desde 17/08** — e este é o ponto que mais engana:
+- `index.html` — app dos Pequenos Grupos;
+- `embaixadores-agosto.html` — app dos Embaixadores da Esperança para colaboradores **sem PG**
+  (coleção Firestore própria `embaixadoresExternos`, chaves locais com prefixo `embx_`, lista
+  fixa de 31 setores). Criado no commit `9a17841`.
+
+Os dois têm **cópias independentes das mesmas 8 telas** da experiência de Agosto. Não há código
+compartilhado: **alterar a jornada em um NÃO altera o outro**. Toda revisão de texto ou de
+comportamento da experiência precisa ser feita duas vezes.
+
+**O que foi feito em 17/08 (tudo publicado, detalhado no `CHANGELOG.md`):**
+1. `1d6fa62` — modo de teste isolado (Etapa 0), resposta ao INC-001.
+2. `60b3b51` / `9a17841` — selo do mês no cartão + criação do app dos Embaixadores externos.
+3. `2c697bc` — **correção do Relatório Mensal**: a tela oferecia 6 meses, mas o app descarta
+   todo encontro anterior a `REUNIOES_MES_INICIO` (`'2026-07'`) — quem escolhesse junho ou
+   antes registrava e o dado sumia no mesmo instante, sem aviso. Relatado no PG Multibênçãos.
+   Corrigidos também: mensagens de recusa visíveis (antes o botão desistia em silêncio) e a
+   data que era calculada pelo fuso de Londres (depois das 21h o app achava que "hoje" era o
+   dia seguinte). Nova função `dataLocalISO()`.
+4. `2d4fee3` — dois comentários desatualizados sobre onde acontece o registro.
+5. `fc10e14` — **revisão editorial da experiência de Agosto, nos dois apps**: inversão
+   espelho→entrega (telas 3 e 4 trocaram), "A ENTREGA", botões "E SE VOCÊ TAMBÉM FIZER ISSO?" e
+   "DESCOBRIR UMA FORÇA", bloco "O ENVIO" fechando o arco de "A esperança começa em mim." com
+   "A esperança começa quando eu encontro o outro.", e remoção da frase sobre
+   relatório/Coordenador/supervisão/gerência.
+
+**Como testar sem tocar na produção (obrigatório — lição do INC-001):** acrescente `?teste=1`
+à URL. Vale só para aquela aba (`sessionStorage`), sobrevive ao reload, barra escrita e leitura
+do Firestore e prefixa 20 chaves locais com `teste_`. Funciona nos dois apps. Para testar um
+arquivo local sem servidor, a query string se perde — nesse caso force `const MODO_TESTE = true`
+numa CÓPIA do arquivo, nunca no arquivo publicável.
+
+**Em aberto (nada urgente, nada quebrado):**
+1. `isObstacleActionDoneToday` / `doObstacleAction` ainda decidem o "hoje" da missão diária dos
+   obstáculos pelo fuso de Londres — mesma raiz já corrigida no Relatório Mensal, mas em outra
+   funcionalidade. Deixado para decisão à parte (as duas pontas são coerentes entre si, então
+   o app não se contradiz hoje).
+2. Encontros anteriores a julho/2026 continuam sem poder ser registrados — decisão consciente
+   (os meses anteriores eram teste). Se algum PG precisar lançar aquele período, é preciso
+   decidir antes o que fazer com a trava `REUNIOES_MES_INICIO`.
+3. Lacuna de documentação: os commits de 2026-08-07 a 08-14 nunca viraram registro no roadmap
+   nem no CHANGELOG. Já investigados por diff numa sessão anterior; falta escrever.
+4. Pendências herdadas da auditoria de agosto (PGs duplicados 38/32, PG 7 × 13) — ver o ponto
+   de parada anterior, logo abaixo. **Continuam sem resolução.**
+
+**Sugestão de próxima ação:** conferir os dois apps publicados no celular (a experiência de
+Agosto está no ar para gente de verdade) e, se os textos estiverem como o Capelão quer, atacar
+o item 3 — a lacuna de documentação — antes que ela cresça.
+
+## PONTO DE PARADA ANTERIOR — 2026-08-05 (mantido como histórico)
 
 **Estado:** RC6.0.1A implementada em código (local, ainda não commitada). ADR-005 aprovado. Campo
 `status` já existe em produção nos 50 PGs; feature flag `pgStatusFiltros` desligada (nenhuma tela
