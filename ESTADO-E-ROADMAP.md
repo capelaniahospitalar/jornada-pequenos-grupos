@@ -1,10 +1,155 @@
-# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-08-17)
+# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-08-18)
 
 > Documento para retomar o trabalho em outra máquina/sessão. Cole o conteúdo de volta
 > para o assistente ao recomeçar — a "memória" do assistente **não viaja entre máquinas**;
 > só este arquivo (via GitHub) viaja. **Nenhuma alteração de código sem aprovação do desenho.**
 
-## 🛑 PONTO DE PARADA — 2026-08-17 (noite) — retomar por aqui
+## 🛑 PONTO DE PARADA — 2026-08-18 — retomar por aqui
+
+**Sequenciamento decidido nesta sessão.** Duas frentes independentes: uma correção de
+persistência (concluída e no ar) e a revisão do algoritmo de ranking (em homologação). A
+Mudança B (50→70 PGs) foi **deliberadamente adiada** para não misturar mudança de capacidade
+com a homologação de uma regra matemática crítica.
+
+```
+Checkpoint A  →  Fases 1–5  →  Fase 6  →  Fase 7  →  Fase 8  →  Mudança B
+   ✅ no ar        ✅ feitas    ✅ entregue  ⏸️ bloqueada  ⏸️ depois   ⏸️ adiada
+                              homologação
+                               pendente
+```
+
+| Etapa | Estado |
+|---|---|
+| **Checkpoint A** — Persistência protegida contra escrita destrutiva | ✅ **homologado em produção** (commit `130d268`, publicado 18/08) |
+| **Fases 1–5** — Auditoria, dados reais, princípios, modelagem, teste de estresse | ✅ concluídas e versionadas (commit `2b7c4f3`) |
+| **Fase 6** — Homologação matemática do novo ranking | ✅ entregue · ⏳ **aguardando homologação das decisões finais** |
+| **Fase 7** — Implementação em modo paralelo (v2 oficial × v3 experimental, mesmos dados) | ⏸️ **bloqueada até a Fase 6 ser homologada — NÃO iniciada** |
+| **Fase 8** — Homologação e ativação do v3 como oficial | ⏸️ posterior |
+| **Mudança B** — 50 → 70 slots de PG | ⏸️ **adiada para depois da Fase 8** |
+
+**PRODUÇÃO NÃO MUDOU.** O que está no ar: **50 PGs**, ranking pelo **IMD v2 de 23/07/2026**
+(`FB_FLAGS.imdV2 = true`, `pgStatusFiltros = false`), mais a proteção de persistência. Nenhuma
+linha de lógica de ranking foi tocada em nenhuma das seis fases.
+
+### Fase 6 — as cinco decisões que faltam para liberar a Fase 7
+
+| # | Bloco decisório | Natureza | Próximo passo |
+|---|---|---|---|
+| 1 | Fórmula **50/25/15/10** + corte de **3 critérios** + piso de **3 pessoas** | decisão matemática (os três formam um bloco só) | homologar ou ajustar |
+| 2 | **Ciclo mensal** | decisão de regra | confirmar (assumido: mês) |
+| 3 | **Ato de bondade** — 0 de 166 pessoas | dado/UX | teste humano: abrir a tela e verificar se é desuso ou defeito |
+| 4 | **Ketellen × Ketelllen** (PG 6) | dado cadastral | conferência humana — **decide o 1º lugar** |
+| 5 | **PG da Capelania em 1º** | comunicação | decidir tratamento |
+
+### Fase 6 — MATEMÁTICA HOMOLOGADA em 18/08/2026
+
+| Regra | Decisão |
+|---|---|
+| Pesos **50/25/15/10** (Abrangência · Envolvimento · Missão · Profundidade) | ✅ homologado |
+| **≥ 3 dos 6 critérios por pessoa** = pessoa com evidência | ✅ homologado |
+| **≥ 3 participantes fora da carência por PG** = amostra mínima | ✅ homologado |
+| Carência não conta para atingir o piso | ✅ homologado |
+| Tamanho absoluto não gera bônus | ✅ homologado |
+| FORTALEZA como caso de regressão obrigatório | ✅ permanente |
+
+**Regra permanente:** um PG com 1 ou 2 participantes elegíveis **nunca** ocupa posição no ranking,
+ainda que seu IMD seja 100 — não é juízo sobre o discipulado das pessoas, é ausência de amostra.
+
+Arquitetura em três níveis: **pessoa** (≥3 critérios) → **PG** (≥3 elegíveis) → **ranking** (fórmula).
+
+**Não reabrir esta discussão durante a Fase 7**, salvo inconsistência objetiva encontrada nos testes
+de implementação.
+
+### Estado das quatro pendências não matemáticas
+
+| # | Pendência | Estado em 18/08 |
+|---|---|---|
+| 1 | **Ciclo do ranking** | ⏳ confirmar: mês-calendário + regra de fechamento (ver abaixo) |
+| 2 | **"Atos de bondade"** | ✅ **TESTADO — motor funciona** (ver abaixo) |
+| 3 | **Ketellen × Ketelllen** | 🔶 identidade **confirmada**; correção **não autorizada** — exige especificação de migração |
+| 4 | **Capelania em 1º** | 🟢 tende a desaparecer sozinha após a consolidação da duplicata |
+
+**Pendência 2 — resultado do teste funcional (18/08, modo de teste isolado):** registrar uma vitória
+sobre um obstáculo **incrementa** o contador de bondades (0 → 1, contrib da semana corrente). O motor
+está íntegro; o problema é **semântico**: a interface exibe "❤️ Atos de bondade" mas o único caminho
+para preencher é a tela Obstáculos ou uma missão de serviço/amor — nada no app diz isso.
+**Consequência para o ranking:** o critério **permanece fora**, porque continua reprovando na regra de
+admissão (praticável, mas não descobrível). Volta ao modelo quando existir um caminho que a pessoa
+reconheça. Correção de UX própria, fora do escopo do ranking.
+*O teste não tocou produção: zero chaves fora do prefixo `teste_`, Firebase bloqueado nos dois sentidos.*
+
+**Pendência 3 — o que a correção exige.** Identidade confirmada (mesmo WhatsApp `5521993558217`,
+mesmo dia, 65 min de diferença; registro das 13:46 abandonado, o das 14:51 é o vivo). Mas
+**identidade confirmada ≠ autorização para apagar**. A operação correta é, nesta ordem:
+preservar/transferir o histórico do registro antigo (ele guarda **Embaixadores de julho**) →
+consolidar no registro vivo → validar → só então neutralizar a duplicata. Merece especificação de
+migração de dados própria, separada da Fase 6. **Efeito no ranking:** PG 6 vai de 5/8 para 5/7,
+IMD 49 → 55, assume o 1º lugar.
+
+**Pendência 4 — decisão de princípio:** não haverá regra especial para esconder ou rebaixar o PG da
+Capelania. O ranking mostra o resultado da regra homologada sobre a base de dados correta. Se a
+consolidação cadastral muda o 1º lugar, o ranking reflete isso.
+
+### Ciclo de apuração — a decidir formalmente
+
+**Proposta:** `Ciclo de apuração do ranking = mês-calendário`, coerente com a chave mensal que o
+Embaixadores já usa.
+
+Falta decidir o **momento de fechamento**, que muda o comportamento do app:
+
+| Opção | Comportamento |
+|---|---|
+| **A — Ranking corrente** | recalculado ao vivo durante o mês; o que se vê hoje é o parcial |
+| **B — Ranking fechado** | só vale o retrato do último dia do mês |
+| **A + B (recomendado)** | o painel mostra o **parcial ao vivo**, marcado como parcial; no último dia do mês grava-se o **retrato congelado**, que é o único que pode ser publicado |
+
+A recomendação A+B atende o requisito P7.4 da Fase 3 (resultado congelado, reconstruível) sem tirar
+do Tutor a visão corrente — e é o que destrava o teste TA-07, hoje impossível.
+
+### Dívidas e correções abertas por esta investigação (fora do escopo do ranking)
+
+- **IDENT-02 — deduplicação derrotada por erro de digitação.** `buscarCadastroExistente` (IDENT-01)
+  compara **nome + WhatsApp**; um "l" a mais no nome criou um cadastro duplicado da mesma pessoa
+  (caso Ketellen/Ketelllen, PG 6). Considerar o **WhatsApp como identificador de colisão**, isolado do
+  nome. Bug independente, não misturar com o ranking.
+- **UX-BONDADE — label sem caminho.** Ver pendência 2 acima.
+
+### Decisões de escopo já tomadas
+
+- **O motor v1 permanece intocado durante a Fase 7.** Passarão a conviver três motores: v1
+  (legado/morto), v2 (oficial) e v3 (experimental). O v1 fica como referência histórica para
+  diagnosticar discrepâncias. Sua remoção vira **tarefa independente pós-RC** ("Limpeza técnica —
+  remoção do motor v1 legado"), só depois de o v3 ser promovido a oficial. Não misturar mudança
+  de regra + remoção de legado + aumento de capacidade na mesma RC.
+- **A Fase 7 nasce em modo paralelo**, nunca substituindo o ranking atual: os dois motores
+  calculam sobre os mesmos dados, comparam-se, e só na Fase 8 o novo vira oficial. É o mesmo
+  padrão já usado na RC3.5.3 → RC3.5.5, quando o IMD v2 entrou.
+- **A Mudança B não bloqueia a Fase 7:** o algoritmo especificado na Fase 6 já é indiferente ao
+  número de slots (parte dos três estados; slot vazio cai em "Não classificável"
+  automaticamente). Com 70 slots, os 11 não classificáveis de hoje seriam 31, sem mudança de
+  fórmula. A proteção de persistência (Checkpoint A) é o que torna a expansão segura quando ela
+  vier.
+
+### Caso de validação obrigatório (permanente)
+
+**PG 41 "FORTALEZA" — IMD 78 com 1 único elegível.** Qualquer regra nova precisa ser testada
+contra este caso: 3 participantes, dois deles em carência, e uma única pessoa sustentando 100%
+em três dimensões. Na especificação da Fase 6 ele sai do ranking e vai para "Em medição".
+O caso-espelho é o **PG 49 "Limpando corações"** (8 pessoas, todas em carência, 3 já engajadas),
+que hoje aparece como "Não Engajado" e também deve ficar "Em medição".
+
+### Documentos produzidos (todos versionados, exceto o último)
+
+`AUDITORIA-IMD-FASE-1.md` · `AUDITORIA-IMD-FASE-2-DADOS.md` · `AUDITORIA-IMD-FASE-2-MATRIZ.csv` ·
+`ESPEC-RANKING-FASE-3-PRINCIPIOS.md` · `MODELOS-RANKING-FASE-4.md` · `TESTE-ESTRESSE-FASE-5.md` ·
+`HOMOLOGACAO-RANKING-FASE-6.md` *(ainda não commitado)*
+
+Dívida registrada: **DIV-001** em `ARQ-004` — escrita destrutiva da lista inteira; direção-alvo é
+escrita por delta.
+
+---
+
+## PONTO DE PARADA ANTERIOR — 2026-08-17 (noite) — mantido como histórico
 
 **Estado:** tudo publicado. Último commit `fc10e14`, sincronizado com `origin/main`, **nada
 pendente na pasta**. Antes de qualquer coisa no outro PC: `git fetch origin` e `git pull`.
