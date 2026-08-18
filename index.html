@@ -11895,6 +11895,253 @@ function renderRankingPgs(nome) {
   resetScroll();
 }
 
+// ════════════════════════════════════════════════════════════════════════
+//  FASE 7 — MOTOR v3 DO RANKING (EXPERIMENTAL, EM PARALELO — NÃO OFICIAL)
+// ════════════════════════════════════════════════════════════════════════
+// Implementa a especificação homologada em HOMOLOGACAO-RANKING-FASE-6.md (18/08/2026).
+//
+// ESTADO: experimental. NENHUMA tela chama este motor. O ranking exibido a Tutores e
+// Coordenadores continua sendo o v2 (classificarPgsV2), inalterado. O v1 legado
+// (getPgIMD/classificarPgs) também segue intocado. Promover o v3 a oficial é decisão da
+// Fase 8 — não fazer aqui.
+//
+// O QUE MUDA EM RELAÇÃO AO v2 (tudo homologado, não reinterpretar):
+//   1. Dimensões: Abrangência 50% · Envolvimento 25% · Missão 15% · Profundidade 10%.
+//      A Regularidade SAI do cálculo (reprovada na regra de admissão: depende de um terceiro
+//      registrar em nome do grupo — um PG pode se reunir fielmente e tirar zero).
+//   2. Critérios de evidência: 6, não 7. "Ato de bondade" sai (0 de 166 pessoas; praticável,
+//      mas não descobrível — ver UX-BONDADE). Corte permanece em 3.
+//   3. População medível = ativos sem duplicata − (em carência sem evidência) + (em carência
+//      COM evidência). A carência protege a pessoa, nunca premia o PG.
+//   4. Piso de amostra: o PG só compete com >= 3 participantes FORA da carência. Abaixo disso
+//      fica "Em medição" — sem posição, sem nota, sem categoria.
+//   5. Categoria derivada só da Abrangência (a posição vem da nota ponderada; são coisas
+//      distintas por decisão — ver BASELINE-F7, seção 6.2).
+//   6. (EMENDA 1 / Fase 6.6) JANELA DO CICLO MENSAL, aplicada a TODAS as dimensões que dependem
+//      de atividade observável — não só à evidência. Misturar dois relógios dentro do mesmo IMD
+//      (evidência do mês + envolvimento histórico) reintroduziria o problema que a emenda corrige.
+//      LIMITAÇÃO DECLARADA (granularidade temporal): contrib não guarda histórico por critério,
+//      então a janela é aplicada NO NÍVEL DA PESSOA ("esteve ativa no ciclo"), nunca por critério.
+//      Não criar regras temporais independentes por critério — exigiria mudar o modelo de dados,
+//      o que está fora de escopo. A Profundidade mantém medidas acumuladas (estudos/sequência),
+//      calculadas sobre população já filtrada pelo ciclo. Ver BASELINE-F7-CICLO-MENSAL.md §2.1.
+
+const PG_IMD_V3_WEIGHTS = Object.freeze({
+  abrangencia: 0.50, envolvimento: 0.25, missao: 0.15, profundidade: 0.10,
+});
+const PG_V3_CRITERIOS_MIN   = 3;   // dos 6 critérios, para a pessoa ter "evidência"
+const PG_V3_CARENCIA_DIAS   = 7;   // proteção do recém-chegado
+const PG_V3_MIN_ELEGIVEIS   = 3;   // piso de amostra do PG (fora da carência)
+const PG_V3_CATEGORIAS = Object.freeze([
+  { categoria: 'Altamente Engajado',   abrangencia: 75 },
+  { categoria: 'Engajado',             abrangencia: 60 },
+  { categoria: 'Engajamento Moderado', abrangencia: 40 },
+]);
+
+// Os 6 critérios admitidos. "bondades" NÃO entra (ver cabeçalho).
+function contarCriteriosV3(p, monthKey) {
+  const c = (p.progresso && p.progresso.contrib) ? p.progresso.contrib : null;
+  let n = 0;
+  if (c && c.estudos     > 0) n++;
+  if (c && c.oracoes     > 0) n++;
+  if (c && c.gratidao    > 0) n++;
+  if (c && c.engajamento > 0) n++;
+  if ((p.progresso?.streak || 0) > 0) n++;
+  if (p.embaixadores?.[monthKey]?.participou) n++;
+  return n;
+}
+function foraDaCarenciaV3(p, agora) {
+  if (!p.ts) return true;   // registro legado sem data: elegível de imediato (mesma regra do v2)
+  return ((agora - p.ts) / 86400000) >= PG_V3_CARENCIA_DIAS;
+}
+
+// ── JANELA DO CICLO (Emenda 1) ───────────────────────────────────────────────────────────
+// Primeiro instante do ciclo, derivado do próprio monthKey — nunca uma data fixa no código.
+function inicioDoCicloV3(monthKey) {
+  const [ano, mes] = String(monthKey).split('-').map(Number);
+  return new Date(ano, mes - 1, 1).getTime();
+}
+// A pessoa pertence ao ciclo se agiu no app dentro do mês, ou confirmou os Embaixadores do mês.
+// Este é o ÚNICO teste temporal do motor — aplicado igualmente a todas as dimensões (ver cabeçalho).
+function dentroDoCicloV3(p, monthKey, inicioCiclo) {
+  if ((p.progresso?.updatedAt || 0) >= inicioCiclo) return true;
+  return !!p.embaixadores?.[monthKey]?.participou;
+}
+
+function temEvidenciaV3(p, monthKey, inicioCiclo) {
+  if (contarCriteriosV3(p, monthKey) < PG_V3_CRITERIOS_MIN) return false;
+  return dentroDoCicloV3(p, monthKey, inicioCiclo);
+}
+
+// População do PG, nas quatro camadas que a homologação exige distinguir.
+function populacaoPgV3(g, monthKey, agora, inicioCiclo) {
+  const ativos = participantesAtivos(g);
+  const semDup = ativos.filter((p, i, arr) =>
+    arr.findIndex(x => (x.nome || '').trim().toLowerCase() === (p.nome || '').trim().toLowerCase()) === i);
+  const fora      = semDup.filter(p => foraDaCarenciaV3(p, agora));
+  const mediveis  = semDup.filter(p => foraDaCarenciaV3(p, agora) || temEvidenciaV3(p, monthKey, inicioCiclo));
+  const evidencia = mediveis.filter(p => temEvidenciaV3(p, monthKey, inicioCiclo));
+  // Emenda 1: subconjunto dos medíveis que pertence ao ciclo — base de TODA dimensão de atividade.
+  const noCiclo   = mediveis.filter(p => dentroDoCicloV3(p, monthKey, inicioCiclo));
+  return { registros: (g.participantes || []).length, ativos, semDup, fora, mediveis, evidencia, noCiclo };
+}
+
+// Três estados. Só CLASSIFICADO compete.
+function estadoPgV3(g, pop) {
+  if (!pop.ativos.length)            return { estado: 'NAO_CLASSIFICAVEL', motivo: 'sem participantes' };
+  if (g.status !== 'ATIVO')          return { estado: 'NAO_CLASSIFICAVEL', motivo: 'status = ' + (g.status || 'null') };
+  if (g.institucional)               return { estado: 'NAO_CLASSIFICAVEL', motivo: 'PG institucional' };
+  // Herdado do v2: PG de QA nunca entra em ranking. Não afeta o baseline (zero PGs de teste
+  // em produção hoje); mantido porque um PG de teste pode estar ATIVO.
+  if (isPgDeTeste(g.nome))           return { estado: 'NAO_CLASSIFICAVEL', motivo: 'PG de teste (QA)' };
+  if (pop.fora.length < PG_V3_MIN_ELEGIVEIS) {
+    return { estado: 'EM_MEDICAO',
+             motivo: 'apenas ' + pop.fora.length + ' de ' + pop.ativos.length +
+                     ' fora da carência (mínimo ' + PG_V3_MIN_ELEGIVEIS + ')' };
+  }
+  return { estado: 'CLASSIFICADO', motivo: '' };
+}
+
+function classificarCategoriaV3(abrangencia) {
+  for (const nivel of PG_V3_CATEGORIAS) if (abrangencia >= nivel.abrangencia) return nivel.categoria;
+  return abrangencia > 0 ? 'Baixo Engajamento' : 'Sem Evidência Registrada';
+}
+
+// Calcula o IMD v3 de um PG. Não persiste nada (mesma disciplina CQS do v2).
+function getPgIMDv3(grupoNum, monthKey, agora) {
+  monthKey = monthKey || embMonthKey();
+  agora    = agora    || Date.now();
+  const g = (typeof PEQUENOS_GRUPOS !== 'undefined') ? PEQUENOS_GRUPOS.find(x => x.num === grupoNum) : null;
+  const vazio = { grupoNum, estado: 'NAO_CLASSIFICAVEL', motivo: 'grupo inexistente',
+                  registros: 0, ativos: 0, elegiveis: 0, mediveis: 0, comEvidencia: 0,
+                  abrangencia: 0, envolvimento: 0, missao: 0, profundidade: 0, totalScore: 0,
+                  categoria: 'Sem Evidência Registrada', schemaVersion: 3 };
+  if (!g) return vazio;
+
+  const inicioCiclo = inicioDoCicloV3(monthKey);
+  const pop = populacaoPgV3(g, monthKey, agora, inicioCiclo);
+  const st  = estadoPgV3(g, pop);
+  const n   = pop.mediveis.length;
+  const contribDe = p => (p.progresso && p.progresso.contrib) ? p.progresso.contrib : null;
+
+  const abrangencia = pgImdPercent(pop.evidencia.length, n);
+  // Emenda 1: as frentes são contadas apenas entre quem pertence ao ciclo (pop.noCiclo),
+  // mas sempre sobre o denominador completo de medíveis (n) — a proporção é do PG inteiro.
+  const envolvimento = n ? Math.round((
+      pgImdPercent(pop.noCiclo.filter(p => (contribDe(p)?.oracoes     || 0) > 0).length, n) +
+      pgImdPercent(pop.noCiclo.filter(p => (contribDe(p)?.gratidao    || 0) > 0).length, n) +
+      pgImdPercent(pop.noCiclo.filter(p => (contribDe(p)?.engajamento || 0) > 0).length, n)
+    ) / 3) : 0;
+  // Missão já é intrinsecamente do ciclo (embaixadores[monthKey]) — nenhum filtro extra é preciso.
+  const missao = pgImdPercent(pop.mediveis.filter(p => p.embaixadores?.[monthKey]?.participou).length, n);
+  const profundidade = pop.evidencia.length ? Math.round((
+      pgImdPercent(pop.evidencia.reduce((s, p) => s + (p.progresso?.estudosConcluidos || 0), 0) / pop.evidencia.length, STUDIES.length) +
+      pgImdPercent(pop.evidencia.reduce((s, p) => s + Math.min(p.progresso?.streak || 0, MAX_STREAK_DAYS), 0) / pop.evidencia.length, MAX_STREAK_DAYS)
+    ) / 2) : 0;
+
+  // Arredondamento: dimensões inteiras ANTES da ponderação, para que o cartão feche a conta.
+  const totalScore = Math.round(
+      abrangencia  * PG_IMD_V3_WEIGHTS.abrangencia +
+      envolvimento * PG_IMD_V3_WEIGHTS.envolvimento +
+      missao       * PG_IMD_V3_WEIGHTS.missao +
+      profundidade * PG_IMD_V3_WEIGHTS.profundidade);
+
+  return { grupoNum, grupo: g.nome || (PG_DEFAULT_NAME + ' ' + g.num),
+    estado: st.estado, motivo: st.motivo,
+    registros: pop.registros, ativos: pop.ativos.length, elegiveis: pop.fora.length,
+    mediveis: n, comEvidencia: pop.evidencia.length, noCiclo: pop.noCiclo.length,
+    abrangencia, envolvimento, missao, profundidade, totalScore,
+    categoria: classificarCategoriaV3(abrangencia),
+    // ── ARQUITETURA DE LEITURA (Fase 6.6) ────────────────────────────────────────────────
+    // "O ranking ordena os PGs; os indicadores explicam por que eles estão naquela posição."
+    // O resultado competitivo é totalScore/rank/categoria. Os indicadores abaixo EXPLICAM —
+    // nenhum deles entra na nota, e o alcance absoluto nunca pode virar componente (P3).
+    indicadores: {
+      capilaridade: { proporcao: abrangencia, absoluto: pop.evidencia.length, base: n },
+      envolvimento: envolvimento,
+      profundidade: profundidade,
+    },
+    ciclo: monthKey,
+    calculatedAt: new Date(agora).toISOString(), schemaVersion: 3 };
+}
+
+// Desempate homologado: nota → Abrangência → Envolvimento → Profundidade → nº de medíveis →
+// menor número de PG. Determinístico, nunca sorteio.
+const PG_RANKING_TIEBREAK_V3 = ['totalScore', 'abrangencia', 'envolvimento', 'profundidade', 'mediveis'];
+function compararPgsParaRankingV3(a, b) {
+  for (const campo of PG_RANKING_TIEBREAK_V3) if (b[campo] !== a[campo]) return b[campo] - a[campo];
+  return a.grupoNum - b.grupoNum;
+}
+
+// Classificação v3 completa. Devolve os três estados separados — quem está "Em medição" não
+// recebe posição, nota nem categoria (exigência da homologação).
+function classificarPgsV3(monthKey, agora) {
+  monthKey = monthKey || embMonthKey();
+  agora    = agora    || Date.now();
+  const todos = PEQUENOS_GRUPOS.map(g => getPgIMDv3(g.num, monthKey, agora));
+  const classificados = todos.filter(x => x.estado === 'CLASSIFICADO').sort(compararPgsParaRankingV3);
+  let pos = 1;
+  classificados.forEach((e, i) => {
+    if (i > 0 && compararPgsParaRankingV3(classificados[i - 1], e) !== 0) pos = i + 1;
+    e.rank = pos;
+  });
+  return {
+    classificados,
+    emMedicao:        todos.filter(x => x.estado === 'EM_MEDICAO'),
+    naoClassificaveis:todos.filter(x => x.estado === 'NAO_CLASSIFICAVEL'),
+    todos, monthKey, calculatedAt: new Date(agora).toISOString(),
+  };
+}
+
+// ── Comparação v2 × v3 (diagnóstico da Fase 7) ───────────────────────────────────────────
+// LEITURA CONGELADA POR CONSTRUÇÃO: os dois motores rodam no MESMO bloco síncrono, sobre o
+// mesmo PEQUENOS_GRUPOS. Como o JavaScript é single-threaded e toda sincronização é assíncrona,
+// nenhuma gravação pode entrar no meio. É a resposta ao salto 54 → 56 observado em 18/08, quando
+// uma participante confirmou os Embaixadores entre duas leituras feitas em momentos diferentes.
+function compararMotoresRankingV2xV3() {
+  const agora = Date.now();
+  const monthKey = embMonthKey();
+
+  const v2Lista = classificarPgsV2();                    // motor oficial, intocado
+  const v3      = classificarPgsV3(monthKey, agora);     // motor experimental
+
+  const v2Por = {}; v2Lista.forEach(e => { v2Por[e.grupoNum] = e; });
+  const v3Por = {}; v3.todos.forEach(e => { v3Por[e.grupoNum] = e; });
+
+  const linhas = PEQUENOS_GRUPOS.map(g => {
+    const a = v2Por[g.num] || null;
+    const b = v3Por[g.num];
+    return {
+      grupoNum: g.num, grupo: b.grupo,
+      elegiveis: b.elegiveis, mediveis: b.mediveis, comEvidencia: b.comEvidencia,
+      abrangencia: b.abrangencia, envolvimento: b.envolvimento, missao: b.missao, profundidade: b.profundidade,
+      imdV2: a ? a.totalScore : null, imdV3: b.estado === 'CLASSIFICADO' ? b.totalScore : null,
+      diferenca: (a && b.estado === 'CLASSIFICADO') ? (b.totalScore - a.totalScore) : null,
+      posV2: a ? a.rank : null, posV3: b.rank || null,
+      estadoV3: b.estado, motivoV3: b.motivo,
+      categoriaV2: a ? a.categoria : null, categoriaV3: b.estado === 'CLASSIFICADO' ? b.categoria : null,
+      // v2 só tem "capilaridade" e "regularidade" como comparáveis diretos
+      capilaridadeV2: a ? a.capilaridadeScore : null, regularidadeV2: a ? a.regularidadeScore : null,
+      elegiveisV2: a ? a.totalElegiveis : null, comEvidenciaV2: a ? a.totalComEvidencia : null,
+    };
+  });
+
+  return {
+    monthKey, calculadoEm: new Date(agora).toISOString(),
+    resumo: {
+      v2_classificados: v2Lista.length,
+      v3_classificados: v3.classificados.length,
+      v3_emMedicao: v3.emMedicao.length,
+      v3_naoClassificaveis: v3.naoClassificaveis.length,
+      v3_mediveis: v3.classificados.reduce((s, e) => s + e.mediveis, 0),
+      v3_comEvidencia: v3.classificados.reduce((s, e) => s + e.comEvidencia, 0),
+    },
+    podioV2: v2Lista.slice(0, 3).map(e => e.rank + 'º ' + e.grupo + ' (' + e.totalScore + ')'),
+    podioV3: v3.classificados.slice(0, 3).map(e => e.rank + 'º ' + e.grupo + ' (' + e.totalScore + ')'),
+    linhas, v2Lista, v3,
+  };
+}
+
 // RC4.8.5A: painel institucional (cross-PG) do Embaixadores da Esperança por setor —
 // mesmo portão de acesso do Ranking dos PGs (qualquer Tutor/Coordenador, não é PG-específico).
 // RC4.8.3B (redefinição, 2026-07-27): a tela institucional deixa de ser onde se trabalha —
