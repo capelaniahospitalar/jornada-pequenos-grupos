@@ -1,9 +1,14 @@
 # HOMOLOGAÇÃO MATEMÁTICA DO NOVO RANKING — FASE 6
 
-> ## ✅ STATUS: **HOMOLOGADA** em 18/08/2026
+> ## ✅ STATUS: **HOMOLOGADA** em 18/08/2026 · **⚠️ COM EMENDA 1**
 >
 > Todas as regras — matemáticas e não matemáticas — estão fechadas. Ver **"Decisões finais"** ao fim
 > do documento.
+>
+> **⚠️ LEIA A EMENDA 1 (final do documento) ANTES DE IMPLEMENTAR.** A Fase 6.6 restringiu a
+> evidência do IMD competitivo ao **ciclo mensal vigente**. A matemática desta especificação
+> permanece integralmente válida; o que mudou foi a **janela de observação**. O texto original está
+> preservado sem edição — a emenda não revoga, acrescenta.
 >
 > **Esta especificação é a fonte da verdade da Fase 7.** A implementação deve implementá-la como
 > está: **não reinterpretar, não "melhorar" e não reabrir** a fórmula, os pesos, os cortes ou os
@@ -696,3 +701,54 @@ Este baseline é o ponto de comparação da Fase 7: o motor v3 implementado deve
 
 *Fase 6 encerrada. O algoritmo aqui especificado ainda não existe no app: o que está em produção
 continua sendo o IMD v2 de 23/07/2026.*
+
+---
+
+# EMENDA 1 — Janela do ciclo mensal (Fase 6.6, 18/08/2026)
+
+> **Esta emenda não revoga nada.** Tudo o que foi homologado em 18/08/2026 permanece válido:
+> a fórmula, os pesos 50/25/15/10, o corte de ≥3 critérios por pessoa, o piso de ≥3 elegíveis por PG,
+> o tratamento da carência, a normalização, o arredondamento, o desempate e as categorias.
+> **O texto original acima está preservado sem edição, para rastreabilidade histórica.**
+
+## O que muda
+
+A especificação original definia "Evidência de Engajamento" **sem recorte temporal** — usava o
+último registro da pessoa, de qualquer época. Era a limitação **A-07**, herdada da Fase 1 e mantida
+conscientemente por falta de histórico por participante.
+
+A Fase 6.5 mostrou que isso é uma incoerência de construto: declaramos "IMD de agosto" e contávamos
+ação de julho. Medido em 18/08: **4 das 36 pessoas com evidência não tiveram nenhuma atividade em
+agosto** e mesmo assim pontuavam.
+
+**A partir da Fase 6.6, fica decidido:**
+
+> ### O IMD competitivo do ciclo usa exclusivamente evidências produzidas **dentro do ciclo mensal vigente**.
+>
+> O histórico permanece disponível para análise longitudinal, mas **não interfere** no ranking do
+> ciclo corrente.
+
+## O que isso não muda
+
+Nada na matemática. A fórmula, os pesos, os cortes e o piso continuam idênticos. **Muda a janela de
+observação, não o cálculo.**
+
+## Efeito medido (18/08/2026)
+
+Pessoas com evidência: **36 → 32**. Os **quatro primeiros colocados não se movem** — a mudança não
+fabrica um novo campeão, apenas retira evidência antiga de quem estava sendo beneficiado por
+histórico. Caem de forma expressiva o PG 24 CONEXÃO REAL (5º → 7º) e o PG 5 Manutenção da Fé
+(7º → 13º), cuja evidência era majoritariamente histórica.
+
+## Efeito sobre os critérios de validade
+
+O critério **V3** da Fase 6.5 ("a janela temporal é declarada e respeitada") passa de **pendente** a
+**atendido** — era o único da lista que a homologação original deixava em aberto.
+
+## Consequências documentais
+
+- `BASELINE-F7-PRE-IMPLEMENTACAO.md` passa a ser **baseline histórico** (levantado sob janela aberta).
+- O motor v3 escrito na Fase 7 **implementa a janela aberta** e precisará de adaptação — bloqueada
+  até a homologação formal das dez definições da Fase 6.6.
+
+**Fonte:** `FASE-6.6-CONSTRUTO-DO-IMD.md`, decisão 2.

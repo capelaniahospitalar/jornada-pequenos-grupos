@@ -1,9 +1,12 @@
 # ESPECIFICAÇÃO DE MIGRAÇÃO — Consolidação de cadastro duplicado (PG 6)
 
-> ## ⚠️ ESTA ESPECIFICAÇÃO **NÃO FOI EXECUTADA**
-> Documento autorizado a existir; a operação **não** está autorizada a rodar. Nenhum dado de
-> produção foi alterado. A execução exige autorização explícita, em momento próprio, fora da
-> Fase 7.
+> ## ✅ EXECUTADA E VALIDADA EM 18/08/2026
+> Ver **"Registro de execução"** ao fim do documento — inclusive a **correção da previsão do §6**
+> (previa IMD 55; o validado é 54, e a causa está registrada).
+>
+> *O texto das seções 1 a 8 abaixo é o da especificação como foi aprovada **antes** da execução, e
+> está preservado sem edição para efeito de auditoria — inclusive onde diz que a execução não estava
+> autorizada, o que era verdade no momento em que foi escrito.*
 
 **Data:** 18/08/2026 · **Origem:** achado D-08 (Fase 2), evidência conclusiva no Anexo B da Fase 6
 **Alvo:** PG 6 "Serviço social" · **Pessoa:** Ketellen Guedes
@@ -164,3 +167,95 @@ registro foi alterado no intervalo — desde que a janela de baixo uso tenha sid
 ---
 
 *Especificação pronta. Nenhuma etapa foi executada.*
+
+---
+
+# REGISTRO DE EXECUÇÃO — 18/08/2026
+
+> **Status: EXECUTADA E VALIDADA.** Autorizada em duas etapas separadas, com ponto de parada
+> obrigatório entre elas.
+
+## Backup
+
+| | |
+|---|---|
+| Arquivo | `BACKUP-pre-migracao-PG6-20260818T153805Z.json` |
+| Tamanho | 277.655 bytes · 50 PGs |
+| SHA-256 | `812d2fff5af19f6112300a09507d7f639d31b1f3c67ad62dde228b2c21445e33` |
+| `updateTime` de origem | `2026-08-18T14:20:44.779396Z` |
+
+## Passos 1 a 3 — consolidação (PATCH, autorizado)
+
+`PATCH` com `updateMask.fieldPaths=dados&ts` e precondição de `updateTime`. **HTTP 200.**
+Novo `updateTime`: `2026-08-18T15:39:53.385906Z`.
+
+Verificação **antes** de gravar: 50 grupos antes e depois · um único grupo alterado (PG 6) · um único
+participante alterado · um único campo acrescentado (`embaixadores`) · nenhum campo removido.
+Verificação **depois**: gravado idêntico ao pretendido, zero divergências; `tutores` (4) e `convites`
+(344) idênticos ao backup; campos de topo preservados.
+
+## Passo 4 — neutralização (função do próprio app, sem PATCH manual)
+
+Executada por `removerParticipanteDoPainel(6, 1785343575994)` — a mesma função da opção "remover
+participante" do Painel. Confirmação do app exibida. Telemetria do app: **1 sincronização, 1 sucesso,
+0 falhas, 0 retentativas, nada pendente**. Novo `updateTime`: `2026-08-18T15:47:20.508647Z`.
+
+Travas verificadas antes da chamada: alvo correto pelo `memberId`, nome confirmado, ainda não
+removido, e **não era tutor nem coordenador** do PG 6 (a função limparia esse campo se fosse).
+
+## Antes → depois
+
+| PG 6 | Antes | Depois |
+|---|---|---|
+| Registros (inclui tombstone) | 9 | **9** |
+| Ativos | 9 | **8** |
+| Após deduplicação por nome | 9 | **8** |
+| Elegíveis | 8 | **7** |
+| Medíveis | 8 | **7** |
+| Com evidência | 5 | **5** |
+
+| Documento | Antes | Depois |
+|---|---|---|
+| PGs | 50 | **50** |
+| Registros | 200 | **200** |
+| Ativos | 195 | **194** |
+| Elegíveis | 166 | **165** |
+| Medíveis | 172 | **171** |
+| Com evidência | 40 | **40** |
+
+Tombstone criado corretamente (`removed: true` + `updatedAt`), **com o histórico de julho preservado
+dentro dele**. Registro vivo intacto (XP 405, 2 estudos, sequência 1) e com o histórico de julho
+copiado. Tutor e Coordenador do PG 6 inalterados. Gratidão do Mural preservada.
+
+## ⚠️ CORREÇÃO DA PREVISÃO DESTA ESPECIFICAÇÃO
+
+A seção **§6 (Critérios de aceitação)** previa que o PG 6 chegaria a **Abrangência 71 / IMD 55**.
+
+| | Previsto | Validado |
+|---|---|---|
+| Abrangência | 71 | **71** ✔ |
+| **IMD** | **55** | **54** ✘ |
+
+**A previsão estava errada; os dados e a execução estão corretos.**
+
+**Causa:** o registro duplicado possuía `contrib.engajamento = 2`, ou seja, **contava como Missão
+Semanal** na dimensão Envolvimento. A previsão de 55 supôs que ele não contribuía em nenhuma frente.
+Com a neutralização, a Missão Semanal caiu de 3 para 2 de 7, e o **Envolvimento caiu de 43 para 38**
+— o que reduz a nota de 55 para 54.
+
+Isto **não** é registrado como substituição silenciosa: o número previsto fica preservado acima, com
+a causa da divergência, para auditoria futura.
+
+**Nota adicional — o valor mudou de novo, por atividade legítima:** no baseline levantado às
+16:22 UTC do mesmo dia, o PG 6 marca **56**, porque a participante Ana Gabrielle confirmou os
+Embaixadores de Agosto às 13:22 (BRT), elevando a Missão de 3/7 para 4/7. Ver
+`BASELINE-F7-PRE-IMPLEMENTACAO.md`, seção 6.1.
+
+**Efeito no pódio (confirmado):** o PG 6 assume o **1º lugar**; o PG 1 "PG - Capelania" fica em 2º
+com 51, inalterado. Nenhum outro PG foi afetado.
+
+## Pendências desta migração que seguem abertas
+
+1. **A pessoa deve ser avisada?** Decisão pastoral, não técnica.
+2. **Dívida `IDENT-02`** — a deduplicação por nome + WhatsApp foi derrotada por um erro de digitação.
+   Correção independente, fora do escopo do ranking.
