@@ -210,3 +210,47 @@ tem um alarme (`fbWarnTooLarge`) ativo em produção.
 
 **Este documento é exclusivamente diagnóstico/de projeto — nenhum código foi escrito, nenhuma
 coleção nova foi criada, nenhuma migração foi executada.**
+
+---
+
+## Dívida arquitetural — DIV-001: escrita destrutiva da lista inteira
+
+**Registrada em:** 2026-08-18 · **Origem:** vulnerabilidade encontrada ao dimensionar a expansão
+de 50 para 70 slots de PG.
+
+### O modelo atual
+
+Toda gravação monta o payload como `PEQUENOS_GRUPOS.map(...)` e substitui o campo `dados` inteiro
+do documento. Isto significa, na prática:
+
+> **"A minha lista local inteira substitui a lista da nuvem."**
+
+Consequência: aquilo que o aparelho local **não conhece** é indistinguível, para a nuvem, daquilo
+que o aparelho local **decidiu apagar**. Uma versão do app que conhece 50 slots, ao gravar sobre uma
+nuvem que já tem 70, apaga 20 PGs reais — sem erro, sem aviso, sem conflito de concorrência.
+Comprovado em teste em 18/08/2026 sobre o código então em produção: payload de 50, 20 PGs perdidos.
+
+### O que foi feito agora (mitigação, não correção)
+
+`registrarGruposDesconhecidos()` + preservação em `fbGruposPreservados`, devolvidos em toda
+gravação, mais uma validação pré-gravação que cancela a escrita se algum PG já visto na nuvem
+sumiria do payload. Isso **protege o sintoma conhecido** (PG inteiro desconhecido) e não custa
+nada ao fluxo normal.
+
+### O que continua em aberto
+
+A mitigação protege o registro de PG inteiro. Ela **não** protege campos ou entidades dentro de um
+PG que uma versão futura venha a criar e uma versão antiga não conheça — porque `applyGruposData`
+e o payload de `trySaveGrupos` listam campo a campo, e um campo novo que a versão antiga não copia
+continua sendo apagado na regravação. É a mesma família do problema já registrado em
+"campo novo do grupo precisa ser listado em 5 funções".
+
+### Direção-alvo
+
+Evoluir de "substituo a lista inteira" para **"atualizo apenas o que realmente mudou"** — escrita
+por delta/por documento, e não por substituição de coleção serializada. Isso é a mesma direção da
+seção 1 deste documento (de "1 documento" para "N coleções"): com uma coleção por PG, uma gravação
+toca um documento só, e desconhecer um PG deixa de ser capaz de apagá-lo, por construção.
+
+**Não implementar junto com mudanças de capacidade ou de regra de negócio.** Esta dívida é a causa
+raiz de uma classe de perda de dados; merece RC própria, com homologação dedicada.

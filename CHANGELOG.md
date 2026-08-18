@@ -1,5 +1,41 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-08-18] — Correção de segurança de persistência: fim da escrita destrutiva por desconhecimento
+
+**Mudança A, isolada.** Não altera capacidade (segue com 50 slots), não altera ranking, IMD, telas
+ou regra de negócio. Corrige uma vulnerabilidade de gravação encontrada ao dimensionar a futura
+expansão de slots.
+
+**A falha.** A gravação envia a lista local inteira por cima do campo `dados` da nuvem. Um aparelho
+rodando versão antiga (que conhece só os PGs 1–50) lia um documento com PGs 1–70, descartava os
+51–70 em `applyGruposData` (`idx < 0 → return`) e, na gravação seguinte, regravava só os 50 que
+conhecia — **apagando 20 PGs reais da nuvem**, sem erro e sem aviso. Comprovado em teste sobre o
+código em produção: payload de 50 PGs, 20 perdidos.
+
+**A correção.** Princípio: *um registro que existe na nuvem nunca pode ser substituído por ausência
+de conhecimento local.*
+- `registrarGruposDesconhecidos()` guarda **intactos** (sem interpretar, sem mesclar, sem exibir) os
+  PGs lidos da nuvem que não têm correspondente local; `fbGruposPreservados` só cresce.
+- `trySaveGrupos()` devolve esses registros no payload, ordenado por `num`.
+- **Validação pré-gravação:** se algum PG já visto na nuvem sumiria do payload, a gravação é
+  **cancelada** (`perdaDetectada`), a alteração fica pendente e o caso vai para o log local de
+  conflitos. Perder uma gravação é recuperável; perder um PG da nuvem não é.
+
+Guardar sem absorver é deliberado: incorporar os PGs desconhecidos à lista ativa mudaria ranking,
+relatórios e a fila de criação de PG numa versão que não foi feita para eles.
+
+**Testes de aceitação (todos aprovados).**
+
+| # | Cenário | Resultado |
+|---|---|---|
+| T1 | Versão corrigida conhece 1–50 · nuvem tem 1–70 · grava | payload com 70, nenhum perdido, dado do PG 51 preservado byte a byte |
+| T2 | Versão conhece 1–70 · nuvem tem 1–70 · grava | payload com 70, sem perdas nem duplicatas |
+| T3 | Versão conhece 1–70 · nuvem tem só 1–50 · grava | payload com 70, sem duplicatas |
+| T4 | Situação de hoje: 50 slots · nuvem 50 | payload com 50, nada preservado, nada duplicado — sem efeito colateral |
+
+**Dívida registrada:** DIV-001 em `ARQ-004` — a causa raiz é o modelo "minha lista inteira substitui
+a da nuvem"; a direção-alvo é escrita por delta. Fora do escopo desta correção.
+
 ## [2026-08-17] — Embaixadores da Esperança (Agosto): revisão editorial da experiência, nos dois apps
 
 Revisão **editorial e narrativa** da experiência digital de Agosto, conforme especificação

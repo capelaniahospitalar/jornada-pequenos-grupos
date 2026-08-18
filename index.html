@@ -10108,11 +10108,41 @@ async function fbWriteGrupos(cfg, data, tutoresData, baseUpdateTime, convitesDat
   };
 }
 
+// ── PROTEÇÃO DE PERSISTÊNCIA: registros da nuvem que esta versão não conhece ─────────────
+// PROBLEMA (encontrado em 2026-08-18, mesma família dos incidentes de perda de dados):
+// a gravação envia a lista local INTEIRA por cima da nuvem. Um aparelho rodando uma versão
+// antiga (que conhece só os PGs 1–50) lia um documento com PGs 1–70, descartava silenciosamente
+// os 51–70 em applyGruposData (idx < 0 → return) e, na gravação seguinte, regravava só os 50 que
+// conhecia — APAGANDO da nuvem os PGs que a versão nova havia criado.
+//
+// REGRA ADOTADA: um registro que existe na nuvem nunca pode ser substituído por ausência de
+// conhecimento local. Os PGs desconhecidos são guardados INTACTOS aqui (nunca interpretados,
+// nunca exibidos, nunca mesclados — só transportados) e devolvidos em toda gravação. Guardar
+// sem interpretar é deliberado: absorvê-los na lista ativa mudaria ranking, relatórios e a fila
+// de criação de PG numa versão que não foi feita para eles.
+//
+// DÍVIDA ARQUITETURAL: isto protege o sintoma. A causa é o modelo de escrita "minha lista
+// inteira substitui a da nuvem" — ver ARQ-004, seção "Dívida arquitetural".
+let fbGruposPreservados = [];   // registros da nuvem sem correspondente local, guardados verbatim
+let fbNumsVistosNaNuvem = [];   // todo num já visto na nuvem nesta sessão — base da validação pré-gravação
+
+function registrarGruposDesconhecidos(lista) {
+  if (!Array.isArray(lista)) return;
+  lista.forEach(g => {
+    if (!g || g.num == null) return;
+    if (!fbNumsVistosNaNuvem.includes(g.num)) fbNumsVistosNaNuvem.push(g.num);
+    if (PEQUENOS_GRUPOS.some(pg => pg.num === g.num)) return;  // conhecido: segue o fluxo normal
+    const i = fbGruposPreservados.findIndex(x => x.num === g.num);
+    if (i < 0) fbGruposPreservados.push(g); else fbGruposPreservados[i] = g;  // sempre a versão mais recente lida
+  });
+}
+
 function applyGruposData(salvo) {
   if (!Array.isArray(salvo)) return;
+  registrarGruposDesconhecidos(salvo);
   salvo.forEach(g => {
     const idx = PEQUENOS_GRUPOS.findIndex(pg => pg.num === g.num);
-    if (idx < 0) return;
+    if (idx < 0) return;   // desconhecido: já preservado acima, nada a aplicar no estado local
     PEQUENOS_GRUPOS[idx].nome          = g.nome          ?? null;
     PEQUENOS_GRUPOS[idx].tutor         = g.tutor         ?? null;
     PEQUENOS_GRUPOS[idx].coordenador   = g.coordenador   ?? null;
@@ -10303,7 +10333,21 @@ async function trySaveGrupos(cfg, baseUpdateTime) {
     status: g.status || null,
     institucional: g.institucional || false,
   }));
-  return fbWriteGrupos(cfg, payload, TUTORS.length ? TUTORS : undefined, baseUpdateTime, undefined, SETORES_MESTRE.length ? SETORES_MESTRE : undefined, SETORES_EFETIVO.length ? SETORES_EFETIVO : undefined, EMBAIXADORES_EXTERNOS.length ? EMBAIXADORES_EXTERNOS : undefined);
+
+  // Devolve os registros da nuvem que esta versão não conhece (ver registrarGruposDesconhecidos).
+  // Sem isto, gravar equivale a apagar tudo o que o app local não enxerga.
+  const payloadCompleto = payload.concat(fbGruposPreservados).sort((a, b) => a.num - b.num);
+
+  // VALIDAÇÃO PRÉ-GRAVAÇÃO: nenhum PG já visto na nuvem pode sair do payload. Se faltar algum,
+  // a gravação é CANCELADA — perder a gravação é recuperável; perder um PG da nuvem não é.
+  const numsPayload = payloadCompleto.map(g => g.num);
+  const faltando = fbNumsVistosNaNuvem.filter(n => !numsPayload.includes(n));
+  if (faltando.length) {
+    console.error('Firestore: gravação CANCELADA — o payload perderia os PGs', faltando.join(', '));
+    return { ok: false, perdaDetectada: true };
+  }
+
+  return fbWriteGrupos(cfg, payloadCompleto, TUTORS.length ? TUTORS : undefined, baseUpdateTime, undefined, SETORES_MESTRE.length ? SETORES_MESTRE : undefined, SETORES_EFETIVO.length ? SETORES_EFETIVO : undefined, EMBAIXADORES_EXTERNOS.length ? EMBAIXADORES_EXTERNOS : undefined);
 }
 
 // Orquestra: prepara → grava → em conflito, backoff aleatório e tenta de novo (até 3x).
@@ -10329,6 +10373,15 @@ async function saveGruposToFirebase() {
         return;
       }
       if (res && res.sizeExceeded) { recordSync({ resultado: 'falha', tentativas: tentativa }); return; }
+      if (res && res.perdaDetectada) {
+        // Guarda de última instância: o payload perderia PG que existe na nuvem. Não grava e
+        // mantém a alteração local pendente — não deveria acontecer nunca (fbGruposPreservados
+        // só cresce), mas se acontecer, o dado da nuvem fica intacto e o caso fica registrado.
+        recordSync({ resultado: 'falha', tentativas: tentativa });
+        logSyncConflict({ syncId, operacao: 'saveGruposToFirebase', motivo: 'payload perderia PGs existentes na nuvem', tentativa });
+        fbPendingSync = true;
+        return;
+      }
       if (res && res.preconditionFailed) {
         console.warn('Firebase: conflito (FAILED_PRECONDITION) — sync ' + syncId + ' tentativa ' + tentativa + '/3');
         if (tentativa < 3) await sleep(80 + Math.random() * 120);  // backoff aleatório (quebra lock-step)
