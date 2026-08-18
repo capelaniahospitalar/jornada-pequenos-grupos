@@ -221,29 +221,37 @@ function tela2Html() {
       <div style="display:flex;flex-direction:column;gap:.45rem">${rotulos}</div>
       ${consequencia}
       ${efeito}
-      ${botaoHtml(SUB < 2 ? 'CONTINUAR' : 'E AGORA?', SUB === 0 ? (fimRotulos + 0.3).toFixed(2) : '0.35')}
+      ${botaoHtml(SUB < 2 ? 'CONTINUAR' : 'E SE VOCÊ TAMBÉM FIZER ISSO?', SUB === 0 ? (fimRotulos + 0.3).toFixed(2) : '0.35')}
     </div>`;
 }
 
-// TELA 3 — A PERGUNTA.
+// TELA 3 — O ESPELHO. Revisão editorial de 2026-08-17: era a tela 4 e trocou de lugar com a
+// entrega, para que o diagnóstico venha ANTES da pergunta espiritual. Mesma mudança aplicada
+// ao app dos Pequenos Grupos (index.html) — as duas cópias precisam andar juntas.
 function tela3Html() {
+  const e = ESCOLHAS.dificuldade;
+  const opcoes = ESPELHO.map((o, i) => `
+        <button class="opt-btn${e && e.id === o.id ? ' chosen' : ''} emb-ago-in" data-opcao="${o.id}"
+                style="animation-delay:${(1.35 + i * 0.06).toFixed(2)}s" onclick="escolherEspelho('${o.id}')">${o.texto}</button>`).join('');
   return `
     ${dotsHtml()}
     <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
       <div class="content-card">
-        <div class="phase-tag tag-question">A pergunta</div>
-        <p class="body-text emb-ago-in" style="margin:0 0 1rem">E se o problema não estiver apenas no mundo lá fora?</p>
-        <p class="body-text emb-ago-in" style="margin:0;animation-delay:.9s"><strong>O que existe em mim que precisa ser transformado?</strong></p>
+        <div class="phase-tag tag-decision">O espelho</div>
+        <p class="body-text emb-ago-in" style="margin:0 0 .9rem">Foi fácil perceber os rótulos que colocamos nos outros.</p>
+        <p class="body-text emb-ago-in" style="margin:0 0 .9rem;animation-delay:.5s">Mas e quando o rótulo está nas nossas próprias atitudes?</p>
+        <p class="body-text emb-ago-in" style="margin:0;animation-delay:1s"><strong>Agora é a sua vez de olhar para o espelho.</strong></p>
       </div>
-      <div class="emb-ago-in" style="animation-delay:2s;background:linear-gradient(160deg,var(--navy),var(--navy2));border-radius:var(--radius);padding:1.35rem 1.15rem;text-align:center">
-        <div style="font-size:26px;line-height:1;margin-bottom:.6rem">🙏</div>
-        <p style="font-family:var(--ff-serif);font-size:22px;line-height:1.5;color:#fff;margin:0">O que preciso entregar a Deus para servir melhor ao meu semelhante?</p>
+      <div class="content-card emb-ago-in" style="animation-delay:1.2s">
+        <p class="body-text" style="margin:0 0 .85rem">Quando encontro alguém muito diferente de mim, qual é minha maior dificuldade?</p>
+        <div id="espelho-opcoes" style="display:flex;flex-direction:column;gap:.45rem">${opcoes}</div>
       </div>
-      ${botaoHtml('OLHAR PARA MIM', '2.6')}
+      <div id="espelho-dica" style="${e ? 'display:none;' : ''}text-align:center;font-size:14px;color:var(--text3)">Escolha uma opção para continuar.</div>
+      <button id="espelho-continuar" class="start-btn emb-ago-btn" style="letter-spacing:1.5px;font-weight:700" ${e ? '' : 'disabled'} onclick="avancar()">CONTINUAR</button>
     </div>`;
 }
 
-// TELA 4 — O ESPELHO.
+// Alternativas do espelho (usadas pela tela 3, acima).
 const ESPELHO = [
   { id:'ouvir', texto:'Ouvir sem julgar' },
   { id:'paciencia', texto:'Ter paciência' },
@@ -263,25 +271,22 @@ function escolherEspelho(id) {
   const btn = document.getElementById('espelho-continuar'); if (btn) btn.disabled = false;
   const dica = document.getElementById('espelho-dica'); if (dica) dica.style.display = 'none';
 }
+// TELA 4 — A ENTREGA. Era a tela 3 ("A pergunta"); agora chega depois do espelho e se refere
+// à dificuldade que a pessoa acabou de reconhecer.
 function tela4Html() {
-  const e = ESCOLHAS.dificuldade;
-  const opcoes = ESPELHO.map((o, i) => `
-        <button class="opt-btn${e && e.id === o.id ? ' chosen' : ''} emb-ago-in" data-opcao="${o.id}"
-                style="animation-delay:${(0.5 + i * 0.07).toFixed(2)}s" onclick="escolherEspelho('${o.id}')">${o.texto}</button>`).join('');
   return `
     ${dotsHtml()}
     <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
       <div class="content-card">
-        <div class="phase-tag tag-decision">O espelho</div>
-        <p class="body-text emb-ago-in" style="margin:0 0 .9rem"><strong>Agora é a sua vez de olhar para o espelho.</strong></p>
-        <p class="body-text emb-ago-in" style="margin:0;animation-delay:.5s">Não pense primeiro naquilo que o outro precisa mudar.<br>Pense em você.</p>
+        <div class="phase-tag tag-question">A entrega</div>
+        <p class="body-text emb-ago-in" style="margin:0 0 1rem">Você acabou de reconhecer uma dificuldade que existe em você.</p>
+        <p class="body-text emb-ago-in" style="margin:0;animation-delay:.9s"><strong>Reconhecer é um começo. Mas transformação exige entrega.</strong></p>
       </div>
-      <div class="content-card emb-ago-in" style="animation-delay:.35s">
-        <p class="body-text" style="margin:0 0 .85rem">Quando encontro alguém muito diferente de mim, qual é minha maior dificuldade?</p>
-        <div id="espelho-opcoes" style="display:flex;flex-direction:column;gap:.45rem">${opcoes}</div>
+      <div class="emb-ago-in" style="animation-delay:2s;background:linear-gradient(160deg,var(--navy),var(--navy2));border-radius:var(--radius);padding:1.35rem 1.15rem;text-align:center">
+        <div style="font-size:26px;line-height:1;margin-bottom:.6rem">🙏</div>
+        <p style="font-family:var(--ff-serif);font-size:22px;line-height:1.5;color:#fff;margin:0">O que preciso entregar a Deus para servir melhor ao meu semelhante?</p>
       </div>
-      <div id="espelho-dica" style="${e ? 'display:none;' : ''}text-align:center;font-size:14px;color:var(--text3)">Escolha uma opção para continuar.</div>
-      <button id="espelho-continuar" class="start-btn emb-ago-btn" style="letter-spacing:1.5px;font-weight:700" ${e ? '' : 'disabled'} onclick="avancar()">CONTINUAR</button>
+      ${botaoHtml('DESCOBRIR UMA FORÇA', '2.6')}
     </div>`;
 }
 
@@ -423,9 +428,7 @@ function tela7Html() {
         <div style="font-size:14px;color:var(--text3);margin-top:.2rem">Registrada em ${sanitize(registro.data)}</div>
       </div>
       ${resumoHtml()}
-      <div class="content-card" style="border-left:3px solid var(--teal)">
-        <p class="body-text" style="margin:0">Obrigado por caminhar conosco. <strong>A esperança começa em mim.</strong></p>
-      </div>
+      ${envioHtml()}
       <button class="start-btn" style="background:var(--card);color:var(--blue);border:0.5px solid var(--border)" onclick="reverExperiencia()">Rever a experiência desde o início</button>
     </div>`;
   }
@@ -434,8 +437,8 @@ function tela7Html() {
     ${dotsHtml()}
     <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
       <div class="content-card">
-        <div class="phase-tag tag-close">Sua participação</div>
-        <p class="body-text emb-ago-in" style="margin:0 0 .9rem">Você chegou ao fim da jornada deste mês.</p>
+        <div class="phase-tag tag-close">Participação</div>
+        <p class="body-text emb-ago-in" style="margin:0 0 .9rem"><strong>Sua participação termina aqui.</strong></p>
         <p class="body-text emb-ago-in" style="margin:0;animation-delay:.4s">Registre sua participação para que a Capelania saiba que <strong>o seu setor</strong> esteve presente nos Embaixadores da Esperança de Agosto.</p>
       </div>
       ${resumoHtml()}
@@ -457,6 +460,22 @@ function tela7Html() {
       <div id="registro-erro" style="display:none"></div>
       <button id="btn-registrar" class="start-btn" style="letter-spacing:1.5px;font-weight:700" onclick="registrarParticipacao()">✅ REGISTRAR MINHA PARTICIPAÇÃO</button>
     </div>`;
+}
+
+// BLOCO DO ENVIO — fecho do arco que abre na tela de acolhimento com "A esperança começa em
+// mim.". Só aparece depois do registro: quem ainda está diante do formulário pode registrar,
+// e o fecho ali seria um encerramento que a pessoa não pediu. Mesma regra do app dos PGs.
+function envioHtml() {
+  return `
+      <div class="content-card" style="border-left:3px solid var(--teal)">
+        <div class="phase-tag tag-apply">O envio</div>
+        <p class="body-text" style="margin:0 0 .9rem">Mas a jornada não termina aqui.</p>
+        <p class="body-text" style="margin:0 0 .9rem">A missão que você recebeu começa quando você sair desta tela.</p>
+        <p class="body-text" style="margin:0"><strong>Você não precisa mudar o mundo inteiro.</strong><br>Pode começar por uma pessoa.</p>
+      </div>
+      <div style="background:linear-gradient(160deg,var(--navy),var(--navy2));border-radius:var(--radius);padding:1.35rem 1.15rem;text-align:center">
+        <p style="font-family:var(--ff-serif);font-style:italic;font-size:21px;line-height:1.5;color:var(--gold-mid);margin:0">A esperança começa quando eu encontro o outro.</p>
+      </div>`;
 }
 
 function resumoHtml() {

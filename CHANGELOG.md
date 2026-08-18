@@ -1,5 +1,73 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-08-17] — Embaixadores da Esperança (Agosto): revisão editorial da experiência, nos dois apps
+
+Revisão **editorial e narrativa** da experiência digital de Agosto, conforme especificação
+fechada pelo Capelão em 17/08. **Não é reconstrução técnica:** nenhuma função de persistência
+foi tocada — `confirmarEmbaixadores()`, o campo `p.embaixadores[AAAA-MM]`, o Relatório Mensal,
+o IMD e o ranking continuam exatamente como estavam.
+
+**Princípio da revisão:** não tornar a experiência mais explicativa; torná-la mais inevitável.
+
+**Inversão das etapas 3 e 4.** A ordem passa a ser mundo → rótulos → **espelho → entrega** →
+forças → missão → participação/envio → retorno. A razão é pedagógica: o espelho produz o
+diagnóstico ANTES da pergunta espiritual, e a entrega passa a se referir à dificuldade que a
+pessoa acabou de nomear, em vez de vir antes dela, no vazio.
+
+**Tela a tela:**
+
+- **Tela 2 (rótulos):** os 9 rótulos permanecem — o alvo é o mecanismo da rotulação, não a
+  característica. Botão final passa de "E AGORA?" para **"E SE VOCÊ TAMBÉM FIZER ISSO?"**.
+- **Tela 3 (O espelho):** entram "Foi fácil perceber os rótulos que colocamos nos outros." /
+  "Mas e quando o rótulo está nas nossas próprias atitudes?" / "Agora é a sua vez de olhar
+  para o espelho.". Saem "Não pense primeiro naquilo que o outro precisa mudar. / Pense em
+  você.". As 8 alternativas e a trava do CONTINUAR seguem iguais.
+- **Tela 4 (A entrega):** etiqueta passa de "A pergunta" para **"A ENTREGA"**. Entram "Você
+  acabou de reconhecer uma dificuldade que existe em você." / "Reconhecer é um começo. Mas
+  transformação exige entrega.". Saem "E se o problema não estiver apenas no mundo lá fora?" e
+  "O que existe em mim que precisa ser transformado?". A pergunta destacada a Deus permanece —
+  é o coração espiritual da experiência. Botão passa a ser **"DESCOBRIR UMA FORÇA"**.
+- **Tela 7 (participação e envio), sem tela nova:** bloco PARTICIPAÇÃO com "Sua participação
+  termina aqui." + o registro; depois o bloco **O ENVIO** — "Mas a jornada não termina aqui." /
+  "A missão que você recebeu começa quando você sair desta tela." / "Você não precisa mudar o
+  mundo inteiro. / Pode começar por uma pessoa." / **"A esperança começa quando eu encontro o
+  outro."**, fechando o arco que abre no acolhimento com "A esperança começa em mim." (mesmo
+  tratamento visual: serifada dourada sobre navy).
+- **Mantido:** "Confirmar não depende de você já ter realizado a missão." — é regra de negócio
+  e precisa ficar junto do ato de confirmar.
+- **Removida** da experiência a frase sobre relatório/Coordenador/supervisão/gerência,
+  inclusive do estado "já registrado" (é institucional, não narrativa). Consequência aceita: a
+  experiência deixa de explicar para onde vai a participação.
+
+**Regra do bloco de envio por estado da tela 7:** aparece para *confirmou agora*, *já
+registrado*, *vínculo perdido* e *sem PG*; **não** aparece para quem ainda pode confirmar e
+toca "Concluir" (saída voluntária). Ninguém termina a experiência numa mensagem de erro, e o
+envio nunca fica condicionado ao registro institucional — por isso existe inclusive para quem
+não tem onde registrar.
+
+**Aplicada nos DOIS arquivos publicáveis** — `index.html` (app dos PGs) e
+`embaixadores-agosto.html` (app dos Embaixadores externos, criado em `9a17841`). Os dois têm
+cópias independentes das mesmas telas: não há código compartilhado, e alterar um não altera o
+outro. Toda revisão futura da experiência precisa ser feita duas vezes.
+
+**Decisões tomadas na implementação (aprovadas pelo usuário), não previstas na especificação:**
+- o bloco do envio entra DEPOIS do resumo "Suas escolhas de hoje", para que a última linha
+  lida seja o fecho do arco;
+- saíram por redundância "Você concluiu a experiência de agosto." (PGs) e "Você chegou ao fim
+  da jornada deste mês." (externo) — ambas repetiam "Sua participação termina aqui.";
+- **mantidas** as menções ao Coordenador nos estados "vínculo perdido" e "sem PG": são
+  instruções de como conseguir participar, não a explicação de para onde vai a participação.
+
+**Testado** (cópias dos dois apps com o modo de teste forçado, **zero chamadas ao Firestore**
+confirmadas na aba de rede; no app externo o registro saiu como "gravação simulada"):
+- sequência percorrida do acolhimento à entrega nos dois apps: 0 acolhimento → 1 O MUNDO →
+  2 O PROBLEMA (3 momentos) → **3 O ESPELHO → 4 A ENTREGA**;
+- rótulos dos botões nas duas versões: "E SE VOCÊ TAMBÉM FIZER ISSO?" e "DESCOBRIR UMA FORÇA";
+- CONTINUAR do espelho: bloqueado sem escolha, liberado depois dela;
+- bloco do envio nos quatro estados da tela 7 — aparece em três, ausente em "pode registrar";
+- frase de relatório/supervisão/gerência ausente em todos os estados;
+- "Confirmar não depende de você já ter realizado a missão." presente junto do botão.
+
 ## [2026-08-17] — Correção: Relatório Mensal não registrava encontros (relatado no PG Multibênçãos)
 
 **Defeito relatado:** o coordenador do PG Multibênçãos abria o Relatório Mensal, escolhia a

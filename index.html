@@ -5215,31 +5215,45 @@ function embAgoTela2Html() {
       <div style="display:flex;flex-direction:column;gap:.45rem">${rotulos}</div>
       ${consequencia}
       ${efeito}
-      ${embAgoBotaoHtml(EMB_AGO_SUB < 2 ? 'CONTINUAR' : 'E AGORA?', atrasoBotao)}
+      ${embAgoBotaoHtml(EMB_AGO_SUB < 2 ? 'CONTINUAR' : 'E SE VOCÊ TAMBÉM FIZER ISSO?', atrasoBotao)}
     </div>`;
 }
 
-// TELA 3 — A PERGUNTA. A virada do olhar: do mundo lá fora para dentro. A terceira
-// pergunta é a que fica — por isso entra por último e em destaque.
+// TELA 3 — O ESPELHO. A virada do olhar: sai do mundo lá fora e chega em mim.
+//
+// REVISÃO EDITORIAL DE 2026-08-17: esta etapa era a 4 e passou a ser a 3, trocando de lugar
+// com a entrega. A razão é pedagógica: o espelho produz o DIAGNÓSTICO antes da pergunta
+// espiritual, e assim a entrega (tela 4) passa a se referir à dificuldade que a pessoa
+// acabou de nomear — em vez de vir antes dela, no vazio.
+//
+// Escolha ÚNICA entre 8 alternativas; o CONTINUAR só destrava depois de escolher.
 function embAgoTela3Html() {
+  const escolha = getEscolhaEspelhoEmbAgosto();
+  const opcoes = EMB_AGO_ESPELHO_OPCOES.map((o, i) => `
+        <button class="opt-btn${escolha && escolha.id === o.id ? ' chosen' : ''} emb-ago-in" data-opcao="${o.id}"
+                style="animation-delay:${(1.35 + i * 0.06).toFixed(2)}s" onclick="escolherEspelhoEmbAgosto('${o.id}')">${o.texto}</button>`).join('');
   return `
     ${embAgoDotsHtml()}
     <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
       <div class="content-card">
-        <div class="phase-tag tag-question">A pergunta</div>
-        <p class="body-text emb-ago-in" style="margin:0 0 1rem">E se o problema não estiver apenas no mundo lá fora?</p>
-        <p class="body-text emb-ago-in" style="margin:0;animation-delay:.9s"><strong>O que existe em mim que precisa ser transformado?</strong></p>
+        <div class="phase-tag tag-decision">O espelho</div>
+        <p class="body-text emb-ago-in" style="margin:0 0 .9rem">Foi fácil perceber os rótulos que colocamos nos outros.</p>
+        <p class="body-text emb-ago-in" style="margin:0 0 .9rem;animation-delay:.5s">Mas e quando o rótulo está nas nossas próprias atitudes?</p>
+        <p class="body-text emb-ago-in" style="margin:0;animation-delay:1s"><strong>Agora é a sua vez de olhar para o espelho.</strong></p>
       </div>
-      <div class="emb-ago-in" style="animation-delay:2s;background:linear-gradient(160deg,var(--navy),var(--navy2));border-radius:var(--radius);padding:1.35rem 1.15rem;text-align:center">
-        <div style="font-size:26px;line-height:1;margin-bottom:.6rem">🙏</div>
-        <p style="font-family:var(--ff-serif);font-size:22px;line-height:1.5;color:#fff;margin:0">O que preciso entregar a Deus para servir melhor ao meu semelhante?</p>
+      <div class="content-card emb-ago-in" style="animation-delay:1.2s">
+        <p class="body-text" style="margin:0 0 .85rem">Quando encontro alguém muito diferente de mim, qual é minha maior dificuldade?</p>
+        <div id="emb-ago-espelho-opcoes" style="display:flex;flex-direction:column;gap:.45rem">${opcoes}</div>
       </div>
-      ${embAgoBotaoHtml('OLHAR PARA MIM', '2.6')}
+      <div id="emb-ago-espelho-dica" style="${escolha ? 'display:none;' : ''}text-align:center;font-size:14px;color:var(--text3);font-family:var(--ff-body)">Escolha uma opção para continuar.</div>
+      <button id="emb-ago-espelho-continuar" class="start-btn emb-ago-btn" style="letter-spacing:1.5px;font-weight:700"
+              ${escolha ? '' : 'disabled'} onclick="avancarEmbaixadoresAgosto()">CONTINUAR</button>
     </div>`;
 }
 
-// TELA 4 — O ESPELHO. A virada do olhar se completa: sai da sociedade e chega em mim.
-// Escolha ÚNICA entre 8 alternativas; o CONTINUAR só destrava depois de escolher.
+// Alternativas do espelho e a escrita da escolha. Ficam aqui, entre as duas telas, porque
+// pertencem à tela 3 — a declaração vir depois da função que a usa não é problema: a função
+// só roda quando a pessoa chega na etapa, muito depois do script inteiro ter sido lido.
 const EMB_AGO_ESPELHO_OPCOES = [
   { id: 'ouvir',     texto: 'Ouvir sem julgar' },
   { id: 'paciencia', texto: 'Ter paciência' },
@@ -5276,26 +5290,24 @@ function escolherEspelhoEmbAgosto(id) {
   if (dica) dica.style.display = 'none';
 }
 
+// TELA 4 — A ENTREGA. Era a tela 3 ("A pergunta") e trocou de lugar com o espelho na revisão
+// de 2026-08-17. Agora ela chega DEPOIS do diagnóstico: a entrega se refere à dificuldade que
+// a pessoa acabou de reconhecer, e não a uma pergunta genérica sobre o mundo lá fora. A
+// pergunta destacada a Deus é a mesma de sempre — é o coração espiritual da experiência.
 function embAgoTela4Html() {
-  const escolha = getEscolhaEspelhoEmbAgosto();
-  const opcoes = EMB_AGO_ESPELHO_OPCOES.map((o, i) => `
-        <button class="opt-btn${escolha && escolha.id === o.id ? ' chosen' : ''} emb-ago-in" data-opcao="${o.id}"
-                style="animation-delay:${(0.5 + i * 0.07).toFixed(2)}s" onclick="escolherEspelhoEmbAgosto('${o.id}')">${o.texto}</button>`).join('');
   return `
     ${embAgoDotsHtml()}
     <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
       <div class="content-card">
-        <div class="phase-tag tag-decision">O espelho</div>
-        <p class="body-text emb-ago-in" style="margin:0 0 .9rem"><strong>Agora é a sua vez de olhar para o espelho.</strong></p>
-        <p class="body-text emb-ago-in" style="margin:0;animation-delay:.5s">Não pense primeiro naquilo que o outro precisa mudar.<br>Pense em você.</p>
+        <div class="phase-tag tag-question">A entrega</div>
+        <p class="body-text emb-ago-in" style="margin:0 0 1rem">Você acabou de reconhecer uma dificuldade que existe em você.</p>
+        <p class="body-text emb-ago-in" style="margin:0;animation-delay:.9s"><strong>Reconhecer é um começo. Mas transformação exige entrega.</strong></p>
       </div>
-      <div class="content-card emb-ago-in" style="animation-delay:.35s">
-        <p class="body-text" style="margin:0 0 .85rem">Quando encontro alguém muito diferente de mim, qual é minha maior dificuldade?</p>
-        <div id="emb-ago-espelho-opcoes" style="display:flex;flex-direction:column;gap:.45rem">${opcoes}</div>
+      <div class="emb-ago-in" style="animation-delay:2s;background:linear-gradient(160deg,var(--navy),var(--navy2));border-radius:var(--radius);padding:1.35rem 1.15rem;text-align:center">
+        <div style="font-size:26px;line-height:1;margin-bottom:.6rem">🙏</div>
+        <p style="font-family:var(--ff-serif);font-size:22px;line-height:1.5;color:#fff;margin:0">O que preciso entregar a Deus para servir melhor ao meu semelhante?</p>
       </div>
-      <div id="emb-ago-espelho-dica" style="${escolha ? 'display:none;' : ''}text-align:center;font-size:14px;color:var(--text3);font-family:var(--ff-body)">Escolha uma opção para continuar.</div>
-      <button id="emb-ago-espelho-continuar" class="start-btn emb-ago-btn" style="letter-spacing:1.5px;font-weight:700"
-              ${escolha ? '' : 'disabled'} onclick="avancarEmbaixadoresAgosto()">CONTINUAR</button>
+      ${embAgoBotaoHtml('DESCOBRIR UMA FORÇA', '2.6')}
     </div>`;
 }
 
@@ -5543,12 +5555,10 @@ function embAgoTela7Html() {
         <div style="font-size:19px;font-weight:700;color:#04342C;font-family:var(--ff-body);line-height:1.35">Participação registrada</div>
         <div style="font-size:16px;color:#04342C;margin-top:.35rem;font-family:var(--ff-body)">Embaixadores da Esperança — ${embMonthLabel(monthKey)}</div>
         <div style="font-size:14px;color:var(--text3);margin-top:.5rem;font-family:var(--ff-body)">Registrada em ${registro.data}${registro.hora ? ' às ' + registro.hora : ''}</div>
-      </div>
-      <p class="body-text" style="margin:0;font-size:17px;color:var(--text2)">Sua participação já aparece no relatório do seu Pequeno Grupo. O Coordenador o encaminha à supervisão do setor, que segue para a gerência.</p>`
+      </div>`
     // ESTADO 2 — pode registrar: tem vínculo e ainda não confirmou este mês.
     : eu ? `
       <div class="content-card">
-        <p class="body-text" style="margin:0 0 .9rem">Você concluiu a experiência de agosto.</p>
         <p class="body-text" style="margin:0">Registre agora sua participação nos Embaixadores da Esperança. É este registro que informa ao seu Pequeno Grupo que você participou.</p>
       </div>
       <button onclick="registrarParticipacaoEmbAgosto()" style="width:100%;background:var(--teal);color:#fff;border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17.5px;font-weight:700;cursor:pointer;font-family:var(--ff-body)">✅ Confirmar participação</button>
@@ -5570,15 +5580,37 @@ function embAgoTela7Html() {
         <div style="font-size:15px;color:var(--text2);line-height:1.5;font-family:var(--ff-body)">A experiência é sua e vale do mesmo jeito. Para que sua participação seja contabilizada, avise o Coordenador do Pequeno Grupo do seu setor — ele registra os participantes que ainda não estão em um PG.</div>
       </div>`;
 
+  // BLOCO DO ENVIO — o fecho do arco que abre na tela de acolhimento com "A esperança começa
+  // em mim." e termina aqui em "A esperança começa quando eu encontro o outro."
+  //
+  // Aparece em três dos quatro estados: para quem acabou de confirmar e para quem já estava
+  // registrado (ambos caem no ESTADO 1), para quem perdeu o vínculo (3) e para quem não tem
+  // PG (4). NÃO aparece no ESTADO 2 — quem ainda pode confirmar e toca "Concluir" está
+  // saindo por vontade própria, e o envio ficaria como um fecho que a pessoa não pediu.
+  // Nota: o envio nunca fica condicionado ao registro institucional — por isso ele existe
+  // inclusive para quem não tem onde registrar.
+  const mostrarEnvio = jaRegistrado || !eu;
+  const envio = mostrarEnvio ? `
+      <div class="content-card" style="border-left:3px solid var(--teal)">
+        <div class="phase-tag tag-apply">O envio</div>
+        <p class="body-text" style="margin:0 0 .9rem">Mas a jornada não termina aqui.</p>
+        <p class="body-text" style="margin:0 0 .9rem">A missão que você recebeu começa quando você sair desta tela.</p>
+        <p class="body-text" style="margin:0"><strong>Você não precisa mudar o mundo inteiro.</strong><br>Pode começar por uma pessoa.</p>
+      </div>
+      <div style="background:linear-gradient(160deg,var(--navy),var(--navy2));border-radius:var(--radius);padding:1.35rem 1.15rem;text-align:center">
+        <p style="font-family:var(--ff-serif);font-style:italic;font-size:21px;line-height:1.5;color:var(--gold-mid);margin:0">A esperança começa quando eu encontro o outro.</p>
+      </div>` : '';
+
   return `
     ${embAgoDotsHtml()}
     <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
       <div class="content-card">
         <div class="phase-tag tag-close">Participação</div>
-        <p class="body-text emb-ago-in" style="margin:0"><strong>A esperança começa em mim.</strong></p>
+        <p class="body-text emb-ago-in" style="margin:0"><strong>Sua participação termina aqui.</strong></p>
       </div>
       ${bloco}
       ${embAgoResumoHtml()}
+      ${envio}
       <button onclick="fecharEmbaixadoresAgosto()" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">Concluir</button>
     </div>`;
 }
