@@ -1,0 +1,51 @@
+num;nome;status;tutor;coordenador;participantes;dup_nome;em_carencia;elegiveis;com_evidencia;cobertura_capilaridade;engajamento;missao;regularidade;profundidade;IMD;rank;categoria;ind_estudo;ind_oracao;ind_bondade;ind_gratidao;ind_missao_semanal;ind_streak;ind_embaixadores;media_indicadores_0a7;encontros_no_mes;dia_reuniao;dados_ausentes
+1;PG - Capelania;ATIVO;Wladimir Gonçalves;Uálace Costa;4;0;0;4;3;75;25;25;0;37;37;4;Baixo Engajamento;3;1;0;0;2;3;1;2.5;0;Sexta-feira;sem encontro no mes
+2;Foco no alto;ATIVO;Uálace Costa;Ádlley Lopes Fontes;4;0;0;4;1;25;8;25;0;29;17;11;Baixo Engajamento;1;1;0;0;0;1;1;1.0;0;Sexta-feira;sem encontro no mes
+3;Higienização plantão B;ATIVO;Uálace Costa;Michelle Rocha da Silva;5;0;0;5;0;0;0;0;0;0;0;19;Não Engajado;4;0;0;0;0;3;0;1.4;0;Terça-feira;sem encontro no mes
+4;Multibençãos;ATIVO;Uálace Costa;Bruno Cordeiro Zappa;13;0;1;12;1;8;8;8;0;26;9;15;Baixo Engajamento;6;0;0;2;1;8;1;1.5;0;Quinta-feira;sem encontro no mes
+5;Manutenção da Fé;ATIVO;Wladimir Gonçalves;Gabriel Nobre;9;0;0;9;3;33;22;11;0;12;19;8;Baixo Engajamento;7;4;0;2;0;2;1;1.8;0;Sexta-feira;sem encontro no mes
+6;Serviço social;ATIVO;Uálace Costa;Guilherme de Paiva Cosenzo;9;0;1;8;5;63;34;38;69;27;48;2;Engajado;3;3;0;2;3;5;3;2.4;2;Sexta-feira;
+7;Plantão B Hotelaria;EM_FORMACAO;Wladimir Gonçalves;;0;0;0;0;0;0;0;0;0;0;0;19;Não Engajado;0;0;0;0;0;0;0;0.0;0;Sexta-feira;sem coordenador | sem encontro no mes | sem participante
+8;Gestão de almas;ATIVO;Uálace Costa;Marineide Nunes;11;0;1;10;5;50;17;40;0;29;30;7;Baixo Engajamento;7;1;0;1;3;10;4;2.6;0;Sexta-feira;sem encontro no mes
+9;PÃO DA VIDA;ATIVO;Felipe Rodrigues da Silva;Luana de Almeida Sanches;7;0;0;7;0;0;0;0;0;0;0;19;Não Engajado;2;0;0;0;0;0;0;0.3;0;Sexta-feira;sem encontro no mes | participante sem whatsapp
+10;Primícias;ATIVO;Uálace Costa;João Pedro Silva De Melo Ferreira;8;0;1;7;0;0;0;0;0;0;0;19;Não Engajado;4;0;0;0;0;1;0;0.7;0;Sexta-feira;sem encontro no mes | participante sem whatsapp | participante sem vinculo
+11;Conectados;EM_FORMACAO;Uálace Costa;;0;0;0;0;0;0;0;0;0;0;0;19;Não Engajado;0;0;0;0;0;0;0;0.0;0;Sexta-feira;sem coordenador | sem encontro no mes | sem participante
+12;Deus é minha fortaleza Portaria 1;ATIVO;Wladimir Gonçalves;Caio marcio joia da Silva;5;0;1;4;2;50;33;25;0;23;31;6;Baixo Engajamento;3;2;0;2;0;4;1;3.0;0;Sexta-feira;sem encontro no mes
+13;Plantão B Hotelaria;EM_FORMACAO;Wladimir Gonçalves;;0;0;0;0;0;0;0;0;0;0;0;19;Não Engajado;0;0;0;0;0;0;0;0.0;0;Sexta-feira;sem coordenador | sem encontro no mes | sem participante
+14;Portaria de Deus - Portaria 3;ATIVO;Wladimir Gonçalves;Bruno Mendes Villela;2;0;0;2;0;0;0;0;0;0;0;19;Não Engajado;1;0;0;0;0;1;0;1.0;0;Sexta-feira;sem encontro no mes
+15;DEUS SALVA VIDA;ATIVO;Wladimir Gonçalves;Jose Eduardo Silva;4;0;0;4;1;25;0;25;0;15;14;13;Baixo Engajamento;3;0;0;0;0;3;1;1.8;0;Quinta-feira;sem encontro no mes
+16;Lugar de Transformação;ATIVO;Wladimir Gonçalves;Jorge;3;0;0;3;1;33;0;33;0;23;19;9;Baixo Engajamento;3;0;0;0;0;2;1;2.0;0;Sexta-feira;sem encontro no mes
+17;Maranata;ATIVO;Wladimir Gonçalves;Fabrício Henrique da Silva;12;0;0;12;2;17;6;17;42;26;19;10;Baixo Engajamento;7;0;0;0;2;7;2;1.5;1;Terça-feira;
+18;Amigos;ATIVO;Wladimir Gonçalves;Jôse Dias Rocha;4;0;0;4;0;0;0;0;0;0;0;19;Não Engajado;4;0;0;0;0;3;0;1.8;0;Quinta-feira;sem encontro no mes
+19;Farol;ATIVO;Wladimir Gonçalves;Fabiana Alves da Cruz;3;0;0;3;0;0;0;0;0;0;0;19;Não Engajado;2;0;0;0;0;0;0;0.7;0;Sexta-feira;sem encontro no mes
+20;Cristo Vive;ATIVO;Wladimir Gonçalves;Jaime Morais;2;0;0;2;0;0;0;0;0;0;0;19;Não Engajado;1;0;0;0;0;1;0;1.0;0;Sexta-feira;sem encontro no mes
+21;Recepcionando Vidas;ATIVO;Renan Fernando Castro silva;Wellington Aguiar dos Santos;8;0;0;8;1;13;0;13;0;11;8;18;Baixo Engajamento;5;0;0;0;0;2;1;1.0;0;Terça-feira;sem encontro no mes
+22;Farmácia da Cura;ATIVO;Wladimir Gonçalves;Sérgio Araujo Camera;1;0;0;1;0;0;0;0;0;0;0;19;Não Engajado;0;0;0;0;0;0;0;0.0;0;Quinta-feira;sem encontro no mes
+23;DIAGNOSTICO DE ESPERANÇA;ATIVO;Felipe Rodrigues da Silva;Andrea Rodrigues de Freitas;8;0;0;8;0;0;0;0;0;0;0;19;Não Engajado;3;0;0;0;0;0;0;0.4;0;Sexta-feira;sem encontro no mes
+24;CONEXÃO REAL;ATIVO;Renan Fernando Castro silva;THAYS PANSSANI;6;0;0;6;3;50;56;0;46;14;37;5;Engajamento Moderado;5;3;0;3;4;4;0;3.2;1;Terça-feira;
+25;Limpando corações;ATIVO;Renan Fernando Castro silva;Maria das Graças Soares;1;0;0;1;0;0;0;0;0;0;0;19;Não Engajado;0;0;0;0;0;0;0;0.0;0;Quarta-feira;sem encontro no mes
+26;Conexão;EM_FORMACAO;Renan Fernando Castro silva;;0;0;0;0;0;0;0;0;0;0;0;19;Não Engajado;0;0;0;0;0;0;0;0.0;0;Quarta-feira;sem coordenador | sem encontro no mes | sem participante
+27;Esperança VivA;ATIVO;Renan Fernando Castro silva;Henry Henderson Cardoso silva;1;0;0;1;0;0;0;0;0;0;0;19;Não Engajado;0;0;0;0;0;0;0;0.0;0;Quarta-feira;sem encontro no mes
+28;Mãos que curam;EM_FORMACAO;Renan Fernando Castro silva;;0;0;0;0;0;0;0;0;0;0;0;19;Não Engajado;0;0;0;0;0;0;0;0.0;0;Segunda-feira;sem coordenador | sem encontro no mes | sem participante
+29;Ide;ATIVO;Renan Fernando Castro silva;Anderson Correia das Neves;9;0;1;8;1;13;4;13;0;4;8;17;Baixo Engajamento;5;0;0;1;0;1;1;1.0;0;Sexta-feira;sem encontro no mes
+30;Auditoria pra Jesus;ATIVO;Renan Fernando Castro silva;Aline Fonseca Blanco;1;0;0;1;0;0;0;0;0;0;0;19;Não Engajado;0;0;0;0;0;0;0;0.0;0;Sexta-feira;sem encontro no mes
+31;Medicina;ATIVO;Wladimir Gonçalves;Carla Manuela Aparecida Leitão Ribeiro;3;0;2;1;0;0;0;0;0;0;0;19;Não Engajado;0;0;0;0;0;0;0;0.0;0;;sem dia de reuniao | sem encontro no mes
+32;Manutenção da Fé;EM_FORMACAO;Wladimir Gonçalves;;0;0;0;0;0;0;0;0;0;0;0;19;Não Engajado;0;0;0;0;0;0;0;0.0;0;Sexta-feira;sem coordenador | sem encontro no mes | sem participante
+33;Alfa;ATIVO;Wladimir Gonçalves;Marcelo Ramos da Silva;1;0;0;1;0;0;0;0;0;0;0;19;Não Engajado;0;0;0;0;0;0;0;0.0;0;Sexta-feira;sem encontro no mes
+34;Beta;ATIVO;Wladimir Gonçalves;Luzia Ngaca Ngimbo;6;0;0;6;1;17;11;33;0;22;17;12;Baixo Engajamento;6;1;0;0;1;2;2;2.0;0;Sexta-feira;sem encontro no mes
+35;Gama;EM_FORMACAO;Wladimir Gonçalves;;0;0;0;0;0;0;0;0;0;0;0;19;Não Engajado;0;0;0;0;0;0;0;0.0;0;Sexta-feira;sem coordenador | sem encontro no mes | sem participante
+36;Delta;ATIVO;Wladimir Gonçalves;Rafael Azeredo de França;1;0;0;1;0;0;0;0;0;0;0;19;Não Engajado;1;0;0;0;0;0;0;1.0;0;Sexta-feira;sem encontro no mes
+37;Plantão noite A;ATIVO;Uálace Costa;Kelly do Carmo Pereira;8;0;5;3;0;0;0;0;0;0;0;19;Não Engajado;0;0;0;0;0;0;0;0.0;0;Terça-feira;sem encontro no mes
+38;Foco no Alto;EM_FORMACAO;Wladimir Gonçalves;;0;0;0;0;0;0;0;0;0;0;0;19;Não Engajado;0;0;0;0;0;0;0;0.0;0;Segunda-feira;sem coordenador | sem encontro no mes | sem participante
+39;BÁLSAMO;ATIVO;Felipe Rodrigues da Silva;Eliandra Soares Duarte de Souza;1;0;0;1;0;0;0;0;0;0;0;19;Não Engajado;0;0;0;0;0;0;0;0.0;0;Sexta-feira;sem encontro no mes
+40;Conta as Bênçãos;ATIVO;Wladimir Gonçalves;Júlia Percia;5;0;0;5;2;40;53;20;100;19;46;3;Engajamento Moderado;1;2;0;2;4;4;1;2.8;1;;sem dia de reuniao | nome placeholder | participante sem whatsapp
+41;FORTALEZA;ATIVO;Felipe Rodrigues da Silva;Glícia Lima de Souza Marinho;3;0;2;1;1;100;100;100;0;26;78;1;Baixo Engajamento;1;1;0;1;1;1;1;6.0;0;Sexta-feira;sem encontro no mes
+42;Autorizados por Deus;ATIVO;Wladimir Gonçalves;Giulia Geovana Januario da Silva;7;0;1;6;1;17;0;17;0;19;10;14;Baixo Engajamento;4;0;0;0;0;4;1;1.5;0;Sexta-feira;sem encontro no mes
+43;REFUGIO ILUMINADO;ATIVO;Felipe Rodrigues da Silva;Refúgio iluminado;1;0;0;1;0;0;0;0;0;0;0;19;Não Engajado;0;0;0;0;0;0;0;0.0;0;Sexta-feira;sem encontro no mes
+44;MANÁ;ATIVO;Felipe Rodrigues da Silva;Geisson Monteiro Marroch;3;0;2;1;0;0;0;0;0;0;0;19;Não Engajado;0;0;0;0;0;0;0;0.0;0;Sexta-feira;sem encontro no mes
+45;Fortaleza;EM_FORMACAO;Glícia Lima de Souza Marinho;;0;0;0;0;0;0;0;0;0;0;0;19;Não Engajado;0;0;0;0;0;0;0;0.0;0;Sexta-feira;sem coordenador | sem encontro no mes | sem participante
+46;HEMOGLOBINA ESPIRITUAL;ATIVO;Felipe Rodrigues da Silva;Elisa Maria Alves de Sousa;6;0;1;5;0;0;0;0;0;0;0;19;Não Engajado;5;0;0;0;0;3;0;1.6;0;Sexta-feira;sem encontro no mes
+47;Diretoria;ATIVO;Wladimir Gonçalves;Cristian Denis;1;0;1;0;0;0;0;0;0;0;0;19;Não Engajado;0;0;0;0;0;0;0;0.0;0;Sexta-feira;sem encontro no mes
+48;Limpando corações;EM_FORMACAO;Wladimir Gonçalves;;0;0;0;0;0;0;0;0;0;0;0;19;Não Engajado;0;0;0;0;0;0;0;0.0;0;Sexta-feira;sem coordenador | sem encontro no mes | sem participante
+49;Limpando corações;ATIVO;Wladimir Gonçalves;Patrícia da Silva;8;0;8;0;0;0;0;0;63;0;9;16;Não Engajado;0;0;0;0;0;0;0;0.0;1;Sexta-feira;
+50;Nutrição;LIVRE;Uálace Costa;ADRIANE DOS SANTOS DA SILVA;1;0;1;0;0;0;0;0;0;0;0;19;Não Engajado;0;0;0;0;0;0;0;0.0;0;Sexta-feira;sem encontro no mes
