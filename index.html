@@ -1777,9 +1777,10 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 </div>
 
 <!-- EMBAIXADORES DA ESPERANÇA — AGOSTO: experiência digital (tela de abertura) -->
-<!-- Tela de CONTEÚDO apenas. Não registra participação: o registro oficial continua
-     sendo o botão "Confirmar participação" (confirmarEmbaixadores) no cartão dos
-     Embaixadores, dentro de Desafios do Discipulado. -->
+<!-- Tela de CONTEÚDO apenas. Não registra participação: o registro oficial acontece na
+     TELA 7 desta mesma jornada, por confirmarEmbaixadores() — a função de sempre.
+     Desde 2026-08-17 o cartão dos Embaixadores (Desafios do Discipulado) é a PORTA que
+     abre esta experiência, e não mais o ponto de registro. -->
 <div id="screen-embaixadores-ago" class="screen">
   <div class="study-hdr">
     <button class="back-btn" onclick="voltarEmbaixadoresAgosto()" aria-label="Voltar">&#8592;</button>
@@ -5519,8 +5520,9 @@ function embAgoResumoHtml() {
 // TELA 7 — REGISTRO OFICIAL DE PARTICIPAÇÃO.
 //
 // NÃO existe mecanismo novo aqui. Esta tela apenas CONDUZ ao mecanismo que já existia:
-// confirmarEmbaixadores(), o mesmo que o botão "Confirmar participação" do cartão dos
-// Embaixadores (Desafios do Discipulado) sempre chamou. Mesma função, mesmo campo
+// confirmarEmbaixadores(), a mesma função que o botão "Confirmar participação" do cartão
+// dos Embaixadores (Desafios do Discipulado) chamou até 2026-08-17 — desde então o cartão
+// é a PORTA desta jornada e o registro acontece AQUI. Mesma função, mesmo campo
 // (p.embaixadores[AAAA-MM].participou), mesma proteção contra duplicidade, mesmo caminho
 // até o Relatório Mensal do PG. Nada foi duplicado, nada foi reescrito.
 //
