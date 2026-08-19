@@ -3555,7 +3555,41 @@ function mostrarErroEncontro(monthKey, texto) {
   el.style.display = texto ? 'block' : 'none';
 }
 
-function registrarEncontroPg(grupoNum, monthKey, nome) {
+// ── CORREÇÃO B (2026-08-18): o envio para a nuvem deixa de ser invisível ────────────────
+// A gravação é assíncrona e o app anunciava "salvo" antes de a nuvem confirmar. Quando o envio
+// falhava (rede oscilando), o Coordenador não tinha como saber: via o encontro na lista e ia
+// embora. A Correção A garante que o dado não se perde — o app reenvia sozinho —, mas o estado
+// continuava mudo. Aqui ele aparece na própria tela, no lugar onde a pessoa acabou de tocar.
+const AVISOS_ENCONTRO = {
+  enviando: { txt: '⏳ Enviando para a nuvem…',
+              bg: '#EEF2F4', borda: '#CBD5DA', cor: '#4A5A63' },
+  ok:       { txt: '✓ Encontro enviado e guardado na nuvem.',
+              bg: '#E8F5EE', borda: '#A8D8BF', cor: '#1F6B45' },
+  pendente: { txt: '⚠️ Encontro salvo neste aparelho, mas ainda não enviado para a nuvem. Mantenha o app aberto e com internet — ele reenvia sozinho.',
+              bg: '#FFF6E5', borda: '#F0D08A', cor: '#7A5A10' },
+};
+function mostrarAvisoEncontro(monthKey, estado) {
+  const el = document.getElementById('freq-aviso-' + monthKey);
+  if (!el) return;
+  const aviso = AVISOS_ENCONTRO[estado];
+  if (!aviso) { el.textContent = ''; el.style.display = 'none'; return; }
+  el.textContent = aviso.txt;
+  el.style.background = aviso.bg;
+  el.style.borderColor = aviso.borda;
+  el.style.color = aviso.cor;
+  el.style.display = 'block';
+}
+
+// Quando o reenvio automático finalmente consegue subir, o aviso que está NA TELA acompanha —
+// só os já visíveis, para não anunciar "enviado" a quem não registrou nada agora.
+function atualizarAvisosEncontroNaTela() {
+  document.querySelectorAll('[id^="freq-aviso-"]').forEach(el => {
+    if (el.style.display === 'none') return;
+    mostrarAvisoEncontro(el.id.replace('freq-aviso-', ''), fbPendingSync ? 'pendente' : 'ok');
+  });
+}
+
+async function registrarEncontroPg(grupoNum, monthKey, nome) {
   const dataEl = document.getElementById('freq-data-' + monthKey);
   const presentesEl = document.getElementById('freq-presentes-' + monthKey);
   const data = dataEl ? dataEl.value : '';
@@ -3579,11 +3613,15 @@ function registrarEncontroPg(grupoNum, monthKey, nome) {
     ...(g.reunioesMes || {}),
     [monthKey]: { encontros: [...(mesAtual.encontros || []), encontro] },
   };
-  saveGrupos();
+  // CORREÇÃO B: a lista é redesenhada na hora (o encontro já está guardado no aparelho), e só
+  // então a tela espera a nuvem responder. O botão nunca trava — o que muda é o aviso embaixo.
+  const gravacao = saveGrupos();
   gerarRelatorioMensal(nome, grupoNum, monthKey);
+  mostrarAvisoEncontro(monthKey, 'enviando');
+  mostrarAvisoEncontro(monthKey, (await gravacao) ? 'ok' : 'pendente');
 }
 
-function removerEncontroPg(grupoNum, monthKey, encontroId, nome) {
+async function removerEncontroPg(grupoNum, monthKey, encontroId, nome) {
   loadGrupos();
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
   if (!g) return;
@@ -3593,8 +3631,11 @@ function removerEncontroPg(grupoNum, monthKey, encontroId, nome) {
     ...(g.reunioesMes || {}),
     [monthKey]: { encontros: (mesAtual.encontros || []).filter(e => e.id !== encontroId) },
   };
-  saveGrupos();
+  // Apagar corre exatamente o mesmo risco de envio que registrar — mesmo aviso, mesma tela.
+  const gravacao = saveGrupos();
   gerarRelatorioMensal(nome, grupoNum, monthKey);
+  mostrarAvisoEncontro(monthKey, 'enviando');
+  mostrarAvisoEncontro(monthKey, (await gravacao) ? 'ok' : 'pendente');
 }
 
 // Soma os participantes externos (EMBAIXADORES_EXTERNOS) dos setores que este PG
@@ -3663,6 +3704,7 @@ function gerarRelatorioMensal(nome, grupoNumParam, monthKeyParam) {
         <input type="number" min="0" max="${totalParticipantesAtual}" id="freq-presentes-${monthKey}" placeholder="ex: 6" style="width:100%;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.5rem .7rem;font-size:15px;font-family:var(--ff-body);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:.4rem">
         <button onclick="registrarEncontroPg(${grupoNum}, '${monthKey}', '${nomeEsc}')" style="width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.65rem;font-size:15px;font-weight:600;color:#fff;cursor:pointer;font-family:var(--ff-body)">+ Registrar encontro</button>
         <div id="freq-erro-${monthKey}" style="display:none;margin-top:.4rem;background:#FDECEA;border:0.5px solid #F3B8B4;border-radius:var(--radius-sm);padding:.5rem .65rem;font-size:13px;color:#8A2B20;line-height:1.4;font-family:var(--ff-body)"></div>
+        <div id="freq-aviso-${monthKey}" style="display:${fbPendingSync ? 'block' : 'none'};margin-top:.4rem;background:${AVISOS_ENCONTRO.pendente.bg};border:0.5px solid ${AVISOS_ENCONTRO.pendente.borda};border-radius:var(--radius-sm);padding:.5rem .65rem;font-size:13px;color:${AVISOS_ENCONTRO.pendente.cor};line-height:1.4;font-family:var(--ff-body)">${fbPendingSync ? AVISOS_ENCONTRO.pendente.txt : ''}</div>
       </div>`;
 
   const participantesSemDup = (g.participantes || []).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
@@ -9948,6 +9990,9 @@ async function fbRetryOnReconnect() {
   if (!FB_FLAGS.retryOnReconnect || !fbPendingSync) return;
   if (navigator.onLine === false) return;
   await saveGruposToFirebase();
+  // CORREÇÃO B: se o Relatório Mensal estiver aberto com o aviso "ainda não enviado", ele vira
+  // "enviado" no momento em que a nuvem aceita — sem exigir que a pessoa recarregue a tela.
+  if (typeof atualizarAvisosEncontroNaTela === 'function') atualizarAvisosEncontroNaTela();
 }
 window.addEventListener('online', fbRetryOnReconnect);
 document.addEventListener('visibilitychange', () => {
@@ -10381,9 +10426,17 @@ async function trySaveGrupos(cfg, baseUpdateTime) {
 }
 
 // Orquestra: prepara → grava → em conflito, backoff aleatório e tenta de novo (até 3x).
+//
+// CORREÇÃO B (2026-08-18): passou a DEVOLVER se a nuvem confirmou (true) ou não (false). Antes
+// não devolvia nada e quem chamava não tinha como saber — era essa a razão de a tela anunciar
+// "salvo" sem confirmação. Aditivo: nenhum chamador anterior lê o retorno.
+//
+// E todo caminho sem confirmação agora marca pendência, não só a queda de rede: sem a marca, a
+// alteração fica desprotegida (a sincronização a sobrescreveria — ver Correção A) e o aviso da
+// tela mentiria ao prometer reenvio automático.
 async function saveGruposToFirebase() {
   const cfg = loadFbConfig();
-  if (!cfg) return;
+  if (!cfg) return false;
   const syncId = uuid().slice(0, 8);
   const inicio = Date.now();
   let ultimoUpdateTime = null;
@@ -10391,7 +10444,7 @@ async function saveGruposToFirebase() {
   for (let tentativa = 1; tentativa <= 3; tentativa++) {
     try {
       const prep = await prepareSaveGrupos(cfg);
-      if (prep.abort) { setFbPendingSync(false); return; }
+      if (prep.abort) { setFbPendingSync(false); return false; }
       ultimoUpdateTime = prep.remote ? prep.remote.updateTime : null;
 
       const res = await trySaveGrupos(cfg, prep.remote ? prep.remote.updateTime : null);
@@ -10400,9 +10453,9 @@ async function saveGruposToFirebase() {
         fbLastKnownTs = res.ts;
         setFbPendingSync(false);
         recordSync({ resultado: 'ok', tentativas: tentativa, durationMs: Date.now() - inicio });
-        return;
+        return true;
       }
-      if (res && res.sizeExceeded) { recordSync({ resultado: 'falha', tentativas: tentativa }); return; }
+      if (res && res.sizeExceeded) { recordSync({ resultado: 'falha', tentativas: tentativa }); setFbPendingSync(true); return false; }
       if (res && res.perdaDetectada) {
         // Guarda de última instância: o payload perderia PG que existe na nuvem. Não grava e
         // mantém a alteração local pendente — não deveria acontecer nunca (fbGruposPreservados
@@ -10410,19 +10463,20 @@ async function saveGruposToFirebase() {
         recordSync({ resultado: 'falha', tentativas: tentativa });
         logSyncConflict({ syncId, operacao: 'saveGruposToFirebase', motivo: 'payload perderia PGs existentes na nuvem', tentativa });
         setFbPendingSync(true);
-        return;
+        return false;
       }
       if (res && res.preconditionFailed) {
         console.warn('Firebase: conflito (FAILED_PRECONDITION) — sync ' + syncId + ' tentativa ' + tentativa + '/3');
         if (tentativa < 3) await sleep(80 + Math.random() * 120);  // backoff aleatório (quebra lock-step)
         continue;
       }
-      return;
+      setFbPendingSync(true);   // resposta inesperada da nuvem: não confirmou, então é pendente
+      return false;
     } catch (e) {
       console.warn('Firebase save (sync ' + syncId + '):', e);
       setFbPendingSync(true);   // rede caiu: marca pendente p/ retry ao reconectar
       recordSync({ resultado: 'adiado', tentativas: tentativa });
-      return;
+      return false;
     }
   }
 
@@ -10431,7 +10485,9 @@ async function saveGruposToFirebase() {
   logSyncConflict({ syncId, operacao: 'saveGruposToFirebase',
                     motivo: 'FAILED_PRECONDITION apos 3 tentativas',
                     tentativa: 3, updateTimeRecebido: ultimoUpdateTime });
+  setFbPendingSync(true);   // não confirmou em nenhuma das 3 tentativas
   fbWarnConflitoPersistente();
+  return false;
 }
 
 function startFbPoll() {
