@@ -9060,11 +9060,16 @@ function generatePennantSvg(grupoNum, grupoNome, opts = {}) {
 //  SISTEMA DE PEQUENOS GRUPOS
 // ══════════════════════════════════════
 
-// ── Dados dos 50 grupos ──────────────────────────────────────────────────
+// ── Dados dos 70 grupos ──────────────────────────────────────────────────
+// 2026-08-19: ampliado de 50 para 70 slots — os 50 originais estavam todos ocupados
+// (40 completos + 10 em formação) e a criação de PG novo passou a recusar com
+// "Não há mais Pequenos Grupos disponíveis". Slots 51-70 nascem vazios.
+// Aparelho com versão antiga em cache NÃO apaga os novos: ele os lê como
+// desconhecidos e os devolve via fbGruposPreservados na gravação (ver linha ~10417).
 // Estrutura: { num, nome, tutor, coordenador, participantes:[] }
 // A comunicação acontece dentro do próprio app (Comunidade, Mural,
 // Companheiro de Jornada) — não há mais dependência de grupo externo.
-const PEQUENOS_GRUPOS = Array.from({length:50}, (_, i) => ({
+const PEQUENOS_GRUPOS = Array.from({length:70}, (_, i) => ({
   num: i + 1,
   nome: null,         // definido pelo primeiro participante que criar o grupo
   tutor: null,        // nome do tutor (preenchido por quem se identificar como tutor)
