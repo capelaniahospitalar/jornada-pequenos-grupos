@@ -12380,6 +12380,27 @@ function getOrInitPgProgress(grupoNum) {
 const PG_SEMANA_COMPLETA_TIPOS = ['estudos', 'oracoes', 'bondades'];
 const PG_CONTRIB_TIPOS = ['estudos', 'oracoes', 'bondades', 'gratidao', 'engajamento'];
 
+// ── ETAPA A da ESPEC-IMD-v2.1 — histórico de semanas com atividade, por participante ──
+// SÓ ACUMULA. Nenhum cálculo, nota, ranking, categoria ou tela lê este campo — é de
+// propósito: a Etapa A foi aprovada isolada justamente para não alterar nada em produção.
+//
+// Existe porque `contrib` guarda UMA semana só e é substituído quando a semana vira: sem
+// este registro, cada semana que passa é histórico perdido para sempre, e a Participação
+// Regular (2+ semanas distintas) nunca poderia ser calculada. Não reconstrói o passado.
+//
+// Fica dentro de `dados`, que a regra do Firestore já permite — não exige mudança de
+// allowlist. Custo medido em 2026-08-19: dados = 104.881 chars; pior caso desta lista com
+// 200 participantes = +57 mil, bem abaixo do limite de 500.000.
+const SEMANAS_HISTORICO_MAX = 26;   // meio ano; só limite de armazenamento, não entra em cálculo
+function registrarSemanaAtiva(participante, weekKey) {
+  if (!participante || !weekKey) return;
+  const atual = (participante.progresso && Array.isArray(participante.progresso.semanasAtivas))
+    ? participante.progresso.semanasAtivas : [];
+  if (atual.includes(weekKey)) return;
+  const novo = atual.concat(weekKey).slice(-SEMANAS_HISTORICO_MAX);
+  participante.progresso = { ...(participante.progresso || {}), semanasAtivas: novo };
+}
+
 // Incrementa o progresso do grupo quando o usuário completa uma ação
 function bumpPgProgress(tipo, qty = 1) {
   const meuGrupo = loadMeuGrupo ? loadMeuGrupo() : null;
@@ -12396,6 +12417,7 @@ function bumpPgProgress(tipo, qty = 1) {
         ? eu.progresso.contrib : { weekKey: wk, estudos: 0, oracoes: 0, bondades: 0, gratidao: 0, engajamento: 0 };
       c[tipo] = (c[tipo] || 0) + qty;
       eu.progresso = { ...(eu.progresso || {}), contrib: c, updatedAt: Date.now() };
+      registrarSemanaAtiva(eu, wk);   // ETAPA A: só acumula, não altera nenhum cálculo
       saveGrupos();
     }
   }
