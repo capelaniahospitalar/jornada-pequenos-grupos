@@ -9925,7 +9925,23 @@ function recordSync(ev) {  // ev: { resultado:'ok'|'falha'|'adiado', tentativas,
 }
 
 // Estado: há alteração local ainda não confirmada na nuvem (ex.: caiu a rede)?
-let fbPendingSync = false;
+//
+// PERSISTIDO NO APARELHO (2026-08-18): antes era só uma variável de memória, perdida ao fechar
+// o app. Uma alteração que não subiu ficava órfã — ninguém sabia que ela existia no reinício,
+// e a primeira sincronização a apagava (ver syncFromFirebase). Guardar a marca é o que permite
+// a sincronização seguinte MESCLAR em vez de sobrescrever.
+const PENDING_SYNC_KEY = chaveTeste('jdpg_pending_sync_v1');
+function lerPendenciaLocal() {
+  try { return localStorage.getItem(PENDING_SYNC_KEY) === '1'; } catch { return false; }
+}
+let fbPendingSync = lerPendenciaLocal();
+function setFbPendingSync(pendente) {
+  fbPendingSync = pendente;
+  try {
+    if (pendente) localStorage.setItem(PENDING_SYNC_KEY, '1');
+    else localStorage.removeItem(PENDING_SYNC_KEY);
+  } catch(e) { console.warn('setFbPendingSync:', e); }
+}
 
 // Re-tentativa ao reconectar / app voltar a ficar visível
 async function fbRetryOnReconnect() {
@@ -10258,7 +10274,19 @@ async function syncFromFirebase() {
   try {
     const result = await fbReadDoc(cfg);
     if (result && result.dados) {
-      applyGruposData(result.dados);
+      // CORREÇÃO A (2026-08-18) — a sincronização não pode mais apagar o que ainda não subiu.
+      // PROBLEMA: esta função aplicava a nuvem POR CIMA do estado local (e regravava o
+      // localStorage com `result.dados` cru). Quando uma gravação falhava — rede oscilando é o
+      // caso comum no hospital — a alteração ficava só no aparelho e a sincronização seguinte
+      // (poll de 30s, voltar do bloqueio de tela, reabrir o app) a destruía, sem aviso nenhum.
+      // Sintoma de campo: o Coordenador registrava o encontro no Relatório Mensal, via o registro
+      // aparecer na lista, e depois ele sumia (relatado no PG Multibênçãos em 2026-08-18).
+      // CORREÇÃO: havendo alteração local ainda não confirmada, junta os dois lados com a MESMA
+      // mergeGruposData já usada no caminho de gravação (união por id em reuniões/gratidões/
+      // participantes — não duplica nem perde). Sem pendência, o comportamento é o de sempre:
+      // a nuvem é a verdade, e continua trazendo renomeações e edições feitas em outro aparelho.
+      const dadosAplicados = fbPendingSync ? mergeGruposData(result.dados, PEQUENOS_GRUPOS) : result.dados;
+      applyGruposData(dadosAplicados);
       fbLastKnownTs = result.ts;
       // V3: carrega tutores do Firestore se disponível
       if (Array.isArray(result.tutores) && result.tutores.length > 0) TUTORS = result.tutores;
@@ -10281,7 +10309,9 @@ async function syncFromFirebase() {
       }
       migrarSetoresParaMestre();
       migrarStatusPg();
-      try { localStorage.setItem(GRUPOS_KEY, JSON.stringify(result.dados)); } catch(e) { console.warn('sync localStorage:', e); }
+      // Grava o resultado APLICADO (não `result.dados` cru): com pendência, é o merge — senão a
+      // alteração local seria apagada aqui mesmo, uma linha depois de ter sido preservada acima.
+      try { localStorage.setItem(GRUPOS_KEY, JSON.stringify(dadosAplicados)); } catch(e) { console.warn('sync localStorage:', e); }
       fbLastSyncTime = Date.now();
       renderGrupoSyncBadge();
       return true;
@@ -10361,14 +10391,14 @@ async function saveGruposToFirebase() {
   for (let tentativa = 1; tentativa <= 3; tentativa++) {
     try {
       const prep = await prepareSaveGrupos(cfg);
-      if (prep.abort) { fbPendingSync = false; return; }
+      if (prep.abort) { setFbPendingSync(false); return; }
       ultimoUpdateTime = prep.remote ? prep.remote.updateTime : null;
 
       const res = await trySaveGrupos(cfg, prep.remote ? prep.remote.updateTime : null);
 
       if (res && res.ok) {
         fbLastKnownTs = res.ts;
-        fbPendingSync = false;
+        setFbPendingSync(false);
         recordSync({ resultado: 'ok', tentativas: tentativa, durationMs: Date.now() - inicio });
         return;
       }
@@ -10379,7 +10409,7 @@ async function saveGruposToFirebase() {
         // só cresce), mas se acontecer, o dado da nuvem fica intacto e o caso fica registrado.
         recordSync({ resultado: 'falha', tentativas: tentativa });
         logSyncConflict({ syncId, operacao: 'saveGruposToFirebase', motivo: 'payload perderia PGs existentes na nuvem', tentativa });
-        fbPendingSync = true;
+        setFbPendingSync(true);
         return;
       }
       if (res && res.preconditionFailed) {
@@ -10390,7 +10420,7 @@ async function saveGruposToFirebase() {
       return;
     } catch (e) {
       console.warn('Firebase save (sync ' + syncId + '):', e);
-      fbPendingSync = true;   // rede caiu: marca pendente p/ retry ao reconectar
+      setFbPendingSync(true);   // rede caiu: marca pendente p/ retry ao reconectar
       recordSync({ resultado: 'adiado', tentativas: tentativa });
       return;
     }
@@ -12962,7 +12992,11 @@ function initModoTeste() {
 if (MODO_TESTE) {
   initModoTeste();
 } else if (loadFbConfig()) {
-  syncFromFirebase();
+  // CORREÇÃO A (2026-08-18): se o app foi fechado com alteração ainda não confirmada na nuvem,
+  // a marca de pendência sobrevive no aparelho — a primeira sincronização a preserva (merge) e
+  // aqui ela é reenviada. Sem este reenvio a alteração ficaria presa no aparelho para sempre,
+  // porque fbRetryOnReconnect só dispara ao reconectar ou ao app voltar a ficar visível.
+  syncFromFirebase().then(() => { if (fbPendingSync) saveGruposToFirebase(); });
   startFbPoll();
 }
 

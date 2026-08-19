@@ -4,7 +4,33 @@
 > para o assistente ao recomeçar — a "memória" do assistente **não viaja entre máquinas**;
 > só este arquivo (via GitHub) viaja. **Nenhuma alteração de código sem aprovação do desenho.**
 
-## 🛑 PONTO DE PARADA — 2026-08-18 — retomar por aqui
+## 🛑 PONTO DE PARADA — 2026-08-18 (noite) — retomar por aqui
+
+### Correção A — perda silenciosa de encontros na sincronização (aplicada, **não publicada**)
+
+**Achado de campo.** O Coordenador do PG 4 (Multibênçãos, Bruno Cordeiro Zappa) não conseguia
+registrar os encontros: o registro **aparecia e depois sumia**. Reproduzido com os dados reais.
+
+**Causa.** `syncFromFirebase()` sobrescrevia o estado local (e o `localStorage`) com os dados crus
+da nuvem. Quando a gravação falhava — rede oscilando —, a alteração ficava só no aparelho, marcada
+como pendente **apenas em memória**, e a leitura seguinte a destruía. Sem aviso nenhum. Irmã do
+defeito de escrita do commit `130d268`, no caminho oposto (leitura).
+
+**Correção aplicada** (detalhe e testes no CHANGELOG): pendência persistida no aparelho;
+`syncFromFirebase()` mescla com `mergeGruposData()` quando há pendência; `localStorage` recebe o
+resultado aplicado, não a nuvem crua; reenvio na inicialização. 5 testes de aceitação aprovados
+sobre dados reais, com escrita para produção bloqueada e produção verificada intacta ao final.
+
+**Estado:** editado em `index.html`, **ainda não commitado nem publicado** — publicar pelo GitHub
+Desktop. Depois de publicar, pedir ao Bruno para recarregar o app e refazer os registros.
+
+**Decisão pendente — Correção B (não aprovada ainda).** Avisar na tela quando o encontro foi salvo
+no aparelho mas ainda não subiu para a nuvem. Hoje o app diz "salvo" sem confirmação da nuvem: a
+Correção A impede a perda do dado, mas o usuário continua sem enxergar esse estado.
+
+---
+
+## PONTO DE PARADA — 2026-08-18 (dia)
 
 **Sequenciamento decidido nesta sessão.** Duas frentes independentes: uma correção de
 persistência (concluída e no ar) e a revisão do algoritmo de ranking (em homologação). A

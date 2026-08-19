@@ -1,5 +1,55 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-08-18] — Correção A: a sincronização deixa de apagar alterações que ainda não subiram
+
+**Correção A, isolada.** Não altera telas, textos, ranking, IMD nem regra de negócio. Corrige uma
+perda silenciosa de dados no caminho de **leitura** da nuvem — irmã do defeito de escrita corrigido
+no commit `130d268`, no mesmo dia.
+
+**Achado de campo.** O Coordenador do PG 4 (Multibênçãos) relatou que não conseguia registrar os
+encontros do mês: o registro **aparecia na lista e depois sumia**. O `reunioesMes` do PG 4 estava
+vazio na nuvem — nenhum encontro jamais chegou lá.
+
+**A falha.** `registrarEncontroPg()` grava no aparelho, mostra o encontro na tela e dispara a
+gravação na nuvem **sem esperar confirmação**. Se essa gravação falhasse — rede oscilando é o caso
+comum no hospital — a alteração ficava só no aparelho, marcada como pendente **apenas em memória**.
+A sincronização seguinte (poll de 30s, voltar do bloqueio de tela, reabrir o app) chamava
+`applyGruposData(result.dados)` e regravava o `localStorage` com os dados **crus da nuvem**,
+destruindo a alteração pendente. Sem erro, sem aviso, sem registro visível.
+
+Ironia do caso: o app **já tinha** a função que junta os dois lados sem perder nada
+(`mergeGruposData`, união por `id` em reuniões/gratidões/participantes) — ela era usada no caminho
+de gravação e simplesmente não era usada no de leitura.
+
+**A correção.** Princípio: *uma alteração local ainda não confirmada na nuvem nunca pode ser
+apagada por uma leitura.*
+- `fbPendingSync` passou a ser **persistido no aparelho** (`PENDING_SYNC_KEY`, com prefixo de teste),
+  via `setFbPendingSync()` — antes era variável de memória, perdida ao fechar o app.
+- `syncFromFirebase()` mescla com `mergeGruposData()` **quando há pendência**; sem pendência, o
+  comportamento é o de sempre (a nuvem é a verdade, e renomeações feitas em outro aparelho chegam).
+- O `localStorage` passa a receber o resultado **aplicado**, não `result.dados` cru — senão a
+  alteração seria apagada uma linha depois de ter sido preservada.
+- Na inicialização, havendo pendência guardada, o app **reenvia** — sem isso a alteração ficaria
+  presa no aparelho para sempre (`fbRetryOnReconnect` só dispara ao reconectar ou ao voltar visível).
+
+**Testes de aceitação (todos aprovados).** Executados sobre o código editado, com os **dados reais
+de produção** carregados no aparelho de teste e a escrita para a nuvem bloqueada — verificado ao
+final que o documento de produção continua sem nenhum vestígio dos testes.
+
+| # | Cenário | Resultado |
+|---|---|---|
+| 1 | Registrar encontro com a gravação na nuvem falhando, depois sincronizar | encontro **sobrevive** na tela e no aparelho (antes: sumia) |
+| 2 | Três sincronizações seguidas com pendência aberta | 1 encontro — não duplica, não perde |
+| 3 | Conteúdo que a gravação enviaria | leva o encontro e os 50 PGs |
+| 4 | Nuvem finalmente aceita a gravação | pendência limpa, marca removida do aparelho |
+| 5 | Sem pendência, PG renomeado em outro aparelho | nome novo chega normalmente (sem regressão) |
+
+**Fica de fora (não aprovado nesta rodada).** A **Correção B** — avisar na tela quando o encontro
+foi salvo no aparelho mas ainda não subiu. Hoje o usuário continua sem enxergar esse estado: ele vê
+"salvo" mesmo quando a nuvem ainda não confirmou. A Correção A garante que o dado **não se perde**;
+a B daria a informação. Pendente de decisão.
+
+
 ## [2026-08-18] — Correção de segurança de persistência: fim da escrita destrutiva por desconhecimento
 
 **Mudança A, isolada.** Não altera capacidade (segue com 50 slots), não altera ranking, IMD, telas
