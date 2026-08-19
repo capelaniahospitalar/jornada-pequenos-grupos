@@ -3563,9 +3563,10 @@ function mostrarErroEncontro(monthKey, texto) {
 const AVISOS_ENCONTRO = {
   enviando: { txt: '⏳ Enviando para a nuvem…',
               bg: '#EEF2F4', borda: '#CBD5DA', cor: '#4A5A63' },
-  ok:       { txt: '✓ Encontro enviado e guardado na nuvem.',
+  // Texto neutro de propósito: o mesmo aviso serve para registrar e para apagar um encontro.
+  ok:       { txt: '✓ Enviado e guardado na nuvem.',
               bg: '#E8F5EE', borda: '#A8D8BF', cor: '#1F6B45' },
-  pendente: { txt: '⚠️ Encontro salvo neste aparelho, mas ainda não enviado para a nuvem. Mantenha o app aberto e com internet — ele reenvia sozinho.',
+  pendente: { txt: '⚠️ Alteração salva neste aparelho, mas ainda não enviada para a nuvem. Mantenha o app aberto e com internet — ele reenvia sozinho.',
               bg: '#FFF6E5', borda: '#F0D08A', cor: '#7A5A10' },
 };
 function mostrarAvisoEncontro(monthKey, estado) {
