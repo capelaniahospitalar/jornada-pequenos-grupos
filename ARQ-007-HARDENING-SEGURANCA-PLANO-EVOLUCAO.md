@@ -195,7 +195,9 @@ Cada fase segue o ADR-004 (coexistência, validação com dado real, rollback di
 
 ## Controles Obrigatórios (checklist de implementação)
 
-- [ ] `firestore.rules` versionado neste repositório.
+- [x] `firestore.rules` versionado neste repositório. **Feito em 2026-08-19** — cópia de
+  referência do texto publicado no Console (arquivo não é aplicado; o Console continua sendo a
+  fonte de verdade).
 - [ ] Autenticação real (`authUid`) antes de qualquer regra de permissão por papel.
 - [ ] Validação de formato mínima por entidade, cliente + regra do servidor.
 - [ ] Testes automatizados do Motor de Negócio, antes de iniciar a Fase 2.

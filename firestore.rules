@@ -1,0 +1,67 @@
+// ══════════════════════════════════════════════════════════════════════════════
+// REGRAS DE SEGURANÇA DO FIRESTORE — CÓPIA DE REFERÊNCIA
+//
+// ATENÇÃO: este arquivo NÃO é lido por nada. Ele não é publicado, não é aplicado
+// e alterá-lo não muda o comportamento do banco. Quem manda de verdade é o texto
+// que está no Console do Firebase (projeto `jornada-pequenos-grupos`, conta Google
+// "OQQÉ? Tutorial", Firestore Database → aba Regras).
+//
+// Para que serve: até 2026-08-19 as regras existiam SÓ dentro do Console, sem
+// nenhuma cópia — se fossem apagadas ou alteradas por engano, não havia registro
+// do que diziam (risco apontado no ARQ-007). Este arquivo é essa memória escrita.
+//
+// COMO USAR: ao alterar as regras no Console, cole aqui o texto novo e faça um
+// commit. Se as duas versões divergirem, a do Console é a verdadeira.
+//
+// Última sincronização com o Console: 2026-08-19 (versão publicada às 09:20).
+//
+// O que essa versão mudou em relação à anterior (2026-07-08):
+//   1) Bloco novo `/embaixadoresExternos/{registro}` — liberou o app dos
+//      colaboradores sem PG (`embaixadores-agosto.html`), que até então recebia
+//      403 "Missing or insufficient permissions" em toda tentativa de registro.
+//   2) `setoresMestre`, `setoresEfetivo` e `embaixadoresExternos` entraram na
+//      allowlist do `jdpg/grupos`. O `index.html` já mandava esses campos de topo,
+//      e a regra antiga os recusava — o que fazia a gravação INTEIRA falhar, não
+//      só o campo novo. Pendência aberta desde a RC4.8.
+//
+// ARMADILHA DE NOME: existe um CAMPO `embaixadoresExternos` dentro de
+// `jdpg/grupos` (gravado pelo app dos PGs) e uma COLEÇÃO raiz de mesmo nome
+// (gravada pelo app dos externos). São coisas diferentes, no mesmo banco.
+//
+// LEMBRETE: campo de topo novo no `jdpg/grupos` precisa entrar no `hasOnly([...])`
+// ANTES de ir para produção, senão a gravação volta 403 e o app mostra "sem
+// conexão" — mesmo bug já visto com `convites` em 2026-07-08.
+// ══════════════════════════════════════════════════════════════════════════════
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /jdpg/grupos {
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasOnly(['dados','ts','tutores','convites','setoresMestre','setoresEfetivo','embaixadoresExternos'])
+        && request.resource.data.dados is string
+        && request.resource.data.dados.size() < 500000
+        && (!('tutores' in request.resource.data) || request.resource.data.tutores is string)
+        && (!('convites' in request.resource.data) || request.resource.data.convites is string)
+        && (!('setoresMestre' in request.resource.data) || request.resource.data.setoresMestre is string)
+        && (!('setoresEfetivo' in request.resource.data) || request.resource.data.setoresEfetivo is string)
+        && (!('embaixadoresExternos' in request.resource.data) || request.resource.data.embaixadoresExternos is string);
+    }
+
+    match /embaixadoresExternos/{registro} {
+      allow create: if request.resource.data.keys().hasOnly(['nome','setor','monthKey','criadoEm'])
+        && request.resource.data.nome is string
+        && request.resource.data.nome.size() >= 3
+        && request.resource.data.nome.size() <= 120
+        && request.resource.data.setor is string
+        && request.resource.data.setor.size() > 0
+        && request.resource.data.setor.size() <= 120
+        && request.resource.data.monthKey is string
+        && request.resource.data.monthKey.size() <= 10
+        && request.resource.data.criadoEm is string
+        && request.resource.data.criadoEm.size() <= 40;
+      allow read, update, delete: if false;
+    }
+  }
+}
