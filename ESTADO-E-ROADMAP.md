@@ -21,12 +21,21 @@ defeito de escrita do commit `130d268`, no caminho oposto (leitura).
 resultado aplicado, não a nuvem crua; reenvio na inicialização. 5 testes de aceitação aprovados
 sobre dados reais, com escrita para produção bloqueada e produção verificada intacta ao final.
 
-**Estado:** editado em `index.html`, **ainda não commitado nem publicado** — publicar pelo GitHub
-Desktop. Depois de publicar, pedir ao Bruno para recarregar o app e refazer os registros.
+### Correção B — o envio para a nuvem deixa de ser invisível (aprovada e aplicada)
 
-**Decisão pendente — Correção B (não aprovada ainda).** Avisar na tela quando o encontro foi salvo
-no aparelho mas ainda não subiu para a nuvem. Hoje o app diz "salvo" sem confirmação da nuvem: a
-Correção A impede a perda do dado, mas o usuário continua sem enxergar esse estado.
+Aviso novo no cartão "Frequência do Pequeno Grupo": *⏳ Enviando* → *✓ Enviado e guardado na nuvem*
+ou *⚠️ Alteração salva neste aparelho, mas ainda não enviada… ele reenvia sozinho*. Para isso,
+`saveGruposToFirebase()` passou a devolver se a nuvem confirmou, e **todo** caminho sem confirmação
+passou a marcar pendência (antes só a queda de rede marcava). 7 testes aprovados — detalhe no
+CHANGELOG.
+
+**Estado das duas correções:** editadas em `index.html`, **ainda não commitadas nem publicadas** —
+publicar pelo GitHub Desktop. Depois de publicar, pedir ao Bruno para recarregar o app e refazer os
+registros do Multibênçãos (julho pelo relatório de Julho/2026, agosto pelo de Agosto/2026).
+
+**Dívida que fica.** O aviso cobre só o Relatório Mensal, que é onde o defeito apareceu. As demais
+gravações do app (mural, inscrição, missões) continuam sem confirmação visível — mesma dívida
+arquitetural de sempre: a tela anuncia o sucesso antes de a nuvem responder.
 
 ---
 

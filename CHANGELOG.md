@@ -44,10 +44,47 @@ final que o documento de produção continua sem nenhum vestígio dos testes.
 | 4 | Nuvem finalmente aceita a gravação | pendência limpa, marca removida do aparelho |
 | 5 | Sem pendência, PG renomeado em outro aparelho | nome novo chega normalmente (sem regressão) |
 
-**Fica de fora (não aprovado nesta rodada).** A **Correção B** — avisar na tela quando o encontro
-foi salvo no aparelho mas ainda não subiu. Hoje o usuário continua sem enxergar esse estado: ele vê
-"salvo" mesmo quando a nuvem ainda não confirmou. A Correção A garante que o dado **não se perde**;
-a B daria a informação. Pendente de decisão.
+
+## [2026-08-18] — Correção B: o envio para a nuvem deixa de ser invisível
+
+**Correção B, isolada**, aprovada na sequência da Correção A e publicada junto. Única mudança
+visual: um aviso novo no cartão "Frequência do Pequeno Grupo", dentro do Relatório Mensal.
+
+**O que faltava.** A Correção A garante que a alteração **não se perde** — fica guardada e o app
+reenvia sozinho. Mas o app continuava anunciando "salvo" antes de a nuvem confirmar, e o usuário
+não tinha como distinguir um registro já seguro de um que ainda depende de reenvio.
+
+**A correção.**
+- `saveGruposToFirebase()` passou a **devolver** se a nuvem confirmou (`true`) ou não (`false`).
+  Antes não devolvia nada — era por isso que a tela não tinha como saber. Aditivo: nenhum chamador
+  anterior lê o retorno.
+- **Todo caminho sem confirmação marca pendência**, não só a queda de rede (`sizeExceeded`,
+  resposta inesperada e as 3 tentativas esgotadas por conflito passaram a marcar). Sem a marca, a
+  alteração ficaria desprotegida contra a sincronização e o aviso mentiria ao prometer reenvio.
+- `registrarEncontroPg()` e `removerEncontroPg()` viraram assíncronas: redesenham a lista na hora
+  (o dado já está no aparelho, o botão nunca trava) e depois exibem o estado real do envio —
+  *⏳ Enviando para a nuvem…* → *✓ Enviado e guardado na nuvem* ou *⚠️ Alteração salva neste
+  aparelho, mas ainda não enviada… ele reenvia sozinho*. Texto neutro de propósito: serve aos dois.
+- Reabrir o Relatório Mensal com pendência aberta **já mostra o aviso**, e `fbRetryOnReconnect()`
+  troca para "enviado" no instante em que a nuvem aceita, sem recarregar a tela.
+
+**Testes de aceitação (todos aprovados),** mesma bancada da Correção A — dados reais do PG 4,
+escrita para a nuvem bloqueada, produção verificada intacta ao final.
+
+| # | Cenário | Resultado |
+|---|---|---|
+| 1 | Registrar com a nuvem falhando | "⏳ Enviando" → aviso âmbar "ainda não enviada"; encontro na lista; pendência marcada |
+| 2 | Registrar com a nuvem aceitando | "✓ Enviado e guardado na nuvem"; pendência limpa |
+| 3 | Reabrir o Relatório Mensal com pendência aberta | aviso âmbar já visível |
+| 4 | Reenvio automático consegue subir | aviso na tela vira "✓ enviado" sozinho |
+| 5 | Apagar um encontro com a nuvem falhando | mesmo aviso (redação neutra) |
+| 6 | Data futura / fora do mês | segue recusando com a mensagem de erro de sempre (sem regressão) |
+| 7 | Regressão da Correção A: sincronizar com pendência | 2 encontros → 2 (nada apagado) |
+
+**Não entrou.** O aviso cobre o Relatório Mensal, que é onde o defeito foi relatado. As demais
+gravações do app (mural, inscrição, missões) seguem sem confirmação visível — mesma dívida, outro
+escopo.
+
 
 
 ## [2026-08-18] — Correção de segurança de persistência: fim da escrita destrutiva por desconhecimento
