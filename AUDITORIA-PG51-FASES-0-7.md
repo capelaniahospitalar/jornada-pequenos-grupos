@@ -506,21 +506,57 @@ Três pontos: (1) a divergência é **anterior** a esta versão; (2) esta versã
 5. Confirmar que as gravações continuam funcionando
 6. Só então aplicar o passo B da regra — o que finalmente barra o aparelho antigo
 
-### Bateria pós-publicação prevista (ainda não executada)
+---
 
-Leitura · lista de PGs · contagens · PG 51 · PG 70 · limites 50/51/52 · slots vazios — tudo em modo leitura, sem migração, sem limpeza, sem normalização. Se qualquer número divergir do registro acima: interromper e ir para o rollback (`git revert` do commit e republicação de `d76a181`).
+## PUBLICAÇÃO E BATERIA PÓS-PUBLICAÇÃO — 20/08/2026, 23h39
+
+**Decisão tomada: (A) publicar.** O usuário enviou os commits pelo GitHub Desktop.
+`main` = `origin/main` · commits `ac7aae8` (1.1.0-rc1) e `3a5f8de` (documentação da auditoria).
+
+### Verificação do que foi publicado
+
+| Item | Resultado |
+|---|---|
+| Versão servida pelo GitHub Pages | `1.1.0-rc1` · build 2026-08-20 · schema 2 ✅ |
+| `index.html` publicado × local | **conteúdo idêntico**, 13.639 linhas (só difere CRLF/LF) ✅ |
+| sha256 do arquivo local | `81104b32…` — o mesmo registrado antes da publicação ✅ |
+
+### Bateria pós-publicação (tudo em modo leitura)
+
+| Verificação | Resultado |
+|---|---|
+| Leitura da nuvem | ✅ documento lido, 43 PGs com nome carregados |
+| Inventário | ✅ **70 capacidade · 45 ocupados · 43 cadastrados · 38 ativos · 5 em formação · 2 sem identificação · 25 livres · 7 removidos** — idêntico ao registro pré-publicação e à auditoria manual da Fase 2 |
+| PG 51 | ✅ slot vazio, status LIVRE, 0 participantes, pgId ausente — **não foi tocado** |
+| PG 52 | ✅ idem |
+| PG 50 (limite) | ✅ "Nutrição", 1 ativo, status LIVRE (inconsistência conhecida, não corrigida) |
+| PG 70 (limite) | ✅ vazio de fábrica |
+| Slots vazios | ✅ 18 de fábrica (53–70) |
+| Numeração | ✅ `num` = índice+1 em todos; 70 números distintos |
+| Bateria interna `autoTesteFase4()` | ✅ **11 de 11 passaram**, incluindo a reencenação do caso PG 51 e o teste que lê o código-fonte dos quatro pontos de cópia |
+| Telemetria de sincronização | ✅ vazia — **nenhuma gravação tentada** |
+| Pendências e conflitos | ✅ nenhum |
+
+### Produção verificada campo a campo, depois de tudo
+
+| Campo | Situação |
+|---|---|
+| `dados` (116.517 chars) · `ts` · `tutores` · `convites` (145.759 chars) · `setoresMestre` · `setoresEfetivo` | **idênticos** ao snapshot pré-publicação |
+| `updateTime` | `2026-08-20T20:47:51.295280Z` — **inalterado** |
+| Tamanho | 299.917 bytes — **inalterado** |
+
+**Nenhuma migração, nenhuma limpeza, nenhuma normalização automática foi executada.** Nenhuma divergência encontrada. Rollback não foi necessário.
 
 ---
 
 ## O QUE CONTINUA EM ABERTO
 
-1. **Decisão (A) ou (B)** da Fase 7 — bloqueia a publicação.
-2. **Verificar o PITR no Console do Firebase** (R1) — única chance de recuperar os nomes dos dois colaboradores do PG 51. Não depende de publicar nada. **É o item mais urgente.**
+1. **Verificar o PITR no Console do Firebase** (R1) — única chance de recuperar os nomes dos dois colaboradores do PG 51. Não depende de mais nada. **É o item mais urgente.**
+2. **M1 — confirmar a adoção:** que os 4 tutores e os coordenadores ativos recarregaram e estão na `1.1.0-rc1`. Só depois disso se pode fechar a porta no servidor.
 3. **R0 — inspeção offline dos aparelhos dos 4 tutores** para achar o que ainda tem 50 slots.
-4. **M2 — aplicar a regra do Firestore** (a única barreira real contra o aparelho antigo).
+4. **M2 — aplicar a regra do Firestore** (a única barreira real contra o aparelho antigo), nos dois passos escritos em `firestore.rules`, e só então ligar `FB_FLAGS.schemaVersionWrite`.
 5. **M3 — atribuir `pgId` aos 43 PGs existentes** (depende de M2).
-6. **R2–R7 — reconciliação dos dados** (nomes dos PGs 3 e 25, 9 status, participantes de teste do PG 9, cadastro do PG 31, coordenador do PG 43).
-7. **Bateria pós-publicação** da Fase 7.
+6. **R2–R7 — reconciliação dos dados** (nomes dos PGs 3 e 25, 9 status incoerentes, participantes de teste do PG 9, cadastro do PG 31, coordenador do PG 43).
 
 ## ARQUIVOS DE APOIO (fora do repositório)
 

@@ -6,16 +6,21 @@
 
 ## 🛑 PONTO DE PARADA — 2026-08-20 (noite) — retomar por aqui
 
-### Auditoria do PG 51 — Fases 0 a 7 concluídas, publicação BLOQUEADA aguardando decisão
+### Auditoria do PG 51 — Fases 0 a 7 concluídas · versão 1.1.0-rc1 PUBLICADA em 20/08 23h39
 
 O relatório completo das sete fases está em **`AUDITORIA-PG51-FASES-0-7.md`** (neste repositório).
 Leia-o antes de retomar. Resumo do estado:
 
-- **Commit `ac7aae8` (versão `1.1.0-rc1`) está feito localmente e NÃO foi enviado ao GitHub.**
-  `main` está 1 commit à frente da origem. Publicar é pelo GitHub Desktop (Push origin).
-- **Produção intocada.** O documento `jdpg/grupos` continua com os mesmos 299.917 bytes e o mesmo
-  `updateTime 2026-08-20T20:47:51.295280Z` de antes da primeira linha alterada. Nenhuma migração,
-  nenhuma reconciliação, nenhuma escrita.
+- **Publicado.** Commits `ac7aae8` (versão `1.1.0-rc1`) e `3a5f8de` (documentação) estão no GitHub;
+  `main` = `origin/main`. O GitHub Pages já serve a `1.1.0-rc1` (conferido: idêntica ao arquivo
+  local, sha256 `81104b32…`).
+- **Bateria pós-publicação aprovada, tudo em modo leitura.** Inventário reproduzido pelo app
+  publicado: 70 capacidade · 45 ocupados · 43 cadastrados · 38 ativos · 5 em formação · 2 sem
+  identificação · 25 livres · 7 removidos — igual ao registro pré-publicação e à auditoria manual.
+  PG 51, PG 52 e PG 70 vazios; numeração intacta; `autoTesteFase4()` 11/11.
+- **Produção intocada.** `jdpg/grupos` continua com 299.917 bytes e `updateTime
+  2026-08-20T20:47:51.295280Z`, campo a campo idêntico. Telemetria de sincronização vazia — nenhuma
+  gravação foi sequer tentada. Nenhuma migração, limpeza ou normalização automática rodou.
 - **Causa do desaparecimento do PG 51 "Puro & Simples":** um aparelho com o app anterior a 18/08
   (que só conhece 50 slots) gravou sua lista e truncou o documento; em seguida a migração de status
   recriou os slots 51–70 no formato de fábrica. Hipótese de exclusão humana **refutada**.
@@ -23,25 +28,22 @@ Leia-o antes de retomar. Resumo do estado:
   status que nunca acompanhava o conteúdo; slot reciclado herdando a identidade anterior; colisão
   entre dois aparelhos apagando o nome do PG do outro; e o `pgId` que não chegava à nuvem.
 
-**A DECISÃO QUE FALTA (Fase 7):** o registro pré-publicação encontrou 2 registros órfãos — os
-slots 3 e 25 têm gente e responsáveis mas não têm nome. Pela regra "inconsistência gera bloqueio,
-não correção automática", a publicação parou. Duas saídas:
+**O QUE FAZER AGORA, nesta ordem:**
 
-- **(A) Publicar assim mesmo** — recomendado. A versão não escreve dado nenhum; os órfãos seguem
-  para a reconciliação (R2) e a causa deixa de se repetir.
-- **(B) Reconciliar antes** — restaurar os nomes dos slots 3 e 25 com os tutores e só depois
-  publicar. Mais lento, e a reconciliação seria feita com o código antigo, que ainda tem o defeito.
-
-**Item mais urgente, que não depende de publicar nada:** verificar no Console do Firebase se o
-**PITR (Point-in-Time Recovery)** está habilitado. É a única chance de recuperar os nomes dos dois
-colaboradores do PG 51.
-
-**Ordem de publicação (não pode ser invertida):** 1) publicar `1.1.0-rc1`; 2) confirmar que os 4
-tutores e os coordenadores ativos carregaram a versão nova; 3) acrescentar `schemaVersion` à
-allowlist da regra no Console; 4) ligar `FB_FLAGS.schemaVersionWrite = true` e publicar;
-5) confirmar que as gravações continuam funcionando; 6) só então aplicar o passo B da regra — o que
-finalmente barra o aparelho antigo. A regra proposta está escrita como comentário em
-`firestore.rules`, marcada como NÃO PUBLICADA.
+1. **Verificar no Console do Firebase se o PITR (Point-in-Time Recovery) está habilitado.** É a
+   única chance de recuperar os nomes dos dois colaboradores do PG 51. Não depende de mais nada.
+2. **M1 — confirmar a adoção:** que os 4 tutores e os coordenadores ativos recarregaram o app e
+   estão na `1.1.0-rc1`.
+3. **M2 — fechar a porta no servidor:** acrescentar `schemaVersion` à allowlist da regra no Console
+   (passo A), ligar `FB_FLAGS.schemaVersionWrite = true` e publicar, confirmar que as gravações
+   continuam funcionando, e só então aplicar o passo B da regra — o que finalmente barra o aparelho
+   antigo. **A ordem não pode ser invertida.** O texto da regra está como comentário em
+   `firestore.rules`, marcado como NÃO PUBLICADO.
+4. **M3 — atribuir `pgId` aos 43 PGs existentes** (só depois de M2).
+5. **R2–R7 — reconciliação dos dados:** os slots **3 e 25** continuam com gente e responsáveis mas
+   sem nome (é o que bloqueou a Fase 7 e seguiu para depois); mais os 9 status incoerentes, os 4
+   participantes de teste do PG 9, o cadastro do PG 31 e o coordenador do PG 43. **Nada disso foi
+   feito — exige aprovação item a item.**
 
 **Backups e material de apoio** (fora do repositório, contêm dados pessoais):
 `Documents\Backups-PequenosGrupos\` — dois snapshots do documento e a pasta
