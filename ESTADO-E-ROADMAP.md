@@ -1,10 +1,218 @@
-# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-08-20)
+# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-08-21)
 
 > Documento para retomar o trabalho em outra máquina/sessão. Cole o conteúdo de volta
 > para o assistente ao recomeçar — a "memória" do assistente **não viaja entre máquinas**;
 > só este arquivo (via GitHub) viaja. **Nenhuma alteração de código sem aprovação do desenho.**
 
-## 🛑 PONTO DE PARADA — 2026-08-20 (noite) — retomar por aqui
+---
+
+## 🛑 PONTO DE PARADA — 2026-08-21 (tarde) — RETOMAR POR AQUI
+
+### Resumo em uma frase
+
+O problema que parecia ser "tem PG duplicado" era, na verdade, **múltiplos caminhos de escrita sobre
+uma estrutura única de dados, alguns sem contrato uniforme**. A correção estrutural disso — a etapa
+**E1** — está em produção desde hoje, na versão **`1.2.0-rc1`**. A reconciliação dos PGs continua
+deliberadamente **bloqueada**, e volta ao fim da fila.
+
+### ⚠️ REGRA OPERACIONAL NOVA, VALE PARA SEMPRE
+
+**Neste repositório, commit na `main` É a publicação.** O GitHub Pages serve direto da branch; não
+existe passo separado. Descoberto na prática hoje, quando um commit foi ao ar imediatamente.
+Consequência: **toda autorização de commit é uma autorização de produção.** A sequência correta é
+alteração → testes locais → auditoria → autorização explícita → commit → verificação do artefato
+publicado (por sha256 contra o arquivo local).
+
+### O que foi para produção hoje (commits `af18d73` e `fb8376a`)
+
+**E1 — contrato único de gravação.** `fbWriteGrupos(cfg, intencao)` passou a receber uma **intenção
+declarada**: envia exatamente os campos que altera, e todo campo declarado passa pelas mesmas
+guardas, venha de qualquer rota.
+
+Corrigiu dois defeitos que estavam em produção **no app novo**, não só no antigo:
+
+1. **O aceite de convite gravava `dados` sem NENHUMA guarda.** As guardas da Fase 4/5 viviam em
+   `trySaveGrupos()`, e `commitConviteChange()` chama `fbWriteGrupos()` direto. Foram movidas para
+   `validarPayloadDados()`, chamada pelo ponto central — texto e ordem preservados literalmente
+   (perda → esvaziamento → colisão → invariantes).
+2. **O fallback `remote.dados || PEQUENOS_GRUPOS`** em `gerarConvite`/`revogarConvite`: se a leitura
+   remota não trouxesse a lista, uma operação de convite gravava a lista **local** de PGs por cima da
+   nuvem — o mesmo mecanismo que esvaziou o PG 51, disfarçado de convite. **Corrigido por subtração:**
+   essas rotas não declaram mais `dados`, então o fallback deixou de existir. `aceitarConvite` já
+   estava protegido (recusa `grupo_inexistente`).
+
+Mais: `tutores` saiu das rotas de convite (campo já foi zerado 2× no passado); falhas tipadas
+(`guarda`, `app_desatualizado`, `slot_ocupado`, `contrato`) com texto próprio em tela, nenhuma cai
+mais no genérico; máscara e telemetria saem da mesma função, para não divergirem.
+
+**E2 — bateria de testes.** `autoTesteE1()`: 27 testes em modo isolado, 35 fora dele. A parte de rede
+usa um **Firestore falso em memória** que reproduz a semântica de `updateMask` e **recusa qualquer URL
+fora de um projeto fictício** — falha de interceptação vira teste vermelho, nunca tráfego real.
+Somados aos 11 de regressão: **38 testes, zero falhas.**
+
+> **O E2 encontrou um defeito real antes da produção:** depois da troca de assinatura, a linha da
+> precondição ainda usava `baseUpdateTime`, o parâmetro que deixou de existir → `ReferenceError` em
+> toda gravação real. **O modo de teste isolado não pegava**, porque retorna antes daquela linha.
+> Lição: teste que não exercita o caminho de rede não prova o caminho de rede.
+
+**Como rodar os testes:** servir o `index.html` num servidor local e abrir com `?teste=1`; chamar
+`autoTesteE1()` no console. Para exercitar a parte de rede é preciso rodar **sem** `?teste=1`, e para
+isso a técnica segura é servir uma **cópia idêntica com `FB_DEFAULT_CONFIG` apontando para um projeto
+inexistente** — porque **abrir o `index.html` sem `?teste=1` conecta na PRODUÇÃO** (`loadFbConfig()`
+cai no `FB_DEFAULT_CONFIG`).
+
+### 🔴 O QUE ESTÁ BLOQUEADO — não fazer sem autorização específica
+
+| Item | Estado |
+|---|---|
+| **E4 — regra do Firestore + ligar `FB_FLAGS.schemaVersionWrite`** | 🔴 BLOQUEADO. A 1.2.0-rc1 estar estável **não é gatilho** |
+| **Reconciliação dos PGs** | 🔴 BLOQUEADA até E4 + observação de estabilidade |
+| Ativar `pgStatusFiltros` | 🔴 continua desligada |
+
+### 🟡 O QUE ESTÁ AUTORIZADO E NÃO INICIADO
+
+**M1 — confirmar adoção da `1.2.0-rc1` pelos 4 tutores.** É o próximo passo e destrava o resto.
+
+> **⚠️ M1 TEM UM BLOQUEIO NÃO RESOLVIDO.** `APP_VERSION` **não aparece em tela nenhuma** — é usada só
+> no log local de conflitos e na telemetria do `localStorage`, que nunca sobe para a nuvem. Portanto
+> o tutor não consegue ver a própria versão, e não há como verificar remotamente. Também não há
+> atalho pelo servidor: não existe diferença observável no dado gravado entre 1.1.0-rc1 e 1.2.0-rc1
+> — quem resolveria isso é o `writeNonce`, que só entra na E4, **que depende da M1**. Dependência
+> circular.
+>
+> **Correção mínima proposta e NÃO APROVADA:** acrescentar a versão à linha discreta que já existe no
+> topo da tela de Pequenos Grupos (`renderGrupoSyncBadge`), que hoje mostra
+> "☁️ Nuvem ativa · há 2 min ✓" e passaria a mostrar "… ✓ · v1.2.0-rc1". Uma linha. Aí a M1 vira uma
+> pergunta que qualquer tutor responde por WhatsApp ou print.
+
+**E3 — ferramenta de manutenção versionada, modo ensaio.** Autorizada, **sem gravação**.
+
+> **DECISÃO PENDENTE:** o repositório é **público**. Publicar a ferramenta nele significa publicar um
+> gravador pronto para um banco sem autenticação. Não cria capacidade nova (a chave e as regras
+> permissivas já estão públicas no `index.html`), mas baixa muito a barreira.
+> **Recomendação: repositório público, script SEM credenciais** — projeto e chave vêm de um arquivo
+> de parâmetros bloqueado pelo `.gitignore`. Sem esse arquivo, o script não faz nada.
+>
+> Requisitos já homologados para ela: versionada · reproduzível · **ensaio por padrão** · backup
+> antes · **executar as mesmas guardas do app** · precondição `updateTime` · carimbo · verificação
+> depois · rollback documentado · **nenhum dado pessoal no repositório**.
+
+**E5 — documentar em `ARQ-004` e `ADR-005`.** Autorizada, não iniciada. Não toca código nem dado.
+
+### O desenho da E4, já fechado (não implementar sem autorização)
+
+**A regra que estava escrita em `firestore.rules` está DEFEITUOSA e não pode ser publicada.** O passo
+B exige `schemaVersion` em `affectedKeys()`, que lista apenas campos cujo **valor mudou**. Como
+`SCHEMA_VERSION` é a constante 2, ela só "muda" na primeira gravação: da segunda em diante **toda
+gravação seria recusada, inclusive a do app novo**.
+
+Semântica que governa o desenho: `request.resource.data` é o documento **depois** da gravação
+(campos não tocados pela máscara aparecem preservados), e a regra **não enxerga a `updateMask`** —
+só consegue comparar antes × depois.
+
+**Saída desenhada:** um campo de topo novo, `writeNonce`, com valor **diferente a cada gravação**
+(schema + hora + componente aleatório). O app novo sempre o altera; o antigo nunca o envia, e como a
+máscara preserva o valor, ele não entra em `affectedKeys()` e a gravação que toca `dados` é recusada.
+Nomes com valor fixo (`clientBuild`, `lastWriterSchema`) **não servem** — recaem no mesmo defeito.
+
+`gerarWriteNonce()` **já existe no código** e é chamado **exclusivamente dentro de `fbWriteGrupos`**,
+com teste que falha se alguém gerar fora — gerar fora faria as 3 tentativas do retry enviarem o mesmo
+carimbo e a segunda seria recusada.
+
+**Alternativa escolhida: B** — exigir o carimbo quando **`dados` OU `convites`** mudarem. Motivo: as
+rotas de criar/revogar convite alteram `convites` sem alterar o valor de `dados`, então uma trava só
+sobre `dados` deixaria o app antigo mexendo na trilha de 407 convites, submetida a `podarConvites` e
+`mergeConvites` daquela versão. **Alternativa C (granular por operação) é INVIÁVEL** — `convites` é
+JSON dentro de uma string e a regra não interpreta JSON.
+
+**Sequência obrigatória da E4, não inverter:** (1) allowlist recebe `schemaVersion` **e**
+`writeNonce`; (2) **simular no Rules Playground** os 4 casos — o decisivo é *"altera `dados`,
+`writeNonce` presente e inalterado" → tem de ser RECUSADO*; (3) publicar app com a flag ligada;
+(4) confirmar que gravações reais continuam passando; (5) confirmar adoção (M1); (6) atualizar a
+ferramenta de manutenção para carimbar — **depois da trava ela também é bloqueada se não carimbar**;
+(7) publicar o passo B; (8) observar 24 h.
+
+**Limite a lembrar sempre:** o carimbo comprova que a operação **conhece e cumpre o contrato de
+escrita vigente**, e permite bloquear clientes antigos. **Não é autenticação nem prova de identidade**
+— a chave é pública. A ausência de autenticação segue sendo o achado crítico aberto da RC5.0.
+
+### Incidentes de hoje (21/08) — todos com o app antigo como origem
+
+- **~8h36 — reversão em massa.** 12 slots tiveram nome/tutor revertidos ao estado antigo por um
+  aparelho com cópia velha. Os slots 38, 45 e 48, esvaziados em 20/08, **voltaram a ter nome**, e a
+  fila de criação passou a apontar para o **slot 51**. Dois PGs criados naquela manhã (7 e 32)
+  ficaram híbridos: nome antigo, gente nova.
+- **13h01 — apagamento de schema.** Uma gravação de app antigo removeu `status`, `pgId` e
+  `institucional` dos 70 grupos. Às 13h05 um app novo **devolveu os campos, vazios**. O que se perde
+  não é a estrutura, é o **valor**: o `pgId` do PG 32 e o `institucional=true` do **PG 47
+  "Diretoria"** — que voltou a contar no Ranking IMD e **precisa ser reposto** junto com a etapa M3.
+- **Entre 11h55 e 12h48 — perda de um registro de participante no PG 4.** Uma unificação de
+  duplicidade feita às 11h55 teve o registro sobrevivente **apagado** por gravação de app antigo; a
+  pessoa ficou sem inscrição ativa e perdeu 495 pontos. É a prova de que a perda é **ativa**, não só
+  histórico.
+
+### Estado da reconciliação dos PGs (diagnóstico pronto, execução bloqueada)
+
+Mapa de duplicidades levantado sobre o retrato de 21/08 10h31. **Cinco nomes repetidos; três são
+duplicidade real, dois são falsos:**
+
+| Caso | Situação |
+|---|---|
+| **Foco no alto — 2 × 38** | 38 é resíduo: nunca teve coordenador aceito, nunca teve pessoa, sem histórico |
+| **FORTALEZA — 41 × 45** | 45 é resíduo, mesmos critérios |
+| **Limpando corações — 25 × 48 × 49** | 49 é o real; **48 é resíduo** (convite criado 1 min antes do 49, que deu certo); **25 é OUTRO grupo** — outro tutor, outro dia (quarta 10h), outra coordenadora, sem nenhum convite registrado |
+| **Plantão B Hotelaria — 7 × 13** | **FALSO.** O slot 7 é um PG criado em 21/08 cujo nome foi sobrescrito pela reversão. O 13 é resíduo real |
+| **Manutenção da Fé — 5 × 32** | **FALSO.** O slot 32 é o REFUGIO ILUMINADO criado em 21/08; nome sobrescrito pela reversão |
+
+**Provas colhidas para os resíduos 13, 38, 45 e 48:** zero participantes ativos, zero registros de
+exclusão, **zero convites utilizados de qualquer tipo em tempo algum**, campo de coordenador vazio,
+sem mural e sem reunião. **Mas "nunca foi ATIVO" continua sendo INFERÊNCIA**, não prova: o PG 25
+demonstra que pode haver coordenador sem convite, e os slots 11 e 35 demonstram que pessoas somem sem
+deixar rastro. A força do indício varia: 48 e 45 são mais fortes (posteriores ao tombstone, ~23/07);
+13 e 38 são mais fracos.
+
+**Ações especificadas, nenhuma executada:** liberar 13, 38, 48 (independem de resposta humana, mas
+exigem confirmação da inferência acima); renomear 7 e 32; liberar 45; **PG 25 não recebe escrita
+nenhuma**. Todas exigem, na execução: leitura nova da nuvem, backup novo feito depois dela, e recálculo
+dos valores esperados — **os valores do retrato de 21/08 não servem em outro dia**.
+
+**Fora de escopo por decisão:** `salvarFbConfig` grava `dados` sem precondição — dívida técnica de
+concorrência, registrada e adiada. Migração de `pgId` (M3). Reposição do `institucional` do PG 47.
+Restauração do PG 51. Slots 11, 35 e 43 (os três já foram ATIVO — exigem decisão pelo ADR-005).
+Slots 26 e 28.
+
+### 📌 O QUE **NÃO** VIAJA — precisa ser levado à mão
+
+Estes arquivos estão **só no PC do trabalho** e contêm dados pessoais, portanto **não podem entrar no
+repositório**:
+
+| Arquivo | Onde | Para que serve |
+|---|---|---|
+| `RETRATO-PequenosGrupos-2026-08-21-1031.html` | `Documents\Backups-JornadaPG\` | Retrato legível dos 70 slots |
+| `BACKUP-2026-08-21-1031.json` | idem | Documento bruto da nuvem |
+| `CHECKLIST-PASTORAL-PGs-DUPLICADOS.html` | idem | As 6 perguntas aos tutores, **com os nomes** |
+| Dados de restauração do **PG 51** | memória local do assistente | Nomes, WhatsApp e identificadores dos 3 participantes |
+| Snapshot de 19/08 16h40 | scratchpad da sessão de 19/08 | **Única fonte** do conteúdo do PG 51 |
+
+**Para continuar a reconciliação em casa, é preciso levar os três primeiros por nuvem pessoal ou
+pendrive.** Sem eles dá para continuar a frente técnica (E3, E5, E4), mas não a pastoral.
+
+### Perguntas pastorais pendentes (destravam metade da reconciliação, e não dependem de código)
+
+Seis perguntas prontas no checklist: nome e horário do PG do slot 7; nome, horário e coordenação do
+slot 32, além do destino de uma participante; se o slot 45 era rascunho ou segunda turma; se o grupo
+do slot 25 chegou a existir; e por que 22 convites do slot 7 foram cancelados em 25 minutos.
+
+### Próximo passo recomendado
+
+1. **M1** — mas resolvendo antes o bloqueio da versão invisível (a linha proposta acima).
+2. **E3** — depois de decidir onde a ferramenta mora.
+3. **E5** — pode começar a qualquer momento.
+4. **E4** — só depois de 1, 2 e 3 homologados, e com autorização específica.
+
+---
+
+## PONTO DE PARADA ANTERIOR — 2026-08-20 (noite)
 
 ### Auditoria do PG 51 — Fases 0 a 7 concluídas · versão 1.1.0-rc1 PUBLICADA em 20/08 23h39
 
