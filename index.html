@@ -9336,6 +9336,153 @@ function autoTesteFase4() {
   return r;
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+//  E2 — BATERIA DO CONTRATO ÚNICO DE GRAVAÇÃO
+// ══════════════════════════════════════════════════════════════════════════
+// NÃO grava em lugar nenhum. A parte que exercita a gravação de verdade troca o `fetch`
+// por um Firestore FALSO em memória que reproduz a semântica de updateMask (só os campos
+// listados são escritos) — e esse falso RECUSA qualquer URL que não seja a do projeto
+// fictício, de modo que uma falha de interceptação vira teste vermelho, nunca tráfego real.
+// O `fetch` original é restaurado em finally, mesmo se um teste lançar exceção.
+async function autoTesteE1() {
+  const r = [];
+  const ok = (nome, passou, detalhe) => r.push({ teste: nome, resultado: passou ? 'PASSOU' : 'FALHOU', detalhe: detalhe || '' });
+
+  // ── 1. Validação da intenção: o objeto novo não pode virar porta lateral ──────────
+  [['intencao ausente', undefined],
+   ['operacao ausente', {}],
+   ['operacao desconhecida', { operacao: 'apagar-tudo' }],
+   ['campo fora do contrato', { operacao: 'grupos', dados: [{ num: 1 }], apiKey: 'x' }],
+   ['tipo invalido em dados', { operacao: 'grupos', dados: 'lista' }],
+   ['dados declarado vazio', { operacao: 'grupos', dados: [] }],
+  ].forEach(([nome, intencao]) => ok('E1-V recusa ' + nome, validarIntencao(intencao) !== null, String(validarIntencao(intencao))));
+  ok('E1-V aceita intenção válida', validarIntencao({ operacao: 'convite-criar', convites: [] }) === null);
+
+  // Chamada no formato ANTIGO (posicional) tem de falhar ALTO, antes de qualquer rede.
+  const antigo = await fbWriteGrupos({ projectId: 'x', apiKey: 'y' }, [{ num: 1 }]);
+  ok('E1-V recusa chamada posicional antiga', !!(antigo && antigo.intencaoInvalida), antigo && antigo.detalhe);
+
+  // ── 2. O carimbo ────────────────────────────────────────────────────────────────
+  const nonces = new Set();
+  for (let i = 0; i < 500; i++) nonces.add(gerarWriteNonce());
+  ok('E1-N 500 carimbos distintos', nonces.size === 500, nonces.size + '/500');
+  ok('E1-N carimbo nasce dentro de fbWriteGrupos', String(fbWriteGrupos).indexOf('gerarWriteNonce()') > 0);
+  const foraDoLugar = { saveGruposToFirebase, trySaveGrupos, commitConviteChange }; // gerar aqui quebraria o retry
+  const vazando = Object.keys(foraDoLugar).filter(n => String(foraDoLugar[n]).indexOf('gerarWriteNonce') >= 0);
+  ok('E1-N nenhum outro ponto gera carimbo', vazando.length === 0, vazando.join(', '));
+
+  // ── 3. Máscara por operação (mesma função que monta a máscara real) ─────────────
+  const m = (i) => fbCamposDeclarados(i);
+  const mCriar   = m({ operacao: 'convite-criar',   convites: [] });
+  const mRevogar = m({ operacao: 'convite-revogar', convites: [] });
+  const mAceitar = m({ operacao: 'convite-aceitar', convites: [], dados: [{ num: 1 }] });
+  const mGrupos  = m({ operacao: 'grupos', dados: [{ num: 1 }], tutores: [{ name: 'T' }] });
+  ok('E1-M criar convite NÃO declara dados',   mCriar.indexOf('dados') < 0,   mCriar.join(','));
+  ok('E1-M criar convite NÃO declara tutores', mCriar.indexOf('tutores') < 0, mCriar.join(','));
+  ok('E1-M revogar convite NÃO declara dados', mRevogar.indexOf('dados') < 0, mRevogar.join(','));
+  ok('E1-M aceitar convite DECLARA dados',     mAceitar.indexOf('dados') >= 0, mAceitar.join(','));
+  ok('E1-M salvar grupos declara dados e tutores', mGrupos.indexOf('dados') >= 0 && mGrupos.indexOf('tutores') >= 0, mGrupos.join(','));
+
+  // ── 4. Fim do fallback: as rotas de convite não citam mais a lista local ────────
+  // Procura o CÓDIGO do fallback (`dados: remote.dados`), não a expressão citada em comentário —
+  // a primeira versão deste teste falhou justamente por casar com o comentário explicativo.
+  ok('E1-F gerarConvite sem fallback local',   String(gerarConvite).indexOf('dados: remote.dados') < 0);
+  ok('E1-F revogarConvite sem fallback local', String(revogarConvite).indexOf('dados: remote.dados') < 0);
+  ok('E1-F aceitarConvite recusa grupo inexistente', String(validarConviteParaAceite).indexOf("motivo: 'grupo_inexistente'") > 0);
+
+  // ── 5. As guardas passaram a valer para toda rota que declare dados ────────────
+  ok('E1-G guardas vivem no ponto comum', String(fbWriteGrupos).indexOf('validarPayloadDados') > 0);
+  ok('E1-G trySaveGrupos não guarda mais sozinho', String(trySaveGrupos).indexOf('detectarEsvaziamento') < 0);
+  ok('E1-G guarda de schema vale para todos', String(fbWriteGrupos).indexOf('schemaIncompativel') > 0);
+
+  // ── 6. Falhas tipadas chegam à tela com texto próprio ──────────────────────────
+  ['app_desatualizado', 'guarda', 'slot_ocupado', 'contrato'].forEach(motivo => {
+    const msg = mensagemConvite(motivo);
+    const generico = mensagemConvite('__inexistente__');
+    ok('E1-T motivo "' + motivo + '" tem texto próprio', msg.titulo !== generico.titulo, msg.titulo);
+  });
+
+  // ── 7. Firestore FALSO: prova byte a byte que `tutores` sobrevive aos convites ──
+  const PROJ = 'projeto-falso-autoteste-e1';
+  const docFalso = {
+    dados: JSON.stringify([{ num: 1, nome: 'PG Teste', participantes: [] }]),
+    ts: '1',
+    tutores: JSON.stringify([{ name: 'Tutor Real', wa: '5521000000000' }]),
+    convites: JSON.stringify([]),
+  };
+  const tutoresAntes = docFalso.tutores;
+  const fetchOriginal = window.fetch;
+  const guardadas = { nums: fbNumsVistosNaNuvem, retrato: fbRetratoRemoto, criacao: pgCriacaoPretendida, schema: fbSchemaRemoto };
+  let ultimaMascara = [];
+  // No MODO DE TESTE, fbWriteGrupos devolve sucesso simulado ANTES de montar a máscara —
+  // a barreira de isolamento vem primeiro, e é assim que deve ser. Logo, esta parte só tem
+  // o que exercitar fora do modo de teste, onde o `fetch` falso é a proteção.
+  if (MODO_TESTE) {
+    ok('E1-B parte de rede pulada (modo de teste isolado)', true, 'rode autoTesteE1() numa sessão normal para exercitar a máscara real');
+  } else try {
+    fbNumsVistosNaNuvem = [];        // o retrato real da sessão não participa do teste
+    fbRetratoRemoto = new Map();
+    pgCriacaoPretendida = null;
+    fbSchemaRemoto = SCHEMA_VERSION;
+    window.fetch = async (url, init) => {
+      if (String(url).indexOf(PROJ) < 0) throw new Error('AUTOTESTE E1: rede fora do projeto falso — ' + url);
+      ultimaMascara = [];
+      String(url).replace(/updateMask\.fieldPaths=([^&]+)/g, (todo, campo) => { ultimaMascara.push(decodeURIComponent(campo)); return todo; });
+      const corpo = JSON.parse(init.body);
+      ultimaMascara.forEach(campo => {                    // semântica real: só a máscara escreve
+        const f = corpo.fields[campo];
+        if (f) docFalso[campo] = f.stringValue !== undefined ? f.stringValue : f.integerValue;
+      });
+      return { status: 200, ok: true, json: async () => ({ updateTime: new Date().toISOString(), fields: { ts: { integerValue: docFalso.ts } } }) };
+    };
+    const cfg = { projectId: PROJ, apiKey: 'chave-falsa' };
+
+    await fbWriteGrupos(cfg, { operacao: 'convite-criar', convites: [{ inviteId: 'a' }] });
+    ok('E1-B criar convite: máscara sem dados/tutores', ultimaMascara.indexOf('dados') < 0 && ultimaMascara.indexOf('tutores') < 0, ultimaMascara.join(','));
+    ok('E1-B criar convite: tutores idêntico byte a byte', docFalso.tutores === tutoresAntes);
+
+    await fbWriteGrupos(cfg, { operacao: 'convite-revogar', convites: [{ inviteId: 'a', status: 'cancelado' }] });
+    ok('E1-B revogar convite: tutores idêntico byte a byte', docFalso.tutores === tutoresAntes);
+
+    const dadosAntes = docFalso.dados;
+    await fbWriteGrupos(cfg, { operacao: 'convite-aceitar',
+      dados: [{ num: 1, nome: 'PG Teste', participantes: [{ nome: 'Alguém', ts: 1 }] }],
+      convites: [{ inviteId: 'a', status: 'utilizado' }] });
+    ok('E1-B aceitar convite: máscara COM dados', ultimaMascara.indexOf('dados') >= 0, ultimaMascara.join(','));
+    ok('E1-B aceitar convite: tutores idêntico byte a byte', docFalso.tutores === tutoresAntes);
+    ok('E1-B aceitar convite alterou dados', docFalso.dados !== dadosAntes);
+
+    // A guarda de esvaziamento agora alcança o aceite de convite — o que não acontecia antes.
+    fbRetratoRemoto = new Map([[1, { tinhaNome: true, tinhaGente: true }]]);
+    const barrado = await fbWriteGrupos(cfg, { operacao: 'convite-aceitar',
+      dados: [{ num: 1, nome: null, participantes: [] }], convites: [] });
+    ok('E1-B guarda barra aceite que esvaziaria um PG', !!(barrado && barrado.guardaViolada === 'esvaziamento'), barrado && barrado.detalhe);
+
+    // E a guarda de perda idem.
+    fbRetratoRemoto = new Map();
+    fbNumsVistosNaNuvem = [1, 2, 3];
+    const barrado2 = await fbWriteGrupos(cfg, { operacao: 'convite-aceitar', dados: [{ num: 1 }], convites: [] });
+    ok('E1-B guarda barra aceite que perderia PGs', !!(barrado2 && barrado2.guardaViolada === 'perda'), barrado2 && barrado2.detalhe);
+
+    // App defasado não grava nem convite.
+    fbNumsVistosNaNuvem = [];
+    fbSchemaRemoto = SCHEMA_VERSION + 1;
+    const barrado3 = await fbWriteGrupos(cfg, { operacao: 'convite-criar', convites: [] });
+    ok('E1-B schema mais novo barra até convite', !!(barrado3 && barrado3.schemaIncompativel));
+  } finally {
+    window.fetch = fetchOriginal;
+    fbNumsVistosNaNuvem = guardadas.nums;
+    fbRetratoRemoto = guardadas.retrato;
+    pgCriacaoPretendida = guardadas.criacao;
+    fbSchemaRemoto = guardadas.schema;
+  }
+
+  console.table(r);
+  const falhas = r.filter(x => x.resultado === 'FALHOU');
+  console.info(falhas.length ? '❌ E1/E2: ' + falhas.length + ' teste(s) falharam' : '✅ E1/E2: todos os testes passaram (' + r.length + ')');
+  return r;
+}
+
 // A frequência do PG só passou a valer de fato a partir de julho/2026 — meses
 // anteriores eram teste e são descartados sempre que os dados são carregados/mesclados.
 const REUNIOES_MES_INICIO = '2026-07';
@@ -9737,8 +9884,15 @@ async function commitConviteChange(construir) {
     if (built.rejeitar) return built.rejeitar;
     let w;
     try {
-      w = await fbWriteGrupos(cfg, built.dados, TUTORS.length ? TUTORS : undefined,
-                              remote ? remote.updateTime : null, built.convites);
+      // E1: intenção declarada. `dados` só entra quando a operação REALMENTE altera a lista
+      // de PGs (só o aceite altera). `tutores` saiu daqui: uma operação de convite não muda a
+      // lista de tutores e não deve reescrevê-la — esse campo já foi zerado duas vezes
+      // (10/07 e 13/07) e toda gravação desnecessária dele é uma chance a mais de repetir.
+      w = await fbWriteGrupos(cfg, Object.assign({
+        operacao: built.operacao,
+        baseUpdateTime: remote ? remote.updateTime : null,
+        convites: built.convites,
+      }, built.dados !== undefined ? { dados: built.dados } : {}));
     } catch (e) { return { ok: false, motivo: 'sem_conexao', detalhe: String(e && e.message || e) }; }
     if (w.ok) {
       fbLastKnownTs = w.ts;
@@ -9746,6 +9900,13 @@ async function commitConviteChange(construir) {
       return Object.assign({ ok: true }, built.info || {});
     }
     if (w.sizeExceeded) return { ok: false, motivo: 'tamanho' };
+    // E1: falhas tipadas. Antes, tudo o que não fosse ok/tamanho/conflito virava 'erro'
+    // genérico — e uma guarda violada falharia em SILÊNCIO nesta rota. Cada motivo abaixo
+    // precisa de mensagem própria em quem chama (ver aceitarConviteFluxo).
+    if (w.schemaIncompativel) return { ok: false, motivo: 'app_desatualizado' };
+    if (w.guardaViolada)      return { ok: false, motivo: 'guarda', guarda: w.guardaViolada, detalhe: w.detalhe };
+    if (w.colisaoSlot)        return { ok: false, motivo: 'slot_ocupado', num: w.num };
+    if (w.intencaoInvalida)   return { ok: false, motivo: 'contrato', detalhe: w.detalhe };
     if (w.preconditionFailed) { await sleep(80 + Math.random() * 120); continue; }  // ajuste #2: esperado, silencioso
     return { ok: false, motivo: 'erro' };
   }
@@ -9811,7 +9972,12 @@ async function gerarConvite({ tipo, grupoNum, funcao, paraWa }) {
   return await commitConviteChange((remote) => {
     const convitesNovos = podarConvites(mergeConvites(mergeConvites(remote.convites, loadConvites()), [inv]));
     return {
-      dados: remote.dados || PEQUENOS_GRUPOS,          // não altera grupos; devolve o remoto fresco
+      // E1: `dados` NÃO é mais declarado — criar convite não altera a lista de PGs.
+      // Isto remove o fallback `remote.dados || PEQUENOS_GRUPOS`, que podia gravar a lista
+      // LOCAL de PGs sobre a nuvem quando a leitura remota não trouxesse `dados` (documento
+      // inexistente ou campo ausente). Num aparelho com a versão de 50 slots, era o mesmo
+      // mecanismo que esvaziou o PG 51 — disfarçado de operação de convite.
+      operacao: 'convite-criar',
       convites: convitesNovos,
       aplicarLocal: () => saveConvitesLocal(convitesNovos),
       info: { invite: inv, inviteId: inv.inviteId, link: APP_URL + '?conv=' + inv.inviteId },
@@ -9876,6 +10042,10 @@ async function aceitarConvite(inviteId, dadosPessoa) {
     const progressoRecuperado = recuperado ? (p.progresso || {}) : null;
 
     return {
+      // E1: aceitar convite É a única rota de convite que altera a lista de PGs (entra um
+      // participante, e o status do PG muda). Por isso declara `dados` — e passa a submeter-se
+      // às guardas G1-G4 em fbWriteGrupos, o que até agora não acontecia.
+      operacao: 'convite-aceitar',
       dados, convites: convitesNovos,
       aplicarLocal: () => {
         applyGruposData(dados);
@@ -9909,7 +10079,9 @@ async function revogarConvite(inviteId) {
     const invCanc = Object.assign({}, inv, { status: 'cancelado', updatedAt: Date.now() });
     const convitesNovos = podarConvites(mergeConvites(convites, [invCanc]));
     return {
-      dados: remote.dados || PEQUENOS_GRUPOS,
+      // E1: `dados` NÃO é mais declarado — revogar convite não altera a lista de PGs.
+      // Mesmo motivo de gerarConvite(): fim do fallback que podia gravar a lista local.
+      operacao: 'convite-revogar',
       convites: convitesNovos,
       aplicarLocal: () => saveConvitesLocal(convitesNovos),
       info: { invite: invCanc },
@@ -9942,6 +10114,12 @@ function mensagemConvite(motivo) {
     case 'versao_anterior':    return { titulo: 'Convite de versão anterior', texto: 'Este convite pertence a uma versão anterior do aplicativo e não pode mais ser utilizado. Solicite um novo convite ao Coordenador do seu Pequeno Grupo.' };
     case 'sem_conexao':        return { titulo: 'Sem conexão', texto: 'Não foi possível validar o convite. Verifique sua internet e abra o link novamente.' };
     case 'sem_convite':        return { titulo: 'Convite necessário', texto: 'Você precisa de um convite para participar de um Pequeno Grupo. Solicite ao Tutor ou ao Coordenador do seu grupo um convite de ingresso.' };
+    // ── E1: falhas do contrato de gravação. Antes caíam todas no texto genérico do default,
+    // e uma guarda de proteção acionada ficava indistinguível de "convite inexistente".
+    case 'app_desatualizado':  return { titulo: 'Aplicativo desatualizado', texto: 'Este aparelho está com uma versão antiga do aplicativo e não pode entrar no grupo agora. Feche e abra o app (ou puxe a tela para baixo para recarregar) e toque no link do convite novamente.' };
+    case 'guarda':             return { titulo: 'Entrada bloqueada por segurança', texto: 'Uma proteção do sistema impediu esta operação para não perder dados de outros Pequenos Grupos. Sua entrada NÃO foi registrada. Avise o Coordenador ou o Tutor e tente novamente em alguns instantes.' };
+    case 'slot_ocupado':       return { titulo: 'Grupo indisponível', texto: 'Este Pequeno Grupo foi ocupado por outra pessoa enquanto você abria o convite. Solicite um novo convite ao Coordenador.' };
+    case 'contrato':           return { titulo: 'Não foi possível concluir', texto: 'O aplicativo recusou esta operação por inconsistência interna. Nada foi alterado. Avise o responsável pelo sistema.' };
     default:                   return { titulo: 'Convite indisponível', texto: 'Este convite não existe ou não está mais disponível. Solicite um novo convite ao Coordenador.' };
   }
 }
@@ -10111,7 +10289,13 @@ async function gerarECompartilhar(funcao, grupoNum) {
   const paraWa = waDigits.length >= 10 ? ('55' + waDigits) : null;
   const res = await gerarConvite({ grupoNum, funcao, paraWa });
   if (!res.ok) {
-    const map = { sem_autoridade: 'Você não tem permissão para gerar este convite.', sem_conexao: 'Sem conexão. Verifique sua internet e tente novamente.', conflito: 'Muitas alterações ao mesmo tempo. Tente novamente.' };
+    // E1: os quatro motivos novos do contrato de gravação têm texto próprio — nenhum deles
+    // pode cair no genérico, senão uma guarda acionada vira "tente novamente" sem explicação.
+    const map = { sem_autoridade: 'Você não tem permissão para gerar este convite.', sem_conexao: 'Sem conexão. Verifique sua internet e tente novamente.', conflito: 'Muitas alterações ao mesmo tempo. Tente novamente.',
+      app_desatualizado: 'Este aparelho está com uma versão antiga do aplicativo. Feche e abra o app (ou puxe a tela para baixo) e tente de novo.',
+      guarda: 'Uma proteção do sistema impediu esta gravação para não perder dados de outros Pequenos Grupos. O convite NÃO foi criado. Avise o responsável pelo sistema.',
+      slot_ocupado: 'Este Pequeno Grupo foi ocupado por outro aparelho. Recarregue o app e tente novamente.',
+      contrato: 'O aplicativo recusou a operação por inconsistência interna. Nada foi alterado.' };
     alert(map[res.motivo] || 'Não foi possível gerar o convite agora. Tente novamente.');
     return;
   }
@@ -10416,10 +10600,136 @@ function fbWarnConflitoPersistente() {
   } catch(e) { console.warn('fbWarnConflitoPersistente:', e); }
 }
 
-async function fbWriteGrupos(cfg, data, tutoresData, baseUpdateTime, convitesData, setoresMestreData, setoresEfetivoData, embaixadoresExternosData) {
+// ══════════════════════════════════════════════════════════════════════════
+//  E1 — CONTRATO ÚNICO DE GRAVAÇÃO (2026-08-21)
+// ══════════════════════════════════════════════════════════════════════════
+// O QUE ISTO CORRIGE, achado na auditoria dos caminhos de gravação (21/08/2026):
+//   1) As guardas da Fase 4/5 viviam em trySaveGrupos(), mas commitConviteChange()
+//      chama fbWriteGrupos() DIRETAMENTE — ou seja, ACEITAR UM CONVITE gravava `dados`
+//      sem NENHUMA das guardas. Valia para o app novo, em produção.
+//   2) gerarConvite()/revogarConvite() reenviavam `dados` sem alterá-lo, com o fallback
+//      `remote.dados || PEQUENOS_GRUPOS`: se a leitura remota não trouxesse a lista, uma
+//      operação de convite gravava a lista LOCAL de PGs por cima da nuvem — o mesmo
+//      mecanismo que esvaziou o PG 51. Corrigido por SUBTRAÇÃO: essas rotas não declaram
+//      mais `dados`, então o fallback deixou de existir.
+//
+// PRINCÍPIO, válido para todas as rotas:
+//   uma gravação envia exatamente os campos que altera, e todo campo enviado passa pelas
+//   mesmas guardas, independentemente de qual operação o originou.
+
+const FB_OPERACOES = Object.freeze([
+  'grupos', 'convite-criar', 'convite-revogar', 'convite-aceitar', 'init-nuvem'
+]);
+
+// Campos de topo aceitos pelo contrato, NA MESMA ORDEM em que a máscara era montada antes
+// (dados, tutores, convites, setores*, embaixadores*) — preservar a ordem mantém o payload
+// comparável ao das versões anteriores. Chave fora desta lista é recusada: o objeto de
+// intenção não pode virar uma porta lateral para o Firestore.
+const FB_CAMPOS_CONTRATO = Object.freeze(
+  ['dados', 'tutores', 'convites', 'setoresMestre', 'setoresEfetivo', 'embaixadoresExternos']
+);
+const FB_CHAVES_INTENCAO = Object.freeze(['operacao', 'baseUpdateTime'].concat(FB_CAMPOS_CONTRATO));
+
+// Valida a INTENÇÃO antes de qualquer cálculo. Uma chamada no formato antigo (posicional)
+// cai aqui e falha ALTO — em vez de gravar `undefined` em silêncio.
+function validarIntencao(intencao) {
+  if (!intencao || typeof intencao !== 'object' || Array.isArray(intencao)) return 'intencao ausente ou invalida';
+  if (!intencao.operacao) return 'operacao ausente';
+  if (FB_OPERACOES.indexOf(intencao.operacao) < 0) return 'operacao desconhecida: ' + intencao.operacao;
+  const chaves = Object.keys(intencao);
+  for (let i = 0; i < chaves.length; i++) {
+    if (FB_CHAVES_INTENCAO.indexOf(chaves[i]) < 0) return 'campo fora do contrato: ' + chaves[i];
+  }
+  for (let i = 0; i < FB_CAMPOS_CONTRATO.length; i++) {
+    const campo = FB_CAMPOS_CONTRATO[i];
+    if (intencao[campo] === undefined) continue;                    // não declarado: fora da máscara
+    if (!Array.isArray(intencao[campo])) return 'campo ' + campo + ' declarado com tipo invalido';
+  }
+  if (intencao.dados !== undefined && intencao.dados.length === 0) return 'dados declarado vazio';
+  return null;
+}
+
+// Lista os campos que ESTA gravação declara — usada pela telemetria do modo de teste.
+function fbCamposDeclarados(intencao) {
+  const campos = [];
+  if (intencao.dados !== undefined) campos.push('dados');
+  campos.push('ts');
+  if (FB_FLAGS.schemaVersionWrite) { campos.push('schemaVersion'); campos.push('writeNonce'); }
+  FB_CAMPOS_CONTRATO.forEach(c => { if (c !== 'dados' && intencao[c] !== undefined) campos.push(c); });
+  return campos;
+}
+
+// Carimbo do contrato de escrita.
+// ⚠️ NASCE AQUI, DENTRO de fbWriteGrupos, uma vez por invocação — é isso que faz cada
+// retentativa produzir um valor novo. Gerar este valor FORA (por exemplo em
+// saveGruposToFirebase, antes do laço de 3 tentativas) faria todas as tentativas enviarem
+// o MESMO carimbo; da segunda em diante ele não mudaria de valor, não entraria em
+// affectedKeys() e a regra do Firestore recusaria — transformando um conflito recuperável
+// em falha permanente. É o modo mais provável de esta implementação dar errado.
+// O componente aleatório não é enfeite: sem ele, duas gravações no mesmo milissegundo
+// (dois aparelhos, ou a retentativa após o backoff de 80 ms) produziriam carimbos iguais.
+// LIMITE: este carimbo comprova que a operação CONHECE E CUMPRE o contrato de escrita
+// vigente, e permite bloquear clientes antigos que não o implementam. NÃO constitui
+// autenticação nem prova de identidade do cliente — a chave da API é pública.
+function gerarWriteNonce() {
+  return SCHEMA_VERSION + ':' + Date.now() + ':' + Math.random().toString(36).slice(2, 10);
+}
+
+// Guardas de conteúdo — texto MOVIDO de trySaveGrupos(), sem alteração de lógica e NA MESMA
+// ORDEM (perda → esvaziamento → colisão → invariantes). Agora valem para QUALQUER rota que
+// declare `dados`, inclusive o aceite de convite, que até hoje não passava por nenhuma.
+function validarPayloadDados(lista) {
+  // G1: nenhum PG já visto na nuvem pode sair do payload.
+  const numsPayload = lista.map(g => g.num);
+  const faltando = fbNumsVistosNaNuvem.filter(n => !numsPayload.includes(n));
+  if (faltando.length) {
+    console.error('Firestore: gravação CANCELADA — o payload perderia os PGs', faltando.join(', '));
+    return { ok: false, perdaDetectada: true, guardaViolada: 'perda', detalhe: faltando.join(', ') };
+  }
+  // G2: PG que voltaria VAZIO depois de a nuvem tê-lo com conteúdo (a fresta do PG 51).
+  const esvaziando = detectarEsvaziamento(lista);
+  if (esvaziando.length) {
+    console.error('Firestore: gravação CANCELADA — estes PGs seriam esvaziados:', esvaziando.join(', '));
+    return { ok: false, perdaDetectada: true, esvaziando, guardaViolada: 'esvaziamento', detalhe: esvaziando.join(', ') };
+  }
+  // G4: colisão de criação entre dois aparelhos.
+  if (pgCriacaoPretendida) {
+    const ocupadoAgora = fbRetratoRemoto.get(pgCriacaoPretendida.num);
+    if (ocupadoAgora && ocupadoAgora.tinhaNome) {
+      console.error('Firestore: criação CANCELADA — o slot', pgCriacaoPretendida.num, 'foi ocupado por outro aparelho');
+      return { ok: false, colisaoSlot: true, num: pgCriacaoPretendida.num };
+    }
+  }
+  // G3: invariantes de identidade (slot único, pgId único).
+  const violacoes = validarInventario(lista);
+  if (violacoes.length) {
+    console.error('Firestore: gravação CANCELADA — invariantes violadas:', violacoes.join(' · '));
+    return { ok: false, perdaDetectada: true, violacoes, guardaViolada: 'invariantes', detalhe: violacoes.join(' · ') };
+  }
+  return null;
+}
+
+// G6, extraída de prepareSaveGrupos() para poder valer em TODAS as rotas: um app defasado
+// em relação à nuvem não grava nada — nem convite.
+function avisarSchemaNovoUmaVez() {
+  if (_fbAvisouSchemaNovo) return;
+  _fbAvisouSchemaNovo = true;
+  try { alert('⚠️ Este aplicativo está desatualizado.\n\nSuas alterações estão salvas neste aparelho, mas não podem ser enviadas até você recarregar a página (puxe a tela para baixo ou feche e abra o app).'); } catch (_) {}
+}
+
+async function fbWriteGrupos(cfg, intencao) {
+  // CONTRATO: a intenção é validada antes de qualquer cálculo.
+  const erroIntencao = validarIntencao(intencao);
+  if (erroIntencao) {
+    console.error('Firestore: gravação CANCELADA — intenção inválida:', erroIntencao);
+    return { ok: false, intencaoInvalida: true, detalhe: erroIntencao };
+  }
+  const temDados = intencao.dados !== undefined;
+  const dadosStr = temDados ? JSON.stringify(intencao.dados) : null;
+
   // ── BARREIRA DO MODO DE TESTE ────────────────────────────────────────────
-  // Primeira instrução, antes de qualquer cálculo. Este é o ÚNICO ponto do app que faz
-  // PATCH no Firestore, e as TRÊS rotas de gravação desembocam aqui:
+  // Primeira instrução depois da validação, antes de qualquer rede. Este é o ÚNICO ponto
+  // do app que faz PATCH no Firestore, e TODAS as rotas de gravação desembocam aqui:
   //   trySaveGrupos() · commitConviteChange() · salvarFbConfig()
   // (barrar saveGruposToFirebase() deixaria as duas últimas passando).
   // Devolve a MESMA forma de um sucesso real — { ok, ts, updateTime } — para que o laço de
@@ -10427,54 +10737,59 @@ async function fbWriteGrupos(cfg, data, tutoresData, baseUpdateTime, convitesDat
   // depois do ok) se comportem exatamente como em produção. A interface fica realista;
   // apenas nada sai do aparelho.
   if (MODO_TESTE) {
-    const dadosStr = JSON.stringify(data);
     registrarEscritaBloqueada('fbWriteGrupos', {
-      bytes: dadosStr.length,
-      grupos: Array.isArray(data) ? data.length : null,
-      campos: ['dados', 'ts']
-        .concat(tutoresData ? ['tutores'] : [])
-        .concat(convitesData ? ['convites'] : [])
-        .concat(setoresMestreData ? ['setoresMestre'] : [])
-        .concat(setoresEfetivoData ? ['setoresEfetivo'] : [])
-        .concat(embaixadoresExternosData ? ['embaixadoresExternos'] : []),
+      operacao: intencao.operacao,
+      bytes: dadosStr ? dadosStr.length : 0,
+      grupos: temDados ? intencao.dados.length : null,
+      campos: fbCamposDeclarados(intencao),
       destinoQueSeriaUsado: cfg ? cfg.projectId : null,
     });
     return { ok: true, ts: String(Date.now()), updateTime: new Date().toISOString() };
   }
-  const dadosStr = JSON.stringify(data);
-  // Guarda de tamanho: a regra do Firestore rejeita "dados" >= 500 KB. Aborta antes de
-  // um write fadado a falhar e avisa o usuário, evitando perda silenciosa.
-  if (dadosStr.length > 480000) {
-    console.error('Firestore: dados muito grandes (' + dadosStr.length + ' bytes) — gravação cancelada.');
-    fbWarnTooLarge();
-    return { ok: false, sizeExceeded: true };
+
+  // G6 universal: nuvem em formato mais novo do que este app entende → não grava nada.
+  if (fbSchemaRemoto && fbSchemaRemoto > SCHEMA_VERSION) {
+    console.error('Firestore: gravação CANCELADA — nuvem no schema', fbSchemaRemoto,
+                  'e este app entende', SCHEMA_VERSION);
+    avisarSchemaNovoUmaVez();
+    return { ok: false, schemaIncompativel: true };
   }
-  const fields = {
-    dados: { stringValue: dadosStr },
-    ts:    { integerValue: String(Date.now()) },
-  };
+
+  if (temDados) {
+    // Guarda de tamanho: a regra do Firestore rejeita "dados" >= 500 KB. Aborta antes de
+    // um write fadado a falhar e avisa o usuário, evitando perda silenciosa.
+    if (dadosStr.length > 480000) {
+      console.error('Firestore: dados muito grandes (' + dadosStr.length + ' bytes) — gravação cancelada.');
+      fbWarnTooLarge();
+      return { ok: false, sizeExceeded: true };
+    }
+    const falhaGuarda = validarPayloadDados(intencao.dados);
+    if (falhaGuarda) return falhaGuarda;
+  }
+
   // BUG-TUTORES-CONVITES: sem updateMask, o PATCH do Firestore substitui o documento inteiro
-  // pelos campos enviados — qualquer campo omitido (ex.: tutoresData/convitesData ausentes numa
+  // pelos campos enviados — qualquer campo omitido (ex.: tutores/convites ausentes numa
   // gravação comum, como postar uma gratidão) era APAGADO da nuvem. updateMask restringe a
   // gravação só aos campos realmente enviados desta vez; os demais ficam intocados.
-  const maskFields = ['dados', 'ts'];
-  // FASE 4/M2: declara em que schema esta gravação foi feita. Fica atrás de flag porque
-  // depende da allowlist da regra do Firestore (ver FB_FLAGS.schemaVersionWrite).
-  if (FB_FLAGS.schemaVersionWrite) {
-    fields.schemaVersion = { integerValue: String(SCHEMA_VERSION) };
-    maskFields.push('schemaVersion');
-  }
-  if (tutoresData) { fields.tutores = { stringValue: JSON.stringify(tutoresData) }; maskFields.push('tutores'); }
-  if (convitesData) { fields.convites = { stringValue: JSON.stringify(convitesData) }; maskFields.push('convites'); }  // ETAPA 2
-  // RC4.8.2A: campo de topo novo — precisa estar na allowlist (hasOnly) da regra do Firestore.
-  if (setoresMestreData) { fields.setoresMestre = { stringValue: JSON.stringify(setoresMestreData) }; maskFields.push('setoresMestre'); }
-  if (setoresEfetivoData) { fields.setoresEfetivo = { stringValue: JSON.stringify(setoresEfetivoData) }; maskFields.push('setoresEfetivo'); }
-  if (embaixadoresExternosData) { fields.embaixadoresExternos = { stringValue: JSON.stringify(embaixadoresExternosData) }; maskFields.push('embaixadoresExternos'); }
+  // FONTE ÚNICA: a máscara real e a telemetria do modo de teste saem da MESMA função, para
+  // que não possam divergir — e para que o teste de máscara prove a máscara de verdade.
+  // FASE 4/M2 + E1: schemaVersion e writeNonce só entram com a flag ligada, porque dependem
+  // da allowlist da regra do Firestore (ver FB_FLAGS.schemaVersionWrite).
+  // RC4.8.2A: campo de topo novo precisa estar também naquela allowlist (hasOnly).
+  const maskFields = fbCamposDeclarados(intencao);
+  const fields = {};
+  maskFields.forEach(campo => {
+    if (campo === 'dados')         { fields.dados = { stringValue: dadosStr }; return; }
+    if (campo === 'ts')            { fields.ts = { integerValue: String(Date.now()) }; return; }
+    if (campo === 'schemaVersion') { fields.schemaVersion = { integerValue: String(SCHEMA_VERSION) }; return; }
+    if (campo === 'writeNonce')    { fields.writeNonce = { stringValue: gerarWriteNonce() }; return; }
+    fields[campo] = { stringValue: JSON.stringify(intencao[campo]) };
+  });
   const body = { fields };
   // COMMIT 1: pré-condição de concorrência — só grava se o documento não mudou desde a leitura
   let url = fbDocUrl(cfg) + maskFields.map(f => '&updateMask.fieldPaths=' + encodeURIComponent(f)).join('');
-  if (FB_FLAGS.usePrecondition && baseUpdateTime) {
-    url += '&currentDocument.updateTime=' + encodeURIComponent(baseUpdateTime);
+  if (FB_FLAGS.usePrecondition && intencao.baseUpdateTime) {
+    url += '&currentDocument.updateTime=' + encodeURIComponent(intencao.baseUpdateTime);
   }
   const r = await fetch(url, {
     method: 'PATCH',
@@ -10718,10 +11033,9 @@ async function prepareSaveGrupos(cfg) {
   if (remote && remote.schemaVersion && remote.schemaVersion > SCHEMA_VERSION) {
     console.error('Firestore: gravação CANCELADA — nuvem no schema', remote.schemaVersion,
                   'e este app entende', SCHEMA_VERSION);
-    if (!_fbAvisouSchemaNovo) {
-      _fbAvisouSchemaNovo = true;
-      try { alert('⚠️ Este aplicativo está desatualizado.\n\nSuas alterações estão salvas neste aparelho, mas não podem ser enviadas até você recarregar a página (puxe a tela para baixo ou feche e abra o app).'); } catch (_) {}
-    }
+    // E1: o aviso virou função única (avisarSchemaNovoUmaVez), compartilhada com a guarda G6
+    // de fbWriteGrupos — que agora faz a mesma checagem para as rotas que não passam por aqui.
+    avisarSchemaNovoUmaVez();
     return { remote, abort: true, abortSchema: true };
   }
 
@@ -10759,51 +11073,21 @@ async function trySaveGrupos(cfg, baseUpdateTime) {
   // Sem isto, gravar equivale a apagar tudo o que o app local não enxerga.
   const payloadCompleto = payload.concat(fbGruposPreservados).sort((a, b) => a.num - b.num);
 
-  // VALIDAÇÃO PRÉ-GRAVAÇÃO: nenhum PG já visto na nuvem pode sair do payload. Se faltar algum,
-  // a gravação é CANCELADA — perder a gravação é recuperável; perder um PG da nuvem não é.
-  const numsPayload = payloadCompleto.map(g => g.num);
-  const faltando = fbNumsVistosNaNuvem.filter(n => !numsPayload.includes(n));
-  if (faltando.length) {
-    console.error('Firestore: gravação CANCELADA — o payload perderia os PGs', faltando.join(', '));
-    return { ok: false, perdaDetectada: true };
-  }
+  // E1: as quatro guardas de conteúdo que ficavam aqui (perda de PG, esvaziamento, colisão
+  // de criação e invariantes de identidade) foram MOVIDAS para validarPayloadDados(), chamada
+  // por fbWriteGrupos() sempre que a intenção declara `dados`. Motivo: elas protegiam a ROTA,
+  // não o CAMPO — e o aceite de convite, que também altera `dados`, não passava por nenhuma.
+  // O texto e a ordem das guardas foram preservados integralmente.
 
-  // ── FASE 4, GUARDA NOVA: PG que volta VAZIO ────────────────────────────
-  // A validação acima só enxerga o PG que SOME da lista. O caso real do PG 51 foi outro: o
-  // número continuou lá, com a forma exata de um slot de fábrica. Aqui a comparação é com o
-  // retrato do que a nuvem tinha na última leitura: se um slot tinha nome ou gente e o payload
-  // o mandaria em branco, a gravação é cancelada e a alteração local fica pendente.
-  // Esvaziar um PG de propósito continua possível — cancelar/zerar passam por caminhos que
-  // atualizam o retrato antes de gravar.
-  const esvaziando = detectarEsvaziamento(payloadCompleto);
-  if (esvaziando.length) {
-    console.error('Firestore: gravação CANCELADA — estes PGs seriam esvaziados:', esvaziando.join(', '));
-    return { ok: false, perdaDetectada: true, esvaziando };
-  }
-
-  // ── FASE 5, GUARDA NOVA: colisão de criação entre dois aparelhos ───────
-  // DEFEITO REPRODUZIDO EM LABORATÓRIO: dois aparelhos escolhem o mesmo slot livre (cada um
-  // olhando a própria cópia local) e o segundo a gravar apaga o nome do PG do primeiro — mas
-  // MANTÉM as pessoas dele dentro, porque participantes são unidos e o nome é decidido por
-  // `lg.nome ?? rg.nome` (local vence). É a assinatura exata do PG 9 na produção: a
-  // coordenadora do antigo "PÃO DA VIDA" continua dentro do "Centro Cirúrgico".
-  // Aqui a criação é abortada quando alguém ocupou o slot enquanto o formulário estava aberto.
-  if (pgCriacaoPretendida) {
-    const ocupadoAgora = fbRetratoRemoto.get(pgCriacaoPretendida.num);
-    if (ocupadoAgora && ocupadoAgora.tinhaNome) {
-      console.error('Firestore: criação CANCELADA — o slot', pgCriacaoPretendida.num, 'foi ocupado por outro aparelho');
-      return { ok: false, colisaoSlot: true, num: pgCriacaoPretendida.num };
-    }
-  }
-
-  // FASE 4: invariantes de identidade (slot único, pgId único) antes de tocar a nuvem
-  const violacoes = validarInventario(payloadCompleto);
-  if (violacoes.length) {
-    console.error('Firestore: gravação CANCELADA — invariantes violadas:', violacoes.join(' · '));
-    return { ok: false, perdaDetectada: true, violacoes };
-  }
-
-  return fbWriteGrupos(cfg, payloadCompleto, TUTORS.length ? TUTORS : undefined, baseUpdateTime, undefined, SETORES_MESTRE.length ? SETORES_MESTRE : undefined, SETORES_EFETIVO.length ? SETORES_EFETIVO : undefined, EMBAIXADORES_EXTERNOS.length ? EMBAIXADORES_EXTERNOS : undefined);
+  return fbWriteGrupos(cfg, {
+    operacao: 'grupos',
+    baseUpdateTime,
+    dados: payloadCompleto,
+    tutores:              TUTORS.length ? TUTORS : undefined,
+    setoresMestre:        SETORES_MESTRE.length ? SETORES_MESTRE : undefined,
+    setoresEfetivo:       SETORES_EFETIVO.length ? SETORES_EFETIVO : undefined,
+    embaixadoresExternos: EMBAIXADORES_EXTERNOS.length ? EMBAIXADORES_EXTERNOS : undefined,
+  });
 }
 
 // Orquestra: prepara → grava → em conflito, backoff aleatório e tenta de novo (até 3x).
@@ -10840,6 +11124,18 @@ async function saveGruposToFirebase() {
         return true;
       }
       if (res && res.sizeExceeded) { recordSync({ resultado: 'falha', tentativas: tentativa }); setFbPendingSync(true); return false; }
+      // E1: a guarda de schema agora também vive em fbWriteGrupos (vale para todas as rotas).
+      // Aqui o tratamento é o mesmo do abortSchema acima: a alteração continua viva e pendente.
+      if (res && res.schemaIncompativel) { recordSync({ resultado: 'falha', tentativas: tentativa }); setFbPendingSync(true); return false; }
+      // E1: intenção fora do contrato é defeito de programação, não de operação. Falha alto,
+      // registra e mantém a alteração pendente — nunca grava um payload malformado.
+      if (res && res.intencaoInvalida) {
+        console.error('Firebase: intenção inválida —', res.detalhe);
+        recordSync({ resultado: 'falha', tentativas: tentativa });
+        logSyncConflict({ syncId, operacao: 'saveGruposToFirebase', motivo: 'intencao invalida: ' + res.detalhe, tentativa });
+        setFbPendingSync(true);
+        return false;
+      }
       // FASE 5: colisão de slot na criação — não é falha de rede nem conflito de concorrência.
       // Quem chamou (criarPgNoProximoSlot) desfaz a criação local e tenta o próximo slot livre.
       if (res && res.colisaoSlot) { recordSync({ resultado: 'falha', tentativas: tentativa }); pgUltimaColisao = { num: res.num, quando: Date.now() }; return false; }
@@ -11026,7 +11322,15 @@ async function salvarFbConfig() {
         status: g.status || null,
         ...transportarCamposPg({}, g),
       }));
-      await fbWriteGrupos(cfg, dadosSalvar, TUTORS.length ? TUTORS : undefined);
+      // E1: intenção declarada. `baseUpdateTime` continua ausente — esta rota grava sem
+      // precondição de concorrência. É dívida técnica CONHECIDA e deliberadamente adiada
+      // (decisão de 21/08): caminho raro, acionado à mão, e já protegido pela confirmação
+      // explícita acima. Registrado para uma fase posterior, não esquecido.
+      await fbWriteGrupos(cfg, {
+        operacao: 'init-nuvem',
+        dados: dadosSalvar,
+        tutores: TUTORS.length ? TUTORS : undefined,
+      });
     }
     document.getElementById('fb-setup-overlay')?.remove();
     renderGrupoSyncBadge();
@@ -13478,6 +13782,9 @@ if (MODO_TESTE) {
   initModoTeste();
   // FASE 4: a bateria de invariantes roda sozinha no modo de teste — nunca em produção.
   try { setTimeout(autoTesteFase4, 300); } catch (_) {}
+  // E2: a bateria do contrato de gravação. Aqui ela roda só as partes que não dependem de
+  // rede — a parte da máscara real exige uma sessão normal, onde o `fetch` falso protege.
+  try { setTimeout(autoTesteE1, 600); } catch (_) {}
 } else if (loadFbConfig()) {
   // CORREÇÃO A (2026-08-18): se o app foi fechado com alteração ainda não confirmada na nuvem,
   // a marca de pendência sobrevive no aparelho — a primeira sincronização a preserva (merge) e
