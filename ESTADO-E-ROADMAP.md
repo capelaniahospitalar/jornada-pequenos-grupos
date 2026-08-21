@@ -30,8 +30,17 @@ Leia-o antes de retomar. Resumo do estado:
 
 **O QUE FAZER AGORA, nesta ordem:**
 
-1. **Verificar no Console do Firebase se o PITR (Point-in-Time Recovery) está habilitado.** É a
-   única chance de recuperar os nomes dos dois colaboradores do PG 51. Não depende de mais nada.
+1. ~~Verificar o PITR no Console do Firebase.~~ **FEITO em 20/08 — resposta negativa.** O projeto
+   está no **plano Spark (gratuito)**; a aba *Recuperação de desastres* pede upgrade para
+   "recuperação pontual e backups programados". **Não existe PITR e não existe backup automático
+   neste projeto.** Os dados originais do PG 51 não podem vir do Firebase.
+   → **Restam duas fontes:** (a) o aparelho da coordenadora — pedir que ela ponha o celular em
+   **modo avião** e só então abra o app, para ler o `localStorage` antes que a sincronização apague
+   o vestígio; (b) perguntar os nomes diretamente a ela e recriar o PG.
+   → **Dívida registrada:** o único backup hoje é manual (os JSON de 20/08 em
+   `Documents\Backups-PequenosGrupos\`). Migrar para o Blaze daria PITR e backups agendados — não
+   recupera o PG 51, mas evita que o próximo incidente seja irrecuperável. Envolve custo; decisão
+   do usuário, **não tomada**.
 2. **M1 — confirmar a adoção:** que os 4 tutores e os coordenadores ativos recarregaram o app e
    estão na `1.1.0-rc1`.
 3. **M2 — fechar a porta no servidor:** acrescentar `schemaVersion` à allowlist da regra no Console

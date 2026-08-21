@@ -549,9 +549,49 @@ Três pontos: (1) a divergência é **anterior** a esta versão; (2) esta versã
 
 ---
 
+---
+
+## R1 — PITR: VERIFICADO EM 20/08/2026, RESPOSTA NEGATIVA
+
+**O projeto `jornada-pequenos-grupos` está no plano Spark (gratuito).** A aba
+*Firestore → Recuperação de desastres* mostra: *"Faça upgrade do plano para editar a recuperação
+pontual e os backups programados."*
+
+**Conclusões, todas definitivas:**
+
+1. **Não existe PITR neste projeto** — não está desligado por configuração, é um recurso exclusivo
+   do plano Blaze. Não há histórico do documento `jdpg/grupos` em nenhum momento do passado.
+2. **Os dados originais do PG 51 não podem vir do Firebase.** A hipótese de recuperação pelo
+   histórico está encerrada.
+3. **Não existe backup automático nenhum** neste projeto. Os únicos backups que existem são os dois
+   arquivos JSON gerados à mão em 20/08 (`backup-firestore-…-1747.json` e
+   `PRE-PUBLICACAO-…-2313.json`), mais o material em `auditoria-pg51-2026-08-20\`.
+4. Também está confirmado pela tela de Dados que o documento tem exatamente os seis campos
+   auditados (`convites`, `dados`, `setoresEfetivo`, `setoresMestre`, `ts`, `tutores`) e que
+   **`schemaVersion` ainda não existe** — como previsto, porque a flag de escrita nasce desligada.
+
+### As duas únicas fontes que restam para o PG 51
+
+| Ordem | Fonte | Como |
+|---|---|---|
+| 1 | **O aparelho da coordenadora** | Pedir que ela ponha o celular em **modo avião** e só então abra o app; ler `localStorage['jdpg_grupos_v1']` pelo DevTools. **Se abrir com internet, a sincronização apaga o vestígio.** |
+| 2 | **Perguntar diretamente a ela** | Os nomes dos dois colaboradores, e recriar o PG pelo app |
+
+### Dívida registrada, para decisão futura do usuário
+
+O plano Spark não oferece PITR nem backups agendados. Migrar para o Blaze não recuperaria o PG 51
+— o PITR só vale a partir do momento em que é ligado —, mas evitaria que o **próximo** incidente
+fosse irrecuperável. Envolve cartão de crédito e custo variável. **Decisão do usuário, não tomada.**
+
+Enquanto isso, o único backup é manual: gerar um JSON do documento periodicamente e guardar fora do
+repositório.
+
+---
+
 ## O QUE CONTINUA EM ABERTO
 
-1. **Verificar o PITR no Console do Firebase** (R1) — única chance de recuperar os nomes dos dois colaboradores do PG 51. Não depende de mais nada. **É o item mais urgente.**
+1. ~~Verificar o PITR~~ — **feito em 20/08: não existe (plano Spark).** Recuperação do PG 51 depende
+   agora só do aparelho da coordenadora, em modo avião.
 2. **M1 — confirmar a adoção:** que os 4 tutores e os coordenadores ativos recarregaram e estão na `1.1.0-rc1`. Só depois disso se pode fechar a porta no servidor.
 3. **R0 — inspeção offline dos aparelhos dos 4 tutores** para achar o que ainda tem 50 slots.
 4. **M2 — aplicar a regra do Firestore** (a única barreira real contra o aparelho antigo), nos dois passos escritos em `firestore.rules`, e só então ligar `FB_FLAGS.schemaVersionWrite`.
