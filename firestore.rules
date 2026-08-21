@@ -65,3 +65,49 @@ service cloud.firestore {
     }
   }
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PROPOSTA — ETAPA M2 DA FASE 3/4 · NÃO PUBLICADA · NÃO ESTÁ VALENDO
+//
+// O texto ACIMA é o que está no Console hoje. O texto ABAIXO é a proposta que
+// implementa a INVARIANTE 7 ("uma versão antiga não pode sobrescrever
+// destrutivamente uma estrutura mais nova"). Enquanto não for colado no Console,
+// nada disto tem efeito.
+//
+// POR QUE PRECISA SER AQUI E NÃO NO APP: um aparelho com o app antigo em cache não
+// roda código novo — nenhuma proteção escrita em JavaScript alcança ele. O servidor
+// é a única fronteira que ele não atravessa.
+//
+// COMO FUNCIONA: quem alterar `dados` é obrigado a alterar também `schemaVersion`
+// na mesma gravação. O app antigo nunca envia esse campo — a gravação dele é
+// recusada (403). Ele continua LENDO normalmente; só perde o poder de destruir.
+//
+// ORDEM OBRIGATÓRIA DE APLICAÇÃO (não inverter):
+//   1. Publicar a versão do app da Fase 4 (esta já lê `schemaVersion` e o preserva)
+//   2. Confirmar que os tutores e coordenadores ativos carregaram a versão nova
+//   3. Colar no Console SÓ o passo A (acrescenta o campo à allowlist)
+//   4. Ligar FB_FLAGS.schemaVersionWrite = true no app e publicar
+//   5. Confirmar que as gravações continuam funcionando
+//   6. Só então colar o passo B (a exigência que fecha a porta)
+//
+// Inverter 3 e 6 derruba TODAS as gravações do app, inclusive as legítimas.
+//
+// ── PASSO A — allowlist (seguro, não bloqueia ninguém) ──────────────────────
+//    ...hasOnly(['dados','ts','tutores','convites','setoresMestre',
+//                'setoresEfetivo','embaixadoresExternos','schemaVersion'])
+//    && (!('schemaVersion' in request.resource.data)
+//        || request.resource.data.schemaVersion is int)
+//
+// ── PASSO B — a trava de versão (bloqueia o app antigo) ─────────────────────
+//    && (
+//         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['dados'])
+//         || request.resource.data.diff(resource.data).affectedKeys().hasAll(['schemaVersion'])
+//       )
+//    && (!('schemaVersion' in resource.data)
+//        || request.resource.data.schemaVersion >= resource.data.schemaVersion)
+//
+// O último trecho impede também o caminho inverso: ninguém rebaixa o schema.
+//
+// ROLLBACK: apagar os passos A e B e republicar o texto original — as gravações
+// voltam ao comportamento de hoje imediatamente, sem tocar em nenhum dado.
+// ══════════════════════════════════════════════════════════════════════════════

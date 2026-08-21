@@ -3271,21 +3271,22 @@ async function confirmarCriarPg(nomeTutor) {
   const hora = document.getElementById('cpg-hora')?.value || '';
   if (!nomeGrupo) { renderCriarPgForm(nomeTutor, 'Dê um nome ao Pequeno Grupo.'); return; }
 
-  loadGrupos();
-  const g = getProximoGrupoVazio();
-  if (!g) { renderCriarPgForm(nomeTutor, 'Não há mais Pequenos Grupos disponíveis — fale com a administração.'); return; }
+  // FASE 5/D3: a escolha do slot e a gravação passaram para criarPgNoProximoSlot(), que
+  // sincroniza antes de escolher e aborta se outro aparelho ocupar o slot no meio do caminho.
+  // Antes daqui, o slot era escolhido olhando só a cópia local — dois Tutores criando ao mesmo
+  // tempo caíam no mesmo número e o segundo apagava o PG do primeiro.
+  const r = await criarPgNoProximoSlot({ nome: nomeGrupo, tutor: nomeTutor, diaReuniao: dia, horaReuniao: hora });
+  if (!r.ok) {
+    const msg = r.motivo === 'sem_slot'
+      ? 'Não há mais Pequenos Grupos disponíveis — fale com a administração.'
+      : r.motivo === 'colisao_persistente'
+        ? 'Outro Tutor está criando um Pequeno Grupo neste momento. Aguarde alguns segundos e tente de novo.'
+        : 'Não foi possível confirmar a criação na nuvem. Verifique a conexão e tente de novo — nada foi criado pela metade.';
+    renderCriarPgForm(nomeTutor, msg);
+    return;
+  }
 
-  g.nome = nomeGrupo;
-  g.diaReuniao = dia || null;
-  g.horaReuniao = hora || null;
-  g.tutor = nomeTutor;
-  // Espera a gravação do novo grupo chegar na nuvem antes de seguir — do contrário, o
-  // syncFromFirebase() logo abaixo (em gerarConvidarCoordenadorAutoEExibir) pode ler um
-  // instantâneo anterior à criação e reverter o nome do grupo localmente, fazendo o convite
-  // do Coordenador sair com os dados de outro Pequeno Grupo (achado de campo).
-  await saveGrupos();
-
-  await gerarConvidarCoordenadorAutoEExibir(nomeTutor, g.num);
+  await gerarConvidarCoordenadorAutoEExibir(nomeTutor, r.num);
 }
 
 // ARCH-03: gera automaticamente o convite do Coordenador após criar o PG. Reaproveita
@@ -3335,8 +3336,13 @@ async function cancelarCriacaoPg(grupoNum, nomeTutor) {
   g.coordenador = null;
   g.diaReuniao = null;
   g.horaReuniao = null;
+  g.pgId = null;          // FASE 5: a identidade morre com o PG. Um slot reaproveitado recebe
+                          // pgId NOVO — nunca herda a identidade de quem esteve ali antes.
   g.status = 'LIVRE';
-  await saveGrupos();
+  // FASE 5: declara que este esvaziamento é deliberado, senão a guarda da Fase 4 (que existe
+  // para impedir o apagamento acidental de um PG) barraria o próprio Tutor.
+  pgEsvaziamentoAutorizado.add(g.num);
+  try { await saveGrupos(); } finally { pgEsvaziamentoAutorizado.delete(g.num); }
   return { ok: true };
 }
 
@@ -3394,6 +3400,31 @@ function renderPgCriadoSemConvite(nomeTutor, grupoNum, motivo, detalhe) {
 }
 
 // ── Lista de Pequenos Grupos sob a tutela do responsável logado ────────
+// ── FASE 4: painel de capacidade × quantidade ────────────────────────────
+// Existe para tornar impossível repetir a confusão que originou toda a investigação: o app
+// mostrava "70" e as pessoas liam "70 Pequenos Grupos". Aqui capacidade e quantidade aparecem
+// separadas, com a origem de cada número explícita. Fonte única: inventarioPgs().
+function painelCapacidadeHtml() {
+  const inv = inventarioPgs();
+  const linha = (rotulo, valor, destaque) => `
+    <div class="panel-stat"><span>${rotulo}</span><strong${destaque ? ' style="color:var(--teal)"' : ''}>${valor}</strong></div>`;
+  return `
+    <div class="content-card">
+      <div class="phase-tag tag-content">📦 Capacidade e cadastro</div>
+      ${linha('Capacidade do sistema (slots)', inv.capacidade)}
+      ${linha('Pequenos Grupos cadastrados', inv.cadastrados, true)}
+      ${linha('— ativos (com participantes)', inv.ativos)}
+      ${linha('— em formação (sem participantes)', inv.emFormacao)}
+      ${linha('Slots livres', inv.livres)}
+      ${linha('— livres que já tiveram um PG', inv.removidos)}
+      ${inv.semIdentificacao ? linha('⚠️ registros sem nome (verificar)', inv.semIdentificacao) : ''}
+      <p style="font-size:13px;color:var(--text3);margin:.6rem 0 0;font-family:var(--ff-body);line-height:1.5">
+        Slot é lugar, não grupo: ${inv.capacidade} slots é o quanto <em>cabe</em>, não o quanto existe.
+        Um slot vazio não é um Pequeno Grupo.
+      </p>
+    </div>`;
+}
+
 function renderTutorGruposList(nome) {
   loadGrupos();
   const grupos = getGruposDoResponsavel(nome);
@@ -3456,6 +3487,7 @@ function renderTutorGruposList(nome) {
       <div class="phase-tag tag-content">${sanitize(nome)}</div>
       <p class="body-text">${grupos.length} Pequeno${grupos.length===1?'':'s'} Grupo${grupos.length===1?'':'s'} sob seus cuidados.</p>
     </div>
+    ${painelCapacidadeHtml()}
     ${cards}
     <button onclick="abrirRelatoriosMensais('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">📊 Relatórios Mensais</button>
     <button onclick="renderRankingPgs('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">🏆 Índice de Maturidade Discipular</button>
@@ -4384,6 +4416,7 @@ function atribuirSetorParticipante(grupoNum, nome, participanteTs, setorId) {
 // e não está mais disponível pra cancelar a própria inscrição) — antes só existia
 // removerDoGrupoAtual(), que a própria pessoa aciona sobre si mesma. Mesmo tombstone
 // (p.removed=true) pra manter consistente com a sincronização entre aparelhos.
+// FASE 5/D1: remover participante também é transição — ver atualizarStatusPg() no chamador.
 function removerParticipanteDoPainel(grupoNum, participanteTs, nome) {
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
   if (!g) return;
@@ -4398,6 +4431,7 @@ function removerParticipanteDoPainel(grupoNum, participanteTs, nome) {
   }
   if (g.tutor && g.tutor.trim().toLowerCase() === p.nome.trim().toLowerCase()) g.tutor = null;
   if (g.coordenador && g.coordenador.trim().toLowerCase() === p.nome.trim().toLowerCase()) g.coordenador = null;
+  atualizarStatusPg(g);   // FASE 5/D1: sair do último participante devolve o PG a EM_FORMACAO
   saveGrupos();
   renderTutorGrupoDetalhe(grupoNum, nome);
 }
@@ -9060,17 +9094,31 @@ function generatePennantSvg(grupoNum, grupoNome, opts = {}) {
 //  SISTEMA DE PEQUENOS GRUPOS
 // ══════════════════════════════════════
 
-// ── Dados dos 70 grupos ──────────────────────────────────────────────────
+// ── Capacidade de Pequenos Grupos ────────────────────────────────────────
+// FASE 4 (2026-08-20): a capacidade passou a viver numa constante única. Antes o número
+// estava escrito direto no Array.from — e o app inteiro tratava "quantos slots existem"
+// como se fosse "quantos PGs existem", que é a raiz dos sintomas investigados nas Fases 0-2.
+//
+// LEIA ISTO ANTES DE USAR TOTAL_SLOTS: ele é CAPACIDADE, nunca QUANTIDADE.
+//   TOTAL_SLOTS ....... quantos PGs cabem (70)
+//   inventarioPgs() ... quantos PGs existem de verdade, por categoria — é o que a
+//                       interface e qualquer contagem devem usar (Invariante 8)
+// Um slot vazio NÃO é um Pequeno Grupo (Invariante 5).
+const TOTAL_SLOTS = 70;
+
+// ── Dados dos slots ──────────────────────────────────────────────────────
 // 2026-08-19: ampliado de 50 para 70 slots — os 50 originais estavam todos ocupados
 // (40 completos + 10 em formação) e a criação de PG novo passou a recusar com
 // "Não há mais Pequenos Grupos disponíveis". Slots 51-70 nascem vazios.
 // Aparelho com versão antiga em cache NÃO apaga os novos: ele os lê como
 // desconhecidos e os devolve via fbGruposPreservados na gravação (ver linha ~10417).
-// Estrutura: { num, nome, tutor, coordenador, participantes:[] }
+// Estrutura: { num, pgId, nome, tutor, coordenador, participantes:[] }
 // A comunicação acontece dentro do próprio app (Comunidade, Mural,
 // Companheiro de Jornada) — não há mais dependência de grupo externo.
-const PEQUENOS_GRUPOS = Array.from({length:70}, (_, i) => ({
-  num: i + 1,
+const PEQUENOS_GRUPOS = Array.from({length: TOTAL_SLOTS}, (_, i) => ({
+  num: i + 1,         // SLOT: endereço/posição. NÃO é a identidade do PG (Fase 3)
+  pgId: null,         // FASE 4: identidade estável do PG. Esta versão LÊ e PRESERVA, mas
+                      // NUNCA gera — gerar é a etapa M3, que depende da trava de versão (M2)
   nome: null,         // definido pelo primeiro participante que criar o grupo
   tutor: null,        // nome do tutor (preenchido por quem se identificar como tutor)
   coordenador: null,  // nome do coordenador (preenchido por quem se identificar como coordenador)
@@ -9083,6 +9131,210 @@ const PEQUENOS_GRUPOS = Array.from({length:70}, (_, i) => ({
   setores: [],        // RC4.8.2: cadastro dos setores institucionais cobertos por este PG — {id, nome, totalColaboradores}
   status: null,        // RC6.0.1A/ADR-005: 'LIVRE'|'EM_FORMACAO'|'ATIVO'|'INATIVO'|'ARQUIVADO' — populado por migrarStatusPg(), null até a primeira migração rodar
 }));
+
+// ── FASE 4: campos transportados sem interpretação ───────────────────────
+// PROBLEMA QUE ISTO RESOLVE (achado da Fase 1): applyGruposData, saveGruposLocal e
+// trySaveGrupos copiam campo a campo, cada uma com sua lista. Todo campo fora dessas listas
+// é APAGADO na primeira gravação — foi assim que `pgProgress` sumiu silenciosamente do
+// documento, e seria assim que `pgId` sumiria antes mesmo de servir para alguma coisa.
+//
+// REGRA: estes campos atravessam leitura → memória → localStorage → nuvem SEM serem
+// interpretados. Nenhum cálculo, tela ou ranking depende deles nesta versão. Acrescentar um
+// campo novo ao schema = acrescentar aqui, em UM lugar só.
+const PG_CAMPOS_TRANSPORTADOS = ['pgId', 'setorId', 'historico', 'pgProgress'];
+
+function transportarCamposPg(destino, origem) {
+  if (!destino || !origem) return destino;
+  PG_CAMPOS_TRANSPORTADOS.forEach(k => { if (origem[k] !== undefined) destino[k] = origem[k]; });
+  return destino;
+}
+
+// ── FASE 4: fonte única de contagem (Invariante 8) ───────────────────────
+// Antes desta função havia SEIS critérios diferentes espalhados pelo app para responder
+// "quantos PGs existem", e eles devolviam 45, 30, 38, 25, 33 e 43 sobre a mesma base.
+// Aqui a resposta é uma só, e cada categoria tem definição explícita:
+//   ocupado ......... o slot tem nome, responsável ou gente dentro (é um REGISTRO)
+//   cadastrado ...... registro com nome (é um PG identificado)
+//   ativo ........... cadastrado com pelo menos 1 participante ativo
+//   emFormacao ...... cadastrado sem nenhum participante ativo
+//   semIdentificacao  tem gente/responsável mas perdeu o nome (PG 3 e 25 na auditoria)
+//   livre ........... slot sem nada — NÃO é PG (Invariante 5)
+//   removido ........ slot livre HOJE que já teve PG (rastro na base de convites)
+function inventarioPgs() {
+  const convites = (typeof loadConvites === 'function') ? loadConvites() : [];
+  const numsComHistorico = new Set(convites.map(c => c.grupoNum).filter(n => n != null));
+  const inv = {
+    capacidade: TOTAL_SLOTS,
+    ocupados: 0, cadastrados: 0, ativos: 0, emFormacao: 0,
+    semIdentificacao: 0, livres: 0, removidos: 0,
+    listaAtivos: [], listaEmFormacao: [], listaSemIdentificacao: [], listaRemovidos: [],
+  };
+  PEQUENOS_GRUPOS.forEach(g => {
+    const ativos = participantesAtivos(g).length;
+    const ocupado = !!(g.nome || g.tutor || g.coordenador || ativos > 0);
+    if (!ocupado) {
+      inv.livres++;
+      if (numsComHistorico.has(g.num)) { inv.removidos++; inv.listaRemovidos.push(g.num); }
+      return;
+    }
+    inv.ocupados++;
+    if (!g.nome) { inv.semIdentificacao++; inv.listaSemIdentificacao.push(g.num); return; }
+    inv.cadastrados++;
+    if (ativos > 0) { inv.ativos++; inv.listaAtivos.push(g.num); }
+    else { inv.emFormacao++; inv.listaEmFormacao.push(g.num); }
+  });
+  return inv;
+}
+
+// ── FASE 5/D1: o status acompanha o conteúdo ─────────────────────────────
+// DEFEITO REPRODUZIDO EM LABORATÓRIO (2026-08-20): criar um PG gravava nome e tutor mas NUNCA
+// tocava no status. Como migrarStatusPg() só preenche status nulo, o slot ficava 'LIVRE' para
+// sempre — com nome e gente dentro. Efeitos observados na produção e reencenados no teste:
+//   · o Tutor não conseguia cancelar o PG que ele mesmo acabara de criar ('nao_cancelavel')
+//   · 8 PGs vivos ficaram marcados 'LIVRE' (39, 41, 43, 44, 46, 47, 49, 50 — Fase 2)
+//   · o PG 51 nasceu 'LIVRE', e foi por isso que o cancelamento não pôde tê-lo apagado
+// Chamada em toda transição: criação, entrada por convite e remoção de participante.
+// NÃO mexe em INATIVO/ARQUIVADO — esses são decisão humana (ADR-005).
+function atualizarStatusPg(g) {
+  if (!g) return null;
+  if (g.status === 'INATIVO' || g.status === 'ARQUIVADO') return g.status;
+  const ativos = participantesAtivos(g).length;
+  g.status = (!g.nome && !g.tutor && !g.coordenador) ? 'LIVRE'
+           : (ativos > 0 ? 'ATIVO' : 'EM_FORMACAO');
+  return g.status;
+}
+
+// ── FASE 5: declaração de intenção antes de gravar ───────────────────────
+// As guardas da Fase 4 protegem contra perda acidental. Estas duas variáveis existem para
+// distinguir o acidente do ato deliberado — sem elas, a guarda impediria o próprio Tutor de
+// cancelar um PG, e não teria como reconhecer uma colisão de criação entre dois aparelhos.
+let pgEsvaziamentoAutorizado = new Set();   // slots que o usuário mandou esvaziar, agora
+let pgCriacaoPretendida = null;             // { num, nome } do PG sendo criado neste instante
+let pgUltimaColisao = null;                 // { num, quando } da última criação abortada por colisão
+
+// ── FASE 5/D3: criação de PG à prova de colisão ──────────────────────────
+// Substitui o trecho que escolhia o slot olhando só a cópia LOCAL — origem da colisão entre
+// aparelhos. Agora: sincroniza antes de escolher, declara a intenção, grava; se outro aparelho
+// tiver ocupado o slot no meio do caminho, DESFAZ a criação local e tenta o próximo livre.
+// Mesmo espírito de commitConviteChange (montar contra o remoto fresco), que é o caminho mais
+// seguro que já existia no app.
+async function criarPgNoProximoSlot({ nome, tutor, diaReuniao, horaReuniao }, tentativasMax = 3) {
+  for (let tentativa = 1; tentativa <= tentativasMax; tentativa++) {
+    loadGrupos();
+    await syncFromFirebase().catch(() => {});   // escolher o slot com a nuvem fresca
+    const g = getProximoGrupoVazio();
+    if (!g) return { ok: false, motivo: 'sem_slot' };
+
+    const antes = { nome: g.nome, tutor: g.tutor, diaReuniao: g.diaReuniao, horaReuniao: g.horaReuniao, status: g.status, pgId: g.pgId };
+    g.nome = nome;
+    g.tutor = tutor;
+    g.diaReuniao = diaReuniao || null;
+    g.horaReuniao = horaReuniao || null;
+    // Identidade estável nasce COM o PG. Só para PGs novos — atribuir aos 43 já existentes é a
+    // migração M3, que continua dependendo da trava de versão (M2). Campo aditivo: se um
+    // aparelho antigo apagá-lo, nada quebra, porque nada ainda depende dele.
+    if (!g.pgId && typeof uuid === 'function') g.pgId = uuid();
+    atualizarStatusPg(g);
+
+    pgCriacaoPretendida = { num: g.num, nome };
+    pgUltimaColisao = null;
+    let ok = false;
+    try { ok = await saveGrupos(); } finally { pgCriacaoPretendida = null; }
+
+    if (ok) return { ok: true, num: g.num, pgId: g.pgId };
+
+    if (pgUltimaColisao && pgUltimaColisao.num === g.num) {
+      Object.assign(g, antes);          // desfaz a criação local: o slot é de quem chegou antes
+      saveGruposLocal();
+      pgUltimaColisao = null;
+      continue;                          // e tenta o próximo slot livre
+    }
+    Object.assign(g, antes);             // falha de rede/conflito: não deixa PG meio-criado
+    saveGruposLocal();
+    return { ok: false, motivo: 'nao_confirmado' };
+  }
+  return { ok: false, motivo: 'colisao_persistente' };
+}
+
+// ── FASE 4: verificação das invariantes antes de qualquer gravação ───────
+// Devolve [] quando está tudo certo, ou a lista de violações. Quem chama DECIDE o que fazer;
+// esta função nunca corrige nada sozinha (Fase 4: proibido alterar registro automaticamente).
+function validarInventario(lista) {
+  const erros = [];
+  const arr = Array.isArray(lista) ? lista : PEQUENOS_GRUPOS;
+  const vistosNum = new Set(), vistosPgId = new Set();
+  arr.forEach(g => {
+    if (!g || g.num == null) { erros.push('registro sem num'); return; }
+    if (vistosNum.has(g.num)) erros.push('slot repetido: ' + g.num);   // Invariante 4
+    vistosNum.add(g.num);
+    if (g.pgId) {
+      if (vistosPgId.has(g.pgId)) erros.push('pgId repetido no slot ' + g.num);  // Invariantes 2 e 3
+      vistosPgId.add(g.pgId);
+    }
+  });
+  return erros;
+}
+
+// ── FASE 4: bateria de testes das invariantes ────────────────────────────
+// Roda sozinha no modo de teste (?teste=1) e pode ser chamada a qualquer momento pelo console
+// com autoTesteFase4(). NÃO grava, NÃO altera registro — só lê o estado em memória e afirma.
+// Cada teste cita a invariante da Fase 3 que está defendendo.
+function autoTesteFase4() {
+  const r = [];
+  const ok = (nome, passou, detalhe) => r.push({ teste: nome, resultado: passou ? 'PASSOU' : 'FALHOU', detalhe: detalhe || '' });
+
+  // T1 — capacidade centralizada
+  ok('T1 capacidade única', PEQUENOS_GRUPOS.length === TOTAL_SLOTS, PEQUENOS_GRUPOS.length + ' slots / TOTAL_SLOTS=' + TOTAL_SLOTS);
+
+  // T2/T3 — Invariantes 2, 3 e 4: slot único e pgId único
+  ok('T2 invariantes de identidade', validarInventario().length === 0, validarInventario().join(' · '));
+
+  // T4 — Invariante 5 e 8: contagem não é capacidade, e as partes fecham com o todo
+  const inv = inventarioPgs();
+  ok('T4 soma fecha', inv.ocupados + inv.livres === TOTAL_SLOTS, `${inv.ocupados} ocupados + ${inv.livres} livres`);
+  ok('T5 cadastrados = ativos + em formação', inv.cadastrados === inv.ativos + inv.emFormacao, `${inv.cadastrados} = ${inv.ativos} + ${inv.emFormacao}`);
+  ok('T6 slot vazio não é PG', inv.cadastrados <= inv.ocupados && inv.cadastrados <= TOTAL_SLOTS, `${inv.cadastrados} cadastrados`);
+
+  // T7 — Invariante 6: numeração estável (o array nunca é reordenado nem renumerado)
+  ok('T7 numeração intacta', PEQUENOS_GRUPOS.every((g, i) => g.num === i + 1), 'num === índice+1 em todos');
+
+  // T8 — campos do schema novo sobrevivem a uma ida e volta pela projeção de persistência
+  const cobaia = { num: 999, pgId: 'teste-pgid', setorId: 'setor-x', historico: [{ ev: 'x' }], pgProgress: { a: 1 } };
+  const roundtrip = transportarCamposPg({}, cobaia);
+  ok('T8 campos novos sobrevivem', PG_CAMPOS_TRANSPORTADOS.every(k => roundtrip[k] !== undefined), Object.keys(roundtrip).join(','));
+
+  // T8b — os QUATRO pontos de cópia usam a mesma lista. O teste lê o código-fonte de cada um
+  // e exige a chamada: foi a ausência dela em trySaveGrupos que fez o pgId nunca chegar à nuvem.
+  const pontos = { applyGruposData, saveGruposLocal, loadGrupos, trySaveGrupos };
+  const semTransporte = Object.keys(pontos).filter(n => String(pontos[n]).indexOf('transportarCamposPg') < 0);
+  ok('T8b todos os pontos de cópia transportam', semTransporte.length === 0, semTransporte.length ? 'sem transporte: ' + semTransporte.join(', ') : 'apply/saveLocal/load/trySave');
+
+  // T9/T11 — a guarda que teria salvado o PG 51: reencena o caso real, sem gravar nada.
+  // Slot com nome e gente na nuvem sendo enviado em branco → tem de ser detectado.
+  // Slot que sempre esteve vazio sendo enviado vazio → não pode acusar falso positivo.
+  const retratoOriginal = fbRetratoRemoto;
+  try {
+    fbRetratoRemoto = new Map([
+      [51, { tinhaNome: true,  tinhaGente: true  }],   // "Puro & Simples", como estava em 19/08
+      [60, { tinhaNome: false, tinhaGente: false }],   // slot de fábrica, nunca usado
+    ]);
+    const slotDeFabrica = { num: 51, nome: null, participantes: [] };
+    const achados = detectarEsvaziamento([slotDeFabrica, { num: 60, nome: null, participantes: [] }]);
+    ok('T9 guarda detecta PG esvaziado (caso PG 51)', achados.length === 1 && achados[0] === 51, 'detectou: ' + achados.join(','));
+    const semRisco = detectarEsvaziamento([{ num: 60, nome: null, participantes: [] }]);
+    ok('T11 guarda não acusa slot sempre vazio', semRisco.length === 0, 'detectou: ' + semRisco.join(','));
+  } finally {
+    fbRetratoRemoto = retratoOriginal;   // o retrato real nunca é alterado por um teste
+  }
+
+  // T10 — schema: o app declara a versão que entende e nunca grava sobre versão maior
+  ok('T10 schema declarado', Number.isInteger(SCHEMA_VERSION) && SCHEMA_VERSION >= 2, 'SCHEMA_VERSION=' + SCHEMA_VERSION);
+
+  console.table(r);
+  const falhas = r.filter(x => x.resultado === 'FALHOU');
+  console.info(falhas.length ? '❌ FASE 4: ' + falhas.length + ' teste(s) falharam' : '✅ FASE 4: todos os testes passaram (' + r.length + ')');
+  return r;
+}
 
 // A frequência do PG só passou a valer de fato a partir de julho/2026 — meses
 // anteriores eram teste e são descartados sempre que os dados são carregados/mesclados.
@@ -9144,6 +9396,7 @@ function loadGrupos() {
           PEQUENOS_GRUPOS[idx].pgNivel = g.pgNivel || null;
           PEQUENOS_GRUPOS[idx].status = g.status || null;
           PEQUENOS_GRUPOS[idx].institucional = g.institucional || false;
+          transportarCamposPg(PEQUENOS_GRUPOS[idx], g);   // FASE 4: pgId & cia. nunca se perdem
         }
       });
     }
@@ -9170,6 +9423,7 @@ function saveGruposLocal() {
       pgNivel: g.pgNivel || null,
       status: g.status || null,
       institucional: g.institucional || false,
+      ...transportarCamposPg({}, g),   // FASE 4: pgId, setorId, historico, pgProgress
     }));
     localStorage.setItem(GRUPOS_KEY, JSON.stringify(dadosSalvar));
   } catch(e) { console.warn('saveGrupos localStorage:', e); }
@@ -9613,6 +9867,7 @@ async function aceitarConvite(inviteId, dadosPessoa) {
     }
     if (inv.funcao === 'coordenador' && !g.coordenador) g.coordenador = p.nome;
     if (inv.funcao === 'tutor' && !g.tutor) g.tutor = p.nome;
+    atualizarStatusPg(g);   // FASE 5/D1: entrar no grupo é transição de ciclo de vida
 
     const invUsado = Object.assign({}, inv, { status: 'utilizado', usadoPor: memberId, usadoEm: agora, updatedAt: agora });
     const convitesNovos = podarConvites(mergeConvites(convites, [invUsado]));
@@ -9917,10 +10172,30 @@ const FB_FLAGS = Object.freeze({
   convitesV2      : true,   // (Etapa 2) convites de uso único (false = só ?pg= antigo)
   imdV2           : true,   // (RC3.5.5) IMD v2/Capilaridade é o índice oficial em produção — false = rollback de contingência ao algoritmo antigo (getPgIMD/classificarPgs, preservados intocados só para esse cenário durante a Fase 1; remoção definitiva prevista no encerramento da RC3.6)
   pgStatusFiltros : false,  // (RC6.0.1A/ADR-005) Ranking/Painel/criação passam a filtrar por g.status em vez da combinação nome+tutor+coordenador — false = comportamento atual (RC6.0.1A só prepara a migração/infra; RC6.0.1B liga esta flag após homologação)
+  schemaVersionWrite: false, // (FASE 4/M2) enviar o campo de topo `schemaVersion` nas gravações.
+                             // NASCE DESLIGADA DE PROPÓSITO: a regra do Firestore em produção
+                             // ainda tem hasOnly([...]) SEM 'schemaVersion', e campo de topo fora
+                             // da allowlist faz a gravação INTEIRA voltar 403 (armadilha já vivida
+                             // com 'convites' em 08/07 e com 'setoresMestre' na RC4.8).
+                             // ORDEM OBRIGATÓRIA: 1) publicar esta versão · 2) acrescentar
+                             // 'schemaVersion' ao hasOnly no Console · 3) só então ligar aqui.
 });
 
+// ── FASE 4: versão do schema de dados ────────────────────────────────────
+// Responde a uma pergunta que o app nunca soube fazer: "a nuvem está num formato que eu
+// entendo?". A leitura já usa isto agora (bloqueia gravação se a nuvem estiver à frente).
+// A outra metade — impedir que uma versão ANTIGA grave — não pode viver aqui: aparelho antigo
+// não roda código novo. Essa metade é a regra do Firestore (ver firestore.rules, bloco M2).
+const SCHEMA_VERSION = 2;
+let fbSchemaRemoto = null;         // última versão de schema lida da nuvem
+let _fbAvisouSchemaNovo = false;   // o aviso de "recarregue o app" só aparece uma vez
+
 // Versão lógica + data de build (registrada na telemetria/log p/ auditoria futura)
-const APP_VERSION = Object.freeze({ version: '1.0.0', build: '2026-06-30' });
+// FASE 6: estava congelada em 1.0.0/2026-06-30 desde junho, enquanto o app recebia dezenas de
+// alterações. Efeito prático, sentido na perícia do PG 51: o log de conflitos carimbava sempre
+// a mesma versão, e foi impossível saber qual app gravou o quê. Agora a versão acompanha a
+// entrega, e `schema` registra o formato de dados que este app entende (ver SCHEMA_VERSION).
+const APP_VERSION = Object.freeze({ version: '1.1.0-rc1', build: '2026-08-20', schema: 2 });
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function uuid() {
@@ -10060,6 +10335,14 @@ async function fbReadDoc(cfg) {
   try { if (setoresMestreStr) setoresMestre = JSON.parse(setoresMestreStr); } catch { setoresMestre = null; }
   try { if (setoresEfetivoStr) setoresEfetivo = JSON.parse(setoresEfetivoStr); } catch { setoresEfetivo = null; }
   try { if (embaixadoresExternosStr) embaixadoresExternos = JSON.parse(embaixadoresExternosStr); } catch { embaixadoresExternos = null; }
+  // FASE 4: versão do schema gravada por quem escreveu por último. Ausente = schema 1
+  // (todo documento anterior a esta fase). Ler é sempre seguro — não altera nada na nuvem.
+  const sv = doc.fields?.schemaVersion?.integerValue;
+  fbSchemaRemoto = sv != null ? Number(sv) : 1;
+  // FASE 4: retrato do que a nuvem tem AGORA, por slot. É a base da guarda de perda por
+  // conteúdo em trySaveGrupos — sem ele, o app só sabia detectar um PG que sumia da lista,
+  // e não um PG que voltava VAZIO (foi exatamente por essa fresta que o PG 51 passou).
+  registrarRetratoRemoto(s ? JSON.parse(s) : null);
   return {
     dados: s ? JSON.parse(s) : null,
     tutores: tutoresStr ? JSON.parse(tutoresStr) : null,
@@ -10067,9 +10350,39 @@ async function fbReadDoc(cfg) {
     setoresMestre,
     setoresEfetivo,
     embaixadoresExternos,
+    schemaVersion: fbSchemaRemoto,
     ts: t ? String(t) : null,
     updateTime: doc.updateTime || null,   // COMMIT 1: carimbo nativo do servidor (trava otimista)
   };
+}
+
+// ── FASE 4: retrato do conteúdo remoto, por slot ─────────────────────────
+// Guarda só o mínimo necessário para responder "este slot tinha conteúdo na nuvem?".
+// Nunca guarda dado pessoal, nunca é gravado, nunca sai do aparelho.
+let fbRetratoRemoto = new Map();   // num → { tinhaNome, tinhaGente }
+function registrarRetratoRemoto(lista) {
+  if (!Array.isArray(lista)) return;
+  lista.forEach(g => {
+    if (!g || g.num == null) return;
+    const gente = (g.participantes || []).filter(p => !p.removed).length > 0;
+    fbRetratoRemoto.set(g.num, { tinhaNome: !!g.nome, tinhaGente: gente });
+  });
+}
+
+// Devolve os slots que a gravação deixaria em branco depois de a nuvem tê-los com conteúdo.
+// Função separada de propósito: é a guarda que teria impedido a perda do PG 51, e precisa
+// poder ser testada sem gravar nada (ver autoTesteFase4, teste T11).
+function detectarEsvaziamento(lista) {
+  const achados = [];
+  (lista || []).forEach(g => {
+    if (!g || g.num == null) return;
+    if (pgEsvaziamentoAutorizado.has(g.num)) return;   // FASE 5: o usuário mandou esvaziar este
+    const antes = fbRetratoRemoto.get(g.num);
+    if (!antes || (!antes.tinhaNome && !antes.tinhaGente)) return;   // não tinha nada: nada a perder
+    const gente = (g.participantes || []).filter(p => !p.removed).length > 0;
+    if (!g.nome && !gente) achados.push(g.num);                      // tinha conteúdo, iria em branco
+  });
+  return achados;
 }
 
 // Mantido para compatibilidade com testarFbConfig / salvarFbConfig
@@ -10145,6 +10458,12 @@ async function fbWriteGrupos(cfg, data, tutoresData, baseUpdateTime, convitesDat
   // gravação comum, como postar uma gratidão) era APAGADO da nuvem. updateMask restringe a
   // gravação só aos campos realmente enviados desta vez; os demais ficam intocados.
   const maskFields = ['dados', 'ts'];
+  // FASE 4/M2: declara em que schema esta gravação foi feita. Fica atrás de flag porque
+  // depende da allowlist da regra do Firestore (ver FB_FLAGS.schemaVersionWrite).
+  if (FB_FLAGS.schemaVersionWrite) {
+    fields.schemaVersion = { integerValue: String(SCHEMA_VERSION) };
+    maskFields.push('schemaVersion');
+  }
   if (tutoresData) { fields.tutores = { stringValue: JSON.stringify(tutoresData) }; maskFields.push('tutores'); }
   if (convitesData) { fields.convites = { stringValue: JSON.stringify(convitesData) }; maskFields.push('convites'); }  // ETAPA 2
   // RC4.8.2A: campo de topo novo — precisa estar na allowlist (hasOnly) da regra do Firestore.
@@ -10229,6 +10548,7 @@ function applyGruposData(salvo) {
     PEQUENOS_GRUPOS[idx].campanhas = g.campanhas || {};
     PEQUENOS_GRUPOS[idx].status = g.status || null;
     PEQUENOS_GRUPOS[idx].institucional = g.institucional || false;
+    transportarCamposPg(PEQUENOS_GRUPOS[idx], g);   // FASE 4: campos do schema novo
   });
 }
 
@@ -10392,6 +10712,19 @@ async function prepareSaveGrupos(cfg) {
     return { remote, abort: true };
   }
 
+  // FASE 4: trava de schema no lado do leitor. Se a nuvem está num formato mais novo do que
+  // este app entende, gravar por cima seria escrever com um vocabulário menor — exatamente o
+  // que uma versão antiga faz hoje com os PGs novos. Cancela e pede atualização.
+  if (remote && remote.schemaVersion && remote.schemaVersion > SCHEMA_VERSION) {
+    console.error('Firestore: gravação CANCELADA — nuvem no schema', remote.schemaVersion,
+                  'e este app entende', SCHEMA_VERSION);
+    if (!_fbAvisouSchemaNovo) {
+      _fbAvisouSchemaNovo = true;
+      try { alert('⚠️ Este aplicativo está desatualizado.\n\nSuas alterações estão salvas neste aparelho, mas não podem ser enviadas até você recarregar a página (puxe a tela para baixo ou feche e abra o app).'); } catch (_) {}
+    }
+    return { remote, abort: true, abortSchema: true };
+  }
+
   // Se a nuvem mudou desde a última sync, faz merge antes de gravar (lógica preservada)
   if (remote && remote.ts && remote.ts !== fbLastKnownTs) {
     console.warn('Firebase: nuvem mais nova — fazendo merge antes de gravar');
@@ -10415,6 +10748,11 @@ async function trySaveGrupos(cfg, baseUpdateTime) {
     pgNivel: g.pgNivel || null,
     status: g.status || null,
     institucional: g.institucional || false,
+    // FASE 5: sem esta linha o pgId nunca chegava à nuvem — e a sincronização seguinte o
+    // apagava até do aparelho, porque o localStorage é regravado com o que veio de lá.
+    // Era o quarto ponto de cópia, o único que tinha ficado sem a lista única (defeito
+    // encontrado pelo teste T10/T12, não por leitura de código).
+    ...transportarCamposPg({}, g),
   }));
 
   // Devolve os registros da nuvem que esta versão não conhece (ver registrarGruposDesconhecidos).
@@ -10428,6 +10766,41 @@ async function trySaveGrupos(cfg, baseUpdateTime) {
   if (faltando.length) {
     console.error('Firestore: gravação CANCELADA — o payload perderia os PGs', faltando.join(', '));
     return { ok: false, perdaDetectada: true };
+  }
+
+  // ── FASE 4, GUARDA NOVA: PG que volta VAZIO ────────────────────────────
+  // A validação acima só enxerga o PG que SOME da lista. O caso real do PG 51 foi outro: o
+  // número continuou lá, com a forma exata de um slot de fábrica. Aqui a comparação é com o
+  // retrato do que a nuvem tinha na última leitura: se um slot tinha nome ou gente e o payload
+  // o mandaria em branco, a gravação é cancelada e a alteração local fica pendente.
+  // Esvaziar um PG de propósito continua possível — cancelar/zerar passam por caminhos que
+  // atualizam o retrato antes de gravar.
+  const esvaziando = detectarEsvaziamento(payloadCompleto);
+  if (esvaziando.length) {
+    console.error('Firestore: gravação CANCELADA — estes PGs seriam esvaziados:', esvaziando.join(', '));
+    return { ok: false, perdaDetectada: true, esvaziando };
+  }
+
+  // ── FASE 5, GUARDA NOVA: colisão de criação entre dois aparelhos ───────
+  // DEFEITO REPRODUZIDO EM LABORATÓRIO: dois aparelhos escolhem o mesmo slot livre (cada um
+  // olhando a própria cópia local) e o segundo a gravar apaga o nome do PG do primeiro — mas
+  // MANTÉM as pessoas dele dentro, porque participantes são unidos e o nome é decidido por
+  // `lg.nome ?? rg.nome` (local vence). É a assinatura exata do PG 9 na produção: a
+  // coordenadora do antigo "PÃO DA VIDA" continua dentro do "Centro Cirúrgico".
+  // Aqui a criação é abortada quando alguém ocupou o slot enquanto o formulário estava aberto.
+  if (pgCriacaoPretendida) {
+    const ocupadoAgora = fbRetratoRemoto.get(pgCriacaoPretendida.num);
+    if (ocupadoAgora && ocupadoAgora.tinhaNome) {
+      console.error('Firestore: criação CANCELADA — o slot', pgCriacaoPretendida.num, 'foi ocupado por outro aparelho');
+      return { ok: false, colisaoSlot: true, num: pgCriacaoPretendida.num };
+    }
+  }
+
+  // FASE 4: invariantes de identidade (slot único, pgId único) antes de tocar a nuvem
+  const violacoes = validarInventario(payloadCompleto);
+  if (violacoes.length) {
+    console.error('Firestore: gravação CANCELADA — invariantes violadas:', violacoes.join(' · '));
+    return { ok: false, perdaDetectada: true, violacoes };
   }
 
   return fbWriteGrupos(cfg, payloadCompleto, TUTORS.length ? TUTORS : undefined, baseUpdateTime, undefined, SETORES_MESTRE.length ? SETORES_MESTRE : undefined, SETORES_EFETIVO.length ? SETORES_EFETIVO : undefined, EMBAIXADORES_EXTERNOS.length ? EMBAIXADORES_EXTERNOS : undefined);
@@ -10452,6 +10825,9 @@ async function saveGruposToFirebase() {
   for (let tentativa = 1; tentativa <= 3; tentativa++) {
     try {
       const prep = await prepareSaveGrupos(cfg);
+      // FASE 4: aborto por schema mais novo NÃO limpa a pendência — a alteração continua viva
+      // no aparelho e protegida da sincronização (Correção A), e sobe quando o app atualizar.
+      if (prep.abortSchema) { setFbPendingSync(true); return false; }
       if (prep.abort) { setFbPendingSync(false); return false; }
       ultimoUpdateTime = prep.remote ? prep.remote.updateTime : null;
 
@@ -10464,6 +10840,9 @@ async function saveGruposToFirebase() {
         return true;
       }
       if (res && res.sizeExceeded) { recordSync({ resultado: 'falha', tentativas: tentativa }); setFbPendingSync(true); return false; }
+      // FASE 5: colisão de slot na criação — não é falha de rede nem conflito de concorrência.
+      // Quem chamou (criarPgNoProximoSlot) desfaz a criação local e tenta o próximo slot livre.
+      if (res && res.colisaoSlot) { recordSync({ resultado: 'falha', tentativas: tentativa }); pgUltimaColisao = { num: res.num, quando: Date.now() }; return false; }
       if (res && res.perdaDetectada) {
         // Guarda de última instância: o payload perderia PG que existe na nuvem. Não grava e
         // mantém a alteração local pendente — não deveria acontecer nunca (fbGruposPreservados
@@ -10626,11 +11005,26 @@ async function salvarFbConfig() {
       fbLastKnownTs = result.ts;
       try { localStorage.setItem(GRUPOS_KEY, JSON.stringify(result.dados)); } catch(_) {}
     } else {
+      // FASE 4: este ramo (nuvem vazia/inexistente) gravava o PG com apenas 7 campos —
+      // gratidões, reuniões, setores, campanhas, nível, IMD e institucional eram descartados
+      // de TODOS os PGs de uma vez, sem precondição e sem nenhuma das guardas. Bomba latente
+      // apontada na Fase 1. Agora grava o registro completo, pela mesma projeção das demais
+      // rotas, e só depois de o usuário confirmar que a nuvem está mesmo vazia.
+      if (!confirm('A nuvem deste projeto está vazia.\n\nDeseja enviar os dados deste aparelho para iniciá-la?\n\nSe você esperava encontrar dados lá, CANCELE e verifique o projeto antes — enviar agora pode ser o começo de uma perda.')) {
+        status.style.color = '#E05050';
+        status.textContent = '⚠️ Envio cancelado. Nada foi gravado.';
+        return;
+      }
       const dadosSalvar = PEQUENOS_GRUPOS.map(g => ({
         num: g.num, nome: g.nome, tutor: g.tutor,
         coordenador: g.coordenador, diaReuniao: g.diaReuniao,
         horaReuniao: g.horaReuniao, participantes: g.participantes,
+        gratidoes: g.gratidoes || [], reunioesMes: g.reunioesMes || {},
+        pgIMD: g.pgIMD || null, pgRanking: g.pgRanking || null,
+        setores: g.setores || [], campanhas: g.campanhas || {},
+        pgNivel: g.pgNivel || null, institucional: g.institucional || false,
         status: g.status || null,
+        ...transportarCamposPg({}, g),
       }));
       await fbWriteGrupos(cfg, dadosSalvar, TUTORS.length ? TUTORS : undefined);
     }
@@ -10680,8 +11074,8 @@ function migrarStatusPg() {
 
   // Auditoria da migração (ADR-005, pedido explícito): contagem por status + verificação de
   // integridade antes de persistir. Mesmo padrão de log já usado em migrateToVinculos
-  // ("[Migração UUID]"). Se a soma não bater com os 50 slots, ou algum status ficou fora dos
-  // valores válidos, a gravação é cancelada — evita persistir uma migração quebrada.
+  // ("[Migração UUID]"). Se a soma não bater com a capacidade (TOTAL_SLOTS), ou algum status
+  // ficou fora dos valores válidos, a persistência é cancelada — evita gravar migração quebrada.
   const contagem = { LIVRE: 0, EM_FORMACAO: 0, ATIVO: 0, INATIVO: 0, ARQUIVADO: 0 };
   let invalidos = 0;
   PEQUENOS_GRUPOS.forEach(g => {
@@ -10697,7 +11091,12 @@ function migrarStatusPg() {
     console.error('[Migração status PG] Verificação falhou — gravação cancelada. soma:', somaTotal, 'esperado:', total, 'inválidos:', invalidos);
     return;
   }
-  saveGrupos();
+  // FASE 4: era `saveGrupos()`, que grava o documento INTEIRO na nuvem. Como esta função é
+  // chamada por loadGrupos() e por syncFromFirebase() (boot, poll de 30s, retorno de
+  // visibilidade), uma LEITURA disparava uma GRAVAÇÃO completa em produção, sem nenhuma ação
+  // do usuário — foi esse caminho que materializou os slots 51-70 vazios na nuvem.
+  // Agora persiste só no aparelho; o status sobe junto da próxima gravação legítima.
+  saveGruposLocal();
 }
 
 // Próximo grupo disponível para criação = o primeiro 'vazio' da lista,
@@ -13077,6 +13476,8 @@ function initModoTeste() {
 // desvio, abrir a aba de teste já dispararia leitura contínua do banco real.
 if (MODO_TESTE) {
   initModoTeste();
+  // FASE 4: a bateria de invariantes roda sozinha no modo de teste — nunca em produção.
+  try { setTimeout(autoTesteFase4, 300); } catch (_) {}
 } else if (loadFbConfig()) {
   // CORREÇÃO A (2026-08-18): se o app foi fechado com alteração ainda não confirmada na nuvem,
   // a marca de pendência sobrevive no aparelho — a primeira sincronização a preserva (merge) e
