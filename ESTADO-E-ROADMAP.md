@@ -1,10 +1,55 @@
-# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-08-18)
+# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-08-20)
 
 > Documento para retomar o trabalho em outra máquina/sessão. Cole o conteúdo de volta
 > para o assistente ao recomeçar — a "memória" do assistente **não viaja entre máquinas**;
 > só este arquivo (via GitHub) viaja. **Nenhuma alteração de código sem aprovação do desenho.**
 
-## 🛑 PONTO DE PARADA — 2026-08-18 (noite) — retomar por aqui
+## 🛑 PONTO DE PARADA — 2026-08-20 (noite) — retomar por aqui
+
+### Auditoria do PG 51 — Fases 0 a 7 concluídas, publicação BLOQUEADA aguardando decisão
+
+O relatório completo das sete fases está em **`AUDITORIA-PG51-FASES-0-7.md`** (neste repositório).
+Leia-o antes de retomar. Resumo do estado:
+
+- **Commit `ac7aae8` (versão `1.1.0-rc1`) está feito localmente e NÃO foi enviado ao GitHub.**
+  `main` está 1 commit à frente da origem. Publicar é pelo GitHub Desktop (Push origin).
+- **Produção intocada.** O documento `jdpg/grupos` continua com os mesmos 299.917 bytes e o mesmo
+  `updateTime 2026-08-20T20:47:51.295280Z` de antes da primeira linha alterada. Nenhuma migração,
+  nenhuma reconciliação, nenhuma escrita.
+- **Causa do desaparecimento do PG 51 "Puro & Simples":** um aparelho com o app anterior a 18/08
+  (que só conhece 50 slots) gravou sua lista e truncou o documento; em seguida a migração de status
+  recriou os slots 51–70 no formato de fábrica. Hipótese de exclusão humana **refutada**.
+- **Quatro defeitos reais corrigidos e testados** (25 testes, 25 aprovados, em Firestore falso):
+  status que nunca acompanhava o conteúdo; slot reciclado herdando a identidade anterior; colisão
+  entre dois aparelhos apagando o nome do PG do outro; e o `pgId` que não chegava à nuvem.
+
+**A DECISÃO QUE FALTA (Fase 7):** o registro pré-publicação encontrou 2 registros órfãos — os
+slots 3 e 25 têm gente e responsáveis mas não têm nome. Pela regra "inconsistência gera bloqueio,
+não correção automática", a publicação parou. Duas saídas:
+
+- **(A) Publicar assim mesmo** — recomendado. A versão não escreve dado nenhum; os órfãos seguem
+  para a reconciliação (R2) e a causa deixa de se repetir.
+- **(B) Reconciliar antes** — restaurar os nomes dos slots 3 e 25 com os tutores e só depois
+  publicar. Mais lento, e a reconciliação seria feita com o código antigo, que ainda tem o defeito.
+
+**Item mais urgente, que não depende de publicar nada:** verificar no Console do Firebase se o
+**PITR (Point-in-Time Recovery)** está habilitado. É a única chance de recuperar os nomes dos dois
+colaboradores do PG 51.
+
+**Ordem de publicação (não pode ser invertida):** 1) publicar `1.1.0-rc1`; 2) confirmar que os 4
+tutores e os coordenadores ativos carregaram a versão nova; 3) acrescentar `schemaVersion` à
+allowlist da regra no Console; 4) ligar `FB_FLAGS.schemaVersionWrite = true` e publicar;
+5) confirmar que as gravações continuam funcionando; 6) só então aplicar o passo B da regra — o que
+finalmente barra o aparelho antigo. A regra proposta está escrita como comentário em
+`firestore.rules`, marcada como NÃO PUBLICADA.
+
+**Backups e material de apoio** (fora do repositório, contêm dados pessoais):
+`Documents\Backups-PequenosGrupos\` — dois snapshots do documento e a pasta
+`auditoria-pg51-2026-08-20\` com o inventário das 70 posições e a identificação do PG 51.
+
+---
+
+## PONTO DE PARADA — 2026-08-18 (noite)
 
 ### Correção A — perda silenciosa de encontros na sincronização (aplicada, **não publicada**)
 
