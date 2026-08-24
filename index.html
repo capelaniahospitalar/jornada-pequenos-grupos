@@ -3375,10 +3375,13 @@ function abrirWhatsappConviteCoordenador(inviteId) {
   const inv = getConvite(inviteId);
   if (!inv) return;
   const waEl = document.getElementById('cpg-coord-wa');
-  const waDigits = waEl ? waEl.value.replace(/\D/g, '') : '';
-  const destino = waDigits.length >= 10 ? ('55' + waDigits) : '';
+  const waBruto = waEl ? waEl.value.trim() : '';
+  const destino = normalizarWaBR(waBruto);
+  // Mesmo caso do convite ao participante: melhor avisar do que abrir um link que o WhatsApp
+  // recusa. O convite já existe aqui, então só o envio é interrompido.
+  if (waBruto && !destino) { alert(AVISO_WA_INVALIDO); return; }
   const texto = textoConviteWhatsApp(inv) + '\n\n' + APP_URL + '?conv=' + inv.inviteId;
-  window.open('https://wa.me/' + destino + '?text=' + encodeURIComponent(texto), '_blank');
+  window.open('https://wa.me/' + (destino || '') + '?text=' + encodeURIComponent(texto), '_blank');
 }
 
 // Falha parcial (PG criado, convite não): nunca silenciosa — mensagem clara + tentar de novo.
@@ -9736,6 +9739,31 @@ function resolverConvite(a, b) {
   return transicaoConviteValida(maisVelho.status, maisNovo.status) ? maisNovo : maisVelho;
 }
 
+// Normaliza um WhatsApp brasileiro digitado à mão para o formato que o wa.me exige (55 + DDD +
+// número). Aceita as formas que as pessoas realmente digitam: "21 99999-8888", "021 99999-8888",
+// "+55 21 99999-8888", "5521999998888". Devolve null quando o que sobrou não é um celular ou fixo
+// brasileiro plausível.
+// Achado no PG 30 (Aline Fonseca Blanco, 2026-08-24): os três pontos que montavam esse número
+// faziam apenas '55' + dígitos, sem tirar o zero da operadora nem perceber um 55 já digitado.
+// Isso gerava destinos impossíveis ("55021980072004", "552175992492279") que o WhatsApp recusa —
+// e, como o convite era criado assim mesmo, a Coordenadora clicava de novo achando que nada tinha
+// acontecido: 31 convites pendentes num PG que nunca recebeu ninguém.
+function normalizarWaBR(valor) {
+  let d = String(valor || '').replace(/\D/g, '');
+  if (!d) return null;
+  if (d.startsWith('00')) d = d.slice(2);                    // prefixo de saída internacional
+  if (d.startsWith('55') && d.length > 11) d = d.slice(2);   // já veio com o código do país
+  if (d.startsWith('0')) d = d.replace(/^0+/, '');           // zero da operadora antes do DDD
+  if (d.length !== 10 && d.length !== 11) return null;       // DDD (2) + 8 ou 9 dígitos
+  if (parseInt(d.slice(0, 2), 10) < 11) return null;         // não existe DDD abaixo de 11
+  // Celular tem 11 dígitos e começa por 9 depois do DDD; fixo tem 10 e começa entre 2 e 5.
+  // Sem isso, uma digitação truncada ainda passaria como se fosse um número de outro DDD.
+  if (d.length === 11 && d[2] !== '9') return null;
+  if (d.length === 10 && !'2345'.includes(d[2])) return null;
+  return '55' + d;
+}
+const AVISO_WA_INVALIDO = 'O WhatsApp digitado não parece válido.\n\nEscreva DDD + número, como 21 99999-8888.';
+
 // Fábrica PURA de um convite (não valida autoridade e não grava — isso é o 2.2).
 function criarConviteObj({ tipo, funcao, grupoNum, grupoNome, deId, deNome, paraWa }) {
   const agora = Date.now();
@@ -10004,7 +10032,11 @@ async function aceitarConvite(inviteId, dadosPessoa) {
     const g = dados.find(x => x.num === inv.grupoNum);
     const agora = Date.now();
     const nome = (dadosPessoa && dadosPessoa.nome) ? String(dadosPessoa.nome).trim() : (loadMeuGrupo() || {}).nome || ST.userName || '';
-    const wa = '55' + String((dadosPessoa && dadosPessoa.wa) || '').replace(/\D/g, '');
+    // Normaliza pela mesma régua dos convites, mas NUNCA bloqueia o aceite: número que não passe
+    // vira string vazia em vez de virar lixo gravado. Antes, o campo em branco gravava o literal
+    // "55" e um número já com código do país virava "5555…" — foi o que produziu os cadastros com
+    // `wa` inútil vistos nos PGs 40 e 42.
+    const wa = normalizarWaBR((dadosPessoa && dadosPessoa.wa) || '') || '';
     if (!g.participantes) g.participantes = [];
     let p = g.participantes.find(x => x.memberId === memberId);
     let recuperado = false;
@@ -10285,8 +10317,12 @@ async function confirmarEntradaConvite(inviteId) {
 // Gera o convite (pelo papel) e abre o WhatsApp com o texto automático + link.
 async function gerarECompartilhar(funcao, grupoNum) {
   const waEl = document.getElementById('conv-para-wa');
-  const waDigits = waEl ? waEl.value.replace(/\D/g, '') : '';
-  const paraWa = waDigits.length >= 10 ? ('55' + waDigits) : null;
+  const waBruto = waEl ? waEl.value.trim() : '';
+  const paraWa = normalizarWaBR(waBruto);
+  // Campo preenchido, mas número impossível: avisa e NÃO cria o convite. Antes o convite era
+  // criado do mesmo jeito e o WhatsApp abria num destino que ele recusa — para quem convida,
+  // isso é indistinguível de "o botão não funciona" (ver normalizarWaBR, caso do PG 30).
+  if (waBruto && !paraWa) { alert(AVISO_WA_INVALIDO + '\n\nNenhum convite foi criado.'); return; }
   const res = await gerarConvite({ grupoNum, funcao, paraWa });
   if (!res.ok) {
     // E1: os quatro motivos novos do contrato de gravação têm texto próprio — nenhum deles
