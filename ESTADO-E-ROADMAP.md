@@ -6,6 +6,56 @@
 
 ---
 
+## 🔧 Operação em produção — 2026-08-26 — 136 convites vencidos cancelados
+
+**O que foi feito:** PATCH direto no Firestore nos campos `convites` e `ts`, marcando como
+`cancelado` os **136 convites que já tinham passado da validade mas continuavam com status
+`pendente`**. Autorizado pelo usuário.
+
+| Status | Antes | Depois |
+|---|---|---|
+| pendente | 201 | **65** (só os dentro da validade) |
+| cancelado | 52 | **188** |
+| utilizado | 160 | 160 |
+| **total** | 413 | 413 |
+
+**Verificação:** delta de exatamente +136 bytes; `dados` byte-idêntico (nenhum PG tocado, 70 slots
+intactos); os 160 utilizados byte-idênticos; releitura da nuvem idêntica ao payload montado.
+`updateTime` resultante `2026-08-26T17:42:55.875085Z`.
+
+**Os 65 válidos ficaram de fora de propósito.** O app não registra se um convite chegou a ser
+entregue, então um pendente dentro da validade pode estar no WhatsApp de alguém esperando aceite.
+
+### Achado que motivou a limpeza: convite pendente NUNCA é removido
+
+`podarConvites()` (`index.html:9854`) preserva `status === 'pendente'` **incondicionalmente**, sem
+olhar a data. A poda de 30 dias só alcança cancelado/utilizado/expirado. Existe
+`expirarConvitesVencidos()` (`index.html:9806`), que marcaria os vencidos como `expirado` — mas
+**não é chamada em lugar nenhum do app**, e mesmo se fosse só grava em `localStorage`. Resultado:
+pendente vencido acumula para sempre.
+
+Isso importa porque tudo vive num documento único com teto de 1 MB, e **o campo `convites` já era
+maior que os dados dos 70 PGs somados** (185.867 vs 152.086 bytes, ~33% do teto ocupado).
+
+### Causa raiz do lixo — NÃO CORRIGIDA
+
+Em `gerarECompartilhar()` (`index.html:10318-10341`) o `window.open` do WhatsApp roda **depois** de
+`await gerarConvite(...)`. Navegador de celular só permite abrir janela **durante** o gesto do
+usuário; depois da ida à rede a abertura é **bloqueada em silêncio**. O convite é criado, o WhatsApp
+não abre, a pessoa toca de novo — e cada toque cria mais um convite. Os outros 5 pontos do app que
+abrem o WhatsApp (linhas 3384, 3810, 3828, 4689, 8807) estão em funções sem `await` e funcionam.
+
+Morde onde o navegador é rigoroso — iPhone com o app instalado (`"display": "standalone"`). **Não
+atinge todo mundo:** em 26/08 a Coordenadora do PG 25 gerou 5 convites e 3 foram aceitos em minutos.
+O padrão do defeito é rajada de 1-5 segundos para o **mesmo** número (PG 30, 10 convites em 45s);
+rajada de 20-40s com números diferentes é uso normal.
+
+**Correção desenhada e não aplicada:** reservar a janela no instante do toque
+(`window.open('', '_blank')`), preencher o endereço depois do await, e cair num botão visível
+"Abrir o WhatsApp" + link para copiar quando o navegador bloquear mesmo assim.
+
+---
+
 ## 🔧 Operação em produção — 2026-08-26 — PG 7 renomeado para "Medicados por Deus"
 
 **O que foi feito:** PATCH direto no Firestore (doc `jdpg/grupos`), alterando **só** dois campos
