@@ -10637,6 +10637,61 @@ function registrarRetratoRemoto(lista) {
   });
 }
 
+// ── Base da nuvem por slot: o que a nuvem tinha quando este aparelho a leu ────────────────
+// Existe para responder UMA pergunta na hora de mesclar: este campo mudou AQUI, ou eu só
+// estou carregando uma cópia velha? Sem essa distinção, `lg.nome ?? rg.nome` fazia o aparelho
+// empurrar de volta nome/tutor/coordenador dos 70 PGs a cada gravação — inclusive os 69 que
+// ele nunca tocou. Foi assim que o PG 3 (duas vezes) e o PG 7 voltaram sozinhos ao nome
+// antigo, dias depois de corrigidos. Fica só no aparelho: nunca entra no payload da nuvem,
+// por isso não exige campo novo no schema nem mudança na regra do Firestore.
+const BASE_NUVEM_KEY = chaveTeste('jdpg_base_nuvem_v1');
+let baseNuvem = {};                // num → retratoIdentidade() do último estado reconciliado
+function loadBaseNuvem() {
+  try { baseNuvem = JSON.parse(localStorage.getItem(BASE_NUVEM_KEY) || '{}') || {}; }
+  catch { baseNuvem = {}; }
+}
+// Normalização IDÊNTICA à de applyGruposData (`?? null`, `|| []`, `|| false`). Se divergir,
+// um campo ausente vira null de um lado e [] do outro, a comparação acusa "mudou aqui" e a
+// proteção se desliga em silêncio — exatamente o tipo de erro que não aparece em teste raso.
+function retratoIdentidade(g) {
+  return {
+    nome: g.nome ?? null, tutor: g.tutor ?? null, coordenador: g.coordenador ?? null,
+    diaReuniao: g.diaReuniao ?? null, horaReuniao: g.horaReuniao ?? null,
+    setores: g.setores || [], status: g.status || null, institucional: g.institucional || false,
+  };
+}
+// Chamada de UM lugar só: applyGruposData(), o ponto em que o estado local passa a ser o
+// estado reconciliado (venha ele da nuvem crua ou do resultado da mesclagem). Registrar na
+// LEITURA seria cedo demais — a base já chegaria com o valor novo e a comparação não
+// distinguiria mais nada. Persistida para sobreviver a fechar e abrir o app com edição
+// pendente.
+function registrarBaseNuvem(lista) {
+  if (!Array.isArray(lista)) return;
+  lista.forEach(g => {
+    if (!g || g.num == null) return;
+    baseNuvem[g.num] = retratoIdentidade(g);
+  });
+  try { localStorage.setItem(BASE_NUVEM_KEY, JSON.stringify(baseNuvem)); }
+  catch (e) { console.warn('registrarBaseNuvem:', e); }
+}
+// Dos 8 campos, 7 são escalares e só `setores` é lista — comparação rasa dá conta.
+function mesmoValorIdentidade(a, b) {
+  if (Array.isArray(a) || Array.isArray(b)) return JSON.stringify(a || []) === JSON.stringify(b || []);
+  return (a ?? null) === (b ?? null);
+}
+// Decide UM campo de identidade na mesclagem.
+function resolverCampoIdentidade(campo, lg, rg) {
+  const base = baseNuvem[rg.num];
+  // Sem base (instalação que ainda não leu a nuvem nenhuma vez): mantém a regra antiga, para
+  // não descartar uma edição feita antes da primeira sincronização.
+  if (!base || !(campo in base)) return lg[campo] ?? rg[campo];
+  // Igual à base = este aparelho não mexeu nisso desde que viu a nuvem. Não tem opinião:
+  // deixa passar o valor remoto, seja ele qual for. É esta linha que impede o retrocesso.
+  if (mesmoValorIdentidade(lg[campo], base[campo])) return rg[campo];
+  return lg[campo] ?? rg[campo];   // divergiu da base: é edição local de verdade, prevalece
+}
+loadBaseNuvem();   // antes de qualquer mesclagem; sem isso a regra cairia no comportamento antigo
+
 // Devolve os slots que a gravação deixaria em branco depois de a nuvem tê-los com conteúdo.
 // Função separada de propósito: é a guarda que teria impedido a perda do PG 51, e precisa
 // poder ser testada sem gravar nada (ver autoTesteFase4, teste T11).
@@ -10949,6 +11004,9 @@ function applyGruposData(salvo) {
     PEQUENOS_GRUPOS[idx].institucional = g.institucional || false;
     transportarCamposPg(PEQUENOS_GRUPOS[idx], g);   // FASE 4: campos do schema novo
   });
+  // O estado local acabou de virar o estado reconciliado: é exatamente este o retrato contra
+  // o qual uma edição futura deste aparelho será reconhecida como edição de verdade.
+  registrarBaseNuvem(salvo);
 }
 
 // A2: merge de listas de participantes — une por ts para evitar perda de inscrições concorrentes
@@ -11022,19 +11080,21 @@ function mergeGruposData(remoteList, localGroups) {
       ? { semanasMarcadas: [...semanasUnidas], semanasCompletas: semanasUnidas.size }
       : (lg.pgNivel || rg.pgNivel || null);
     return { ...rg, participantes: merged, gratidoes: gratMerged, reunioesMes: filtrarReunioesMes(reunioesMerged),
-      nome: lg.nome ?? rg.nome, tutor: lg.tutor ?? rg.tutor,
-      coordenador: lg.coordenador ?? rg.coordenador,
-      diaReuniao: lg.diaReuniao ?? rg.diaReuniao,
-      horaReuniao: lg.horaReuniao ?? rg.horaReuniao,
-      setores: lg.setores ?? rg.setores,
+      // Antes: `lg.nome ?? rg.nome` — o aparelho vencia sempre que tinha valor, sem ninguém
+      // perguntar qual dos dois era o mais recente nem se ele tinha alterado alguma coisa.
+      // Agora quem decide é resolverCampoIdentidade(): só empurra o que mudou AQUI.
+      nome: resolverCampoIdentidade('nome', lg, rg),
+      tutor: resolverCampoIdentidade('tutor', lg, rg),
+      coordenador: resolverCampoIdentidade('coordenador', lg, rg),
+      diaReuniao: resolverCampoIdentidade('diaReuniao', lg, rg),
+      horaReuniao: resolverCampoIdentidade('horaReuniao', lg, rg),
+      setores: resolverCampoIdentidade('setores', lg, rg),
       campanhas: campanhasMerged,
       pgNivel: pgNivelMerged,
-      // RC6.0.1A/ADR-005: merge simples (local prevalece se definido) — mesmo padrão já usado
-      // acima para nome/tutor/coordenador/diaReuniao/horaReuniao. Não é resolução por
-      // updatedAt como participantes/gratidoes; suficiente para o escopo desta RC (infra +
-      // migração automática), revisitar se o modelo de transições (RC6.0.1B+) exigir mais.
-      status: lg.status ?? rg.status,
-      institucional: lg.institucional ?? rg.institucional,
+      // RC6.0.1A/ADR-005: seguem o mesmo padrão dos campos acima — agora por
+      // resolverCampoIdentidade(), não mais "local prevalece se definido".
+      status: resolverCampoIdentidade('status', lg, rg),
+      institucional: resolverCampoIdentidade('institucional', lg, rg),
     };
   });
 }
