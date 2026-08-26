@@ -4524,7 +4524,18 @@ function iniciarConvidarParticipanteDoPainel(grupoNum, nome) {
   const existing = document.getElementById('convidar-participante-form');
   if (existing) existing.remove();
   body.insertAdjacentHTML('afterbegin', formHtml);
+  // O formulário nasce no TOPO do painel, e o botão que o abre fica LÁ EMBAIXO, depois da lista
+  // de participantes. Num PG com muita gente o formulário aparece fora da tela: a Coordenadora
+  // toca, a visão não se mexe e, para ela, "o botão não faz nada" — nenhum convite chega a ser
+  // criado porque ela nunca alcança o campo de envio. Achado no PG 23 (Andrea, 2026-08-26): os
+  // convites dela pararam em 31/07, exatamente o dia em que o grupo chegou a 9 participantes e
+  // empurrou o botão para fora da tela.
+  // A ordem importa: renderMeusConvitesEnviados() injeta conteúdo DENTRO do formulário, então
+  // rolar antes dele deixaria o alvo no lugar errado. E a rolagem é instantânea de propósito —
+  // com `behavior:'smooth'` a animação é interrompida por essa mesma injeção e o painel parava
+  // ainda mais longe do formulário do que antes (medido: ia para 2531px em vez de ~994px).
   renderMeusConvitesEnviados(grupoNum);
+  document.getElementById('convidar-participante-form')?.scrollIntoView({ block: 'center' });
 }
 
 function renderProgramaSemanal() {
@@ -9947,9 +9958,14 @@ async function commitConviteChange(construir) {
 // participante artificial. Autoridade de coordenador aceita 2 vias equivalentes: participante
 // com papel 'tutor' (fluxo legado, ex. Wladimir) OU o Tutor administrativo autenticado no Painel
 // (ST.tutorPanelAuth) cujo nome bate com g.tutor — comparação normalizada.
+// RC-REST-02 (completado em 2026-08-26): a comparação aqui era ESTRITA (`===`), enquanto o botão
+// que oferece a ação usa nomesCorrespondem() desde 2026-08-04. Os dois discordavam: quem loga no
+// Painel com nome curto ou com acento diferente VIA o botão e levava "Você não tem permissão para
+// gerar este convite" ao tocar nele. O fix de 04/08 arrumou os botões e esqueceu estas duas
+// funções — que são justamente a autoridade de verdade.
 function souTutorAdminDoGrupo(gLocal) {
   return !!ST.tutorPanelAuth && !!gLocal.tutor &&
-    String(ST.tutorPanelAuth).trim().toLowerCase() === String(gLocal.tutor).trim().toLowerCase();
+    nomesCorrespondem(String(ST.tutorPanelAuth).trim().toLowerCase(), String(gLocal.tutor).trim().toLowerCase());
 }
 // Mesmo raciocínio de souTutorAdminDoGrupo, para o Coordenador: cobre o caso (achado em
 // PG1/PG2/PG10, 2026-08-14) de alguém ser o Coordenador de verdade (g.coordenador) e estar
@@ -9958,7 +9974,7 @@ function souTutorAdminDoGrupo(gLocal) {
 // ela fica impedida de convidar participantes mesmo sendo a Coordenadora legítima.
 function souCoordenadorAdminDoGrupo(gLocal) {
   return !!ST.tutorPanelAuth && !!gLocal.coordenador &&
-    String(ST.tutorPanelAuth).trim().toLowerCase() === String(gLocal.coordenador).trim().toLowerCase();
+    nomesCorrespondem(String(ST.tutorPanelAuth).trim().toLowerCase(), String(gLocal.coordenador).trim().toLowerCase());
 }
 
 async function gerarConvite({ tipo, grupoNum, funcao, paraWa }) {
