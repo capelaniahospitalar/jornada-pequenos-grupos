@@ -6,6 +6,54 @@
 
 ---
 
+## 🔧 Correções de convite — 2026-08-26 (commit `4577d0d`, publicado 16h23)
+
+Duas correções no mesmo commit, ambas sobre "não consigo convidar".
+
+### 1. Formulário de convite abria fora da tela — **era a causa do PG 23**
+
+`iniciarConvidarParticipanteDoPainel()` insere o formulário com `insertAdjacentHTML('afterbegin')`,
+ou seja **no topo** do painel. O botão "🔗 Convidar Participante" fica **no fim**, depois da lista
+inteira de participantes, e não havia rolagem ligando os dois. Num PG com 9 pessoas o formulário
+abria **1275px acima da tela**: a coordenadora toca, a tela não se mexe, e conclui que o botão não
+funciona. Como ela nunca alcança o campo, **nenhum convite chega a ser criado**.
+
+**Prova na linha do tempo:** o último convite da Andrea (PG 23) é de 31/07 07h49 — o mesmo dia em
+que o grupo saltou para 9 participantes. O defeito nasceu quando o PG cresceu e empurrou o botão
+para fora da tela. Os dados dela estavam impecáveis; nunca foi autoridade.
+
+**Fix:** `renderMeusConvitesEnviados()` primeiro, depois `scrollIntoView({ block: 'center' })`.
+**Duas decisões a preservar:** (a) a ordem é obrigatória, porque `renderMeusConvitesEnviados`
+injeta conteúdo DENTRO do formulário e rolar antes erra o alvo; (b) a rolagem é **instantânea de
+propósito** — com `behavior:'smooth'` a animação é interrompida por essa injeção e o painel parava
+**mais longe** do que antes (2531px em vez de ~994px). Testado com listas de 600, 1800 e 3000px.
+
+### 2. Autorização usava comparação de nome estrita (não era o caso do PG 23)
+
+O botão usa `nomesCorrespondem()` desde 2026-08-04 (aceita nome curto e acento diferente), mas
+`souTutorAdminDoGrupo()` e `souCoordenadorAdminDoGrupo()` — a autoridade de verdade — continuavam
+com `===`. Os dois discordavam: quem loga no Painel como "Andrea" ou "Andréa" **via o botão** e
+levava *"Você não tem permissão para gerar este convite"* ao tocar. O fix de 04/08 arrumou os
+botões e esqueceu estas duas funções.
+
+Contraste medido: `Andrea` e `Andréa Rodrigues de Freitas` passaram de **barrado** para **pode**;
+`André Rodrigues de Freitas` — pessoa real e distinta, irmão da Andrea, no mesmo PG 23 — continua
+corretamente **barrado**. A correção não alargou demais.
+
+### Já são quatro causas distintas para "não consigo convidar"
+
+| # | Causa | Sintoma que a distingue |
+|---|---|---|
+| 1 | Autoridade (14/08) | convite **não** é criado |
+| 2 | WhatsApp não normalizado (24/08) | convite criado, WhatsApp recusa o destino |
+| 3 | `window.open` depois do `await` (26/08) | convite criado, WhatsApp não abre |
+| 4 | Formulário fora da tela (26/08) | convite **não** é criado, botão "não faz nada" |
+
+**Triagem:** conferir primeiro se o convite existe no Firestore. Se existe → é entrega (2 ou 3). Se
+não existe → é 1 ou 4, e **pedir uma foto da tela separa os dois** mais rápido do que auditar dado.
+
+---
+
 ## 🔧 Correção de raiz — 2026-08-26 — fim do retrocesso de nome/tutor (commit `f622375`)
 
 **O defeito que morreu aqui:** `mergeGruposData()` decidia os campos de identidade com
