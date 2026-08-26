@@ -1,8 +1,38 @@
-# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-08-21)
+# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-08-26)
 
 > Documento para retomar o trabalho em outra máquina/sessão. Cole o conteúdo de volta
 > para o assistente ao recomeçar — a "memória" do assistente **não viaja entre máquinas**;
 > só este arquivo (via GitHub) viaja. **Nenhuma alteração de código sem aprovação do desenho.**
+
+---
+
+## 🔧 Operação em produção — 2026-08-26 — PG 7 renomeado para "Medicados por Deus"
+
+**O que foi feito:** PATCH direto no Firestore (doc `jdpg/grupos`), alterando **só** dois campos
+escalares do slot 7. Autorizado pelo usuário antes da montagem da operação.
+
+| Campo | Antes | Depois |
+|---|---|---|
+| `nome` | `Plantão B Hotelaria` | `Medicados por Deus` |
+| `tutor` | `Wladimir Gonçalves` | `Renan Fernando Castro silva` |
+
+`coordenador` (`Joao Ricardo`), o participante dele (inscrito 21/08/2026), `status`, dia e hora de
+reunião ficaram intactos. Grafia do tutor padronizada com a dos outros 11 PGs dele, para não criar
+um segundo "Renan" nos relatórios.
+
+**Verificação:** delta de exatamente +6 bytes na string `dados`; prefixo e sufixo idênticos byte a
+byte; 70 slots preservados, `num` 1–70 sem furo; contagem de `memberId` (230), chaves e aspas
+inalterada; releitura da nuvem idêntica ao payload montado. `updateTime` resultante
+`2026-08-26T16:54:31.787110Z`.
+
+**Causa do problema:** é a reversão fantasma de [`mergeGruposData`](index.html) (`lg.nome ?? rg.nome`),
+**ainda não corrigida**. O slot 7 foi esvaziado em 20/08 por ser duplicata do 13; em 21/08 o João
+Ricardo criou o PG dele nesse slot livre; depois, um aparelho com cópia velha do slot 7 salvou algo e
+ressuscitou nome e tutor antigos por cima. **Pode acontecer de novo** enquanto os campos escalares não
+tiverem `updatedAt` próprio.
+
+**Resíduo que continua de pé:** o PG **13** segue como `Plantão B Hotelaria`, vazio, sem coordenador —
+é o registro original desse nome. O conflito de nomes 7 × 13 deixou de existir.
 
 ---
 
@@ -161,7 +191,7 @@ duplicidade real, dois são falsos:**
 | **Foco no alto — 2 × 38** | 38 é resíduo: nunca teve coordenador aceito, nunca teve pessoa, sem histórico |
 | **FORTALEZA — 41 × 45** | 45 é resíduo, mesmos critérios |
 | **Limpando corações — 25 × 48 × 49** | 49 é o real; **48 é resíduo** (convite criado 1 min antes do 49, que deu certo); **25 é OUTRO grupo** — outro tutor, outro dia (quarta 10h), outra coordenadora, sem nenhum convite registrado |
-| **Plantão B Hotelaria — 7 × 13** | **FALSO.** O slot 7 é um PG criado em 21/08 cujo nome foi sobrescrito pela reversão. O 13 é resíduo real |
+| **Plantão B Hotelaria — 7 × 13** | **FALSO**, e **corrigido em 2026-08-26**: o slot 7 é o PG "Medicados por Deus" (nome sobrescrito pela reversão, restaurado por PATCH). O 13 é resíduo real |
 | **Manutenção da Fé — 5 × 32** | **FALSO.** O slot 32 é o REFUGIO ILUMINADO criado em 21/08; nome sobrescrito pela reversão |
 
 **Provas colhidas para os resíduos 13, 38, 45 e 48:** zero participantes ativos, zero registros de
@@ -529,7 +559,7 @@ anterior deixa de ser o referencial oficial.
 **Pendências herdadas da auditoria de 2026-08-04/05 (ainda não aplicadas):**
 1. PG 38 (duplicata de "Foco no Alto" com PG 2) — zerar. **Confirmado pelo usuário em 2026-08-04.**
 2. PG 32 (duplicata de "Manutenção da Fé" com PG 5) — zerar. **Achado, ainda não confirmado.**
-3. PG 7 × PG 13 ("Plantão B Hotelaria", ambos vazios) — decidir qual mantém o slot. **Pendente.**
+3. PG 7 × PG 13 ("Plantão B Hotelaria") — **RESOLVIDO em 2026-08-26**: o slot 7 é o PG real "Medicados por Deus" (coord. Joao Ricardo, tutor Renan) e foi renomeado; o 13 continua vazio, é o resíduo. Ver a seção de operação no topo deste arquivo.
 
 **Próxima ação:** revisar o diff do `index.html` (RC6.0.1A) → decidir commit/publicação → só
 depois considerar RC6.0.1B (ligar a flag, homologar, remover lógica antiga por trás dela). As
