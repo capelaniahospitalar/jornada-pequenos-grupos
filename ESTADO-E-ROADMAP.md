@@ -50,7 +50,7 @@ atinge todo mundo:** em 26/08 a Coordenadora do PG 25 gerou 5 convites e 3 foram
 O padrão do defeito é rajada de 1-5 segundos para o **mesmo** número (PG 30, 10 convites em 45s);
 rajada de 20-40s com números diferentes é uso normal.
 
-**Correção desenhada e não aplicada:** reservar a janela no instante do toque
+**CORREÇÃO APLICADA e publicada em 2026-08-26** (commit `0f5f0f0`): reservar a janela no instante do toque
 (`window.open('', '_blank')`), preencher o endereço depois do await, e cair num botão visível
 "Abrir o WhatsApp" + link para copiar quando o navegador bloquear mesmo assim.
 
