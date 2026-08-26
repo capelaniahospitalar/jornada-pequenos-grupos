@@ -10323,8 +10323,17 @@ async function gerarECompartilhar(funcao, grupoNum) {
   // criado do mesmo jeito e o WhatsApp abria num destino que ele recusa — para quem convida,
   // isso é indistinguível de "o botão não funciona" (ver normalizarWaBR, caso do PG 30).
   if (waBruto && !paraWa) { alert(AVISO_WA_INVALIDO + '\n\nNenhum convite foi criado.'); return; }
+  // O WhatsApp precisa ser aberto DURANTE o toque do dedo. Depois do await abaixo (ida à rede
+  // para gravar o convite) o navegador considera o gesto encerrado e bloqueia a abertura EM
+  // SILÊNCIO — o convite fica criado e nada acontece na tela, então a pessoa toca de novo e
+  // gera outro convite. Foi o caso do PG 30 em 26/08: 10 convites em 45s para o mesmo número.
+  // Por isso a janela é reservada aqui, ainda dentro do gesto, e só recebe o endereço quando o
+  // convite fica pronto. Em MODO_TESTE não se reserva nada: a neutralização do WhatsApp vive
+  // em window.open, e atribuir location.href numa janela reservada passaria por cima dela.
+  const janela = MODO_TESTE ? null : window.open('', '_blank');
   const res = await gerarConvite({ grupoNum, funcao, paraWa });
   if (!res.ok) {
+    if (janela) janela.close();   // devolve o foco ao app antes do alert
     // E1: os quatro motivos novos do contrato de gravação têm texto próprio — nenhum deles
     // pode cair no genérico, senão uma guarda acionada vira "tente novamente" sem explicação.
     const map = { sem_autoridade: 'Você não tem permissão para gerar este convite.', sem_conexao: 'Sem conexão. Verifique sua internet e tente novamente.', conflito: 'Muitas alterações ao mesmo tempo. Tente novamente.',
@@ -10337,8 +10346,47 @@ async function gerarECompartilhar(funcao, grupoNum) {
   }
   const texto = textoConviteWhatsApp(res.invite) + '\n\n' + res.link;
   const destino = res.invite.paraWa ? res.invite.paraWa : '';
-  window.open('https://wa.me/' + destino + '?text=' + encodeURIComponent(texto), '_blank');
+  const url = 'https://wa.me/' + destino + '?text=' + encodeURIComponent(texto);
+  if (janela) janela.location.href = url;
+  // Sem janela reservada: em MODO_TESTE isto cai no interceptador e mostra a prévia (correto).
+  // Fora dele, se o navegador recusar também esta abertura, a falha NUNCA fica silenciosa —
+  // a pessoa recebe um botão para tocar (gesto novo, sempre permitido) e o link para copiar.
+  else if (!window.open(url, '_blank') && !MODO_TESTE) ofertarEnvioConvite(url, res.link);
   renderMeusConvitesEnviados(grupoNum);
+}
+
+// Rede de segurança do envio: o convite JÁ está criado e gravado; só a abertura do WhatsApp
+// falhou. Mesma construção da prévia do modo teste (createElement + textContent, nunca HTML
+// interpolado) para não abrir porta de injeção com texto vindo do nome do grupo.
+function ofertarEnvioConvite(url, link) {
+  const fundo = document.createElement('div');
+  fundo.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100000;display:flex;align-items:center;justify-content:center;padding:1rem';
+  const caixa = document.createElement('div');
+  caixa.style.cssText = 'background:#fff;border-radius:12px;max-width:520px;width:100%;padding:1rem;font-family:system-ui,sans-serif';
+  const cabecalho = document.createElement('div');
+  cabecalho.style.cssText = 'font-weight:700;font-size:16px;color:#0D2137;margin-bottom:.35rem';
+  cabecalho.textContent = '✅ Convite criado';
+  const explica = document.createElement('div');
+  explica.style.cssText = 'font-size:14px;color:#555;margin-bottom:.75rem';
+  explica.textContent = 'Seu celular não deixou o aplicativo abrir o WhatsApp sozinho. Toque no botão abaixo para abrir, ou copie o link e envie como preferir. NÃO gere outro convite — este aqui já vale.';
+  const abrir = document.createElement('button');
+  abrir.style.cssText = 'width:100%;padding:.8rem;border:none;border-radius:8px;background:#25D366;color:#fff;font-size:16px;font-weight:700;cursor:pointer;margin-bottom:.6rem';
+  abrir.textContent = '📲 Abrir o WhatsApp';
+  abrir.onclick = () => { window.open(url, '_blank'); fundo.remove(); };
+  const rotulo = document.createElement('div');
+  rotulo.style.cssText = 'font-size:13px;color:#555;margin-bottom:.25rem';
+  rotulo.textContent = 'Ou copie este link:';
+  const caixaLink = document.createElement('input');
+  caixaLink.readOnly = true; caixaLink.value = link;
+  caixaLink.style.cssText = 'width:100%;background:#F5F5F5;border:0.5px solid #DDD;border-radius:8px;padding:.6rem;font-size:13px;margin-bottom:.75rem;font-family:system-ui,sans-serif';
+  caixaLink.onclick = () => caixaLink.select();
+  const fechar = document.createElement('button');
+  fechar.style.cssText = 'width:100%;padding:.6rem;border:none;border-radius:8px;background:#0D2137;color:#fff;font-size:15px;cursor:pointer';
+  fechar.textContent = 'Fechar';
+  fechar.onclick = () => fundo.remove();
+  caixa.append(cabecalho, explica, abrir, rotulo, caixaLink, fechar);
+  fundo.appendChild(caixa);
+  document.body.appendChild(fundo);
 }
 
 // Lista dos convites pendentes que EU enviei, com opção de revogar.
