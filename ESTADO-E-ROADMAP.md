@@ -6,6 +6,44 @@
 
 ---
 
+## 🔧 2026-08-26 — Painel some para PG em slot além da versão instalada (commit `59fb2d2`)
+
+**PG 53 "Cuide-se na Palavra"** (coordenadora Gabrielle Kristian, tutor Renan): o botão
+"🧑‍🏫 Painel do Tutor/Coordenador" não aparecia no app dela.
+
+**Causa — não era dado nem autoridade.** `getMinhaFuncaoNoGrupo(num)` começa com
+`PEQUENOS_GRUPOS.find(x => x.num === num)` e devolve `null` se o slot não existir naquela build.
+`applyGruposData` também ignora slot desconhecido (`if (idx < 0) return;`): o grupo vem da nuvem, é
+preservado em `fbGruposPreservados` para não sumir na gravação, mas **nunca entra no estado local**.
+Num aparelho com a versão anterior à ampliação de 50→70 slots (19/08) em cache, o slot 53
+simplesmente não existe — e o botão some **em silêncio**.
+
+**Prova por contraste** (app real, vínculo real dela):
+
+| Build no aparelho | `getMinhaFuncaoNoGrupo(53)` | Botão |
+|---|---|---|
+| atual, 70 slots | `coordenador` | aparece |
+| anterior a 19/08, 50 slots | **`null`** | **some** |
+
+Os dados na nuvem estavam corretos: registro único, `papel`/`tipo` = coordenador, e ela aceitou o
+convite do Renan **duas vezes** (25/08 14h04 e 26/08 09h11), ambas com o mesmo memberId.
+
+**Remédio para a pessoa: furar o cache** — abrir o link com `?v=2`, ou limpar o cache do navegador.
+
+**Mitigação em código:** `renderShareArea()` passou a aceitar também o `papel` do vínculo guardado
+no próprio aparelho, além de `getMinhaFuncaoNoGrupo()`. Mostrar o botão não concede nada — o Painel
+tem login próprio e `getGruposDoResponsavel` só lista os PGs de quem responde por eles. Testado:
+coordenadora com slot desconhecido → aparece (antes sumia); participante comum → não aparece, com ou
+sem o slot.
+
+**LIMITE:** a mitigação é código novo, então **não alcança quem está preso na build velha** — serve
+para a próxima vez que os slots crescerem. Quem está com a versão antiga precisa atualizar.
+
+**Regra de diagnóstico nova:** PG em slot alto + "sumiu botão/tela" + dados corretos na nuvem ⇒
+suspeitar de **build antiga em cache** antes de procurar defeito de lógica.
+
+---
+
 ## 🔧 Correções de convite — 2026-08-26 (commit `4577d0d`, publicado 16h23)
 
 Duas correções no mesmo commit, ambas sobre "não consigo convidar".
