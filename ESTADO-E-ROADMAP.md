@@ -6,6 +6,51 @@
 
 ---
 
+## 🔧 Correção de raiz — 2026-08-26 — fim do retrocesso de nome/tutor (commit `f622375`)
+
+**O defeito que morreu aqui:** `mergeGruposData()` decidia os campos de identidade com
+`lg.nome ?? rg.nome` — o aparelho vencia sempre que tinha valor, sem ninguém perguntar qual dos
+dois era mais recente **nem se aquele aparelho tinha alterado alguma coisa**. Como cada celular
+guarda uma cópia dos 70 slots, qualquer gravação (até uma gratidão no mural) reempurrava o
+nome/tutor/coordenador de todos eles. Foi a causa das reversões do PG 3 (duas vezes) e do PG 7.
+
+**A regra nova, em uma frase: o aparelho só empurra de volta o que ele mesmo mudou.**
+
+Cada aparelho passa a guardar um retrato dos 8 campos de identidade
+(`nome, tutor, coordenador, diaReuniao, horaReuniao, setores, status, institucional`) no momento
+em que se acertou com a nuvem. Na mesclagem, por campo:
+
+| Situação | Decisão |
+|---|---|
+| local **igual** ao retrato | este aparelho não mexeu → passa o valor da **nuvem** |
+| local **diferente** do retrato | edição local de verdade → prevalece o **local** |
+| sem retrato (instalação nova) | regra antiga, para não descartar edição pré-sincronização |
+
+**O retrato nunca sai do aparelho** (localStorage, com prefixo de modo teste). Essa escolha evitou
+três armadilhas conhecidas de uma vez: as 5 funções de envio que precisam listar campo novo do
+grupo, a allowlist da regra do Firestore, e o app antigo apagando campo que não conhece.
+
+**Dois erros de desenho corrigidos antes de publicar:**
+1. O retrato era gravado na **leitura** (`fbReadDoc`) — cedo demais: chegaria já com o valor novo e
+   a comparação não distinguiria nada. Movido para `applyGruposData()`, o ponto em que o estado
+   local vira o estado reconciliado.
+2. A normalização precisa ser **idêntica** à de `applyGruposData` (`?? null`, `|| []`, `|| false`).
+   Divergindo, um campo ausente vira `null` de um lado e `[]` do outro, a comparação acusa "mudou
+   aqui" e a proteção se desliga em silêncio.
+
+**Validação** (servidor local + `?teste=1`): os 38 testes internos seguem passando (11 + 27) e 5
+cenários dirigidos — cópia velha que não editou (nuvem sobrevive ✅), edição legítima (preservada
+✅), sem retrato (regra antiga ✅), campos ausentes (✅), participantes ainda **unidos** e não
+substituídos (✅). Prova por contraste: mesma entrada, regra antiga devolve "Plantão B Hotelaria",
+regra nova devolve "Medicados por Deus".
+
+**LIMITE, e é importante:** a proteção mora no código, então **só vale nos aparelhos que já
+carregaram esta versão**. Um celular com o app antigo aberto ainda pode reverter. Não há service
+worker prendendo versão velha (o app até desregistra os que acha), então cada pessoa pega a
+correção ao recarregar — convergência em dias, não instantânea.
+
+---
+
 ## 🔧 Operação em produção — 2026-08-26 — 136 convites vencidos cancelados
 
 **O que foi feito:** PATCH direto no Firestore nos campos `convites` e `ts`, marcando como
@@ -56,14 +101,14 @@ rajada de 20-40s com números diferentes é uso normal.
 
 ---
 
-## 🔧 Operação em produção — 2026-08-26 — PG 7 renomeado para "Medicados por Deus"
+## 🔧 Operação em produção — 2026-08-26 — PG 7 renomeado para "MEDICADOS POR CRISTO"
 
 **O que foi feito:** PATCH direto no Firestore (doc `jdpg/grupos`), alterando **só** dois campos
 escalares do slot 7. Autorizado pelo usuário antes da montagem da operação.
 
 | Campo | Antes | Depois |
 |---|---|---|
-| `nome` | `Plantão B Hotelaria` | `Medicados por Deus` |
+| `nome` | `Plantão B Hotelaria` | `Medicados por Deus` (de manhã) → **`MEDICADOS POR CRISTO`** (definitivo, 15h37) |
 | `tutor` | `Wladimir Gonçalves` | `Renan Fernando Castro silva` |
 
 `coordenador` (`Joao Ricardo`), o participante dele (inscrito 21/08/2026), `status`, dia e hora de
@@ -1793,3 +1838,22 @@ etapa por vez** → testes de regressão → commit isolado e documentado → at
 só então a próxima etapa. Nenhuma refatoração massiva sem pontos de controle. O assistente deve
 continuar questionando decisões inconsistentes e reportando riscos/dependências ocultas antes de
 implementar, mesmo com essa autorização mais ampla.
+
+---
+
+## 📌 Nome oficial do PG 7 — "MEDICADOS POR CRISTO"
+
+Fechado em 2026-08-26. O slot passou por três nomes no mesmo dia e isso confunde quem ler os
+registros depois:
+
+1. `Plantão B Hotelaria` — reversão fantasma, nunca foi o nome deste PG
+2. `Medicados por Deus` — gravado pela manhã, a pedido do usuário
+3. **`MEDICADOS POR CRISTO`** — **nome oficial**, gravado às 15h37
+
+A decisão veio de uma evidência: o `grupoNome` congelado nos convites que o próprio João Ricardo
+criou em 21/08 dizia "MEDICADOS POR CRISTO", ou seja, foi o que ele digitou ao criar o grupo. O
+usuário optou por manter a grafia dele, em maiúsculas.
+
+Gravação verificada: delta de +2 bytes, `convites` byte-idêntico, 70 slots intactos, releitura
+conferindo com o payload. Tutor `Renan Fernando Castro silva` e coordenador `Joao Ricardo`
+inalterados.
