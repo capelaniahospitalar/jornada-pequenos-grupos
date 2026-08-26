@@ -6539,7 +6539,15 @@ function renderLevelCard() {
 function renderShareArea() {
   const mg = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
   const funcao = mg ? getMinhaFuncaoNoGrupo(mg.grupoNum) : null;
-  const souGerenteDoGrupo = funcao === 'tutor' || funcao === 'coordenador';
+  // O vínculo guardado no próprio aparelho também vale como prova de papel. Sem isto, quem é
+  // Tutor/Coordenador de um PG em slot que a VERSÃO INSTALADA não conhece fica sem o botão, em
+  // silêncio: getMinhaFuncaoNoGrupo() procura o grupo em PEQUENOS_GRUPOS e devolve null quando o
+  // slot não existe naquela build. Foi o caso do PG 53 (Gabrielle, 2026-08-26) num aparelho com a
+  // versão anterior à ampliação de 50→70 slots (19/08) em cache. Mostrar o botão não concede nada:
+  // o Painel tem login próprio e só lista os PGs de quem realmente responde por eles.
+  const funcaoNoVinculo = mg && mg.papel;
+  const souGerenteDoGrupo = funcao === 'tutor' || funcao === 'coordenador'
+    || funcaoNoVinculo === 'tutor' || funcaoNoVinculo === 'coordenador';
   // ARCH-01: o Tutor autentica pela allowlist, não como "participante" de um PG — por isso
   // ST.tutorPanelAuth (já logado no Painel alguma vez neste aparelho) também dá acesso ao botão,
   // mesmo sem vínculo de participante com papel tutor/coordenador em nenhum grupo.
