@@ -6,7 +6,7 @@
 
 ---
 
-## 🔧 2026-08-27 — "Copiar link" nos convites pendentes (PG 50) — **aguardando commit**
+## 🔧 2026-08-27 — "Copiar link" nos convites pendentes (PG 50) — **PUBLICADO** (commit `34ce7ba`)
 
 **Quarta causa distinta de "não consigo convidar".** As três anteriores estão registradas nos
 comentários de `gerarECompartilhar()`: autoridade por comparação de nome (14/08), número de WhatsApp
@@ -60,6 +60,11 @@ hoje o link só é enviado depois da gravação confirmada. Decisão de desenho,
 o convite existia, valia, e **não havia caminho na tela até o link**. A rede de segurança de 26/08
 (`ofertarEnvioConvite`) só entra quando `window.open` devolve `null`; no caso dela a aba **abriu**,
 só foi parar no lugar errado.
+
+**Publicação verificada:** commit `34ce7ba`, GitHub Pages serviu a versão nova em 27/08 12h45 GMT
+(conferido por `curl` com o cache furado; o arquivo no ar é idêntico ao local, tirando fim de linha
+CRLF×LF). Ver [[cache-github-pages-versao-antiga]] — o cache do aparelho de cada pessoa é outra
+camada, e continua exigindo `?v=2`.
 
 **Correção aplicada** (`index.html`, +14/−3, só `renderMeusConvitesEnviados`): botão **📋 Copiar
 link** em cada linha + uma linha de orientação sob o título. Reaproveita `copyLink()`, que já existia
