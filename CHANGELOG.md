@@ -1,5 +1,51 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-08-27] — "📋 Copiar link" nos convites pendentes: saída para quando o WhatsApp não abre
+
+**Mudança de exibição, isolada.** Não altera gravação, permissão, papéis, Firebase, geração de
+convite nem regra de negócio. Uma função tocada (`renderMeusConvitesEnviados`), +14/−3 linhas.
+
+**Achado de campo.** A Coordenadora do PG 50 (Nutrição, ADRIANE DOS SANTOS DA SILVA, tutor Uálace
+Costa) não conseguia convidar colaboradores: ao tocar no botão, o celular abria a **página de
+download do WhatsApp**. Entre 08h42 e 08h46 de 27/08 ela gerou **6 convites**, nenhum aceito.
+
+**Diagnóstico — não era o app, e não era dado.** O PG 50 estava impecável (`papel`/`tipo` de
+coordenador, `memberId` e WhatsApp válidos) e os convites **estavam sendo criados**. Duas outras
+coordenadoras usaram o mesmo caminho na mesma versão na mesma manhã e **tiveram convites aceitos**
+(Fabiana/PG 19: 4 gerados, 1 aceito · Sérgio/PG 22: 9 gerados, 2 aceitos). Ela ainda tentou 2 vezes
+com o número preenchido — número válido, mesmo resultado. O que falhou foi o **celular dela entregar
+o link ao aplicativo WhatsApp**; sem aplicativo para onde ir, o `wa.me` cai na própria página de
+download.
+
+**O buraco que isso revelou — este sim é nosso.** A lista "Convites pendentes que você enviou" só
+oferecia **Revogar**. O convite existia, era válido, e **não havia nenhum caminho na tela até o
+link**. A rede de segurança criada em 26/08 (`ofertarEnvioConvite`, que mostra o link) só aparece
+quando `window.open` devolve `null` — e no caso dela a aba **abriu**, apenas foi parar no lugar
+errado. Quarta causa distinta do sintoma "não consigo convidar".
+
+**A correção.** Cada linha da lista ganhou um botão **📋 Copiar link**, ao lado do "Revogar". Mais
+uma linha de orientação sob o título: *"Se o WhatsApp não abrir sozinho, copie o link aqui e envie
+como preferir."* Reaproveita a função `copyLink()`, que já existia no código e **nunca era chamada**
+— não foi criada função nova. Um único ponto conserta os dois caminhos (tela "Convidar" da Home e
+Painel do Coordenador), porque ambos renderizam no mesmo `#meus-convites`.
+
+**Testes de aceitação (todos aprovados).** Servidor local + `?teste=1` (modo isolado, sem leitura
+nem escrita no Firebase — confirmado `listarEscritasBloqueadas() == []` ao final).
+
+| # | Cenário | Resultado |
+|---|---|---|
+| 1 | Bateria interna de regressão | **38 testes, zero falhas** (11 Fase 4 + 27 E1/E2) |
+| 2 | Lista com 3 convites pendentes | os 3 renderizam com os 2 botões |
+| 3 | Amarração botão↔convite | cada botão leva o `inviteId` da **própria** linha; "Revogar" inalterado |
+| 4 | Área de transferência **negada** pelo navegador | cai no plano B e mostra o link exato — nunca falha calado |
+| 5 | Área de transferência disponível | copia o link certo + aviso "✅ Link copiado!" |
+| 6 | Tela de celular (375px) | sem estouro horizontal; os botões **descem para a 2ª linha** em vez de espremer o texto |
+| 7 | Separação dos botões | 9px de folga entre "Copiar link" e "Revogar" — sem risco de toque errado |
+
+**Observação registrada (não corrigida):** os dois botões têm 25px de altura — abaixo dos 44px
+recomendados para toque. O botão novo **copia a medida do "Revogar" que já existia**, de propósito,
+para não introduzir inconsistência; aumentar os dois é decisão à parte.
+
 ## [2026-08-18] — Correção A: a sincronização deixa de apagar alterações que ainda não subiram
 
 **Correção A, isolada.** Não altera telas, textos, ranking, IMD nem regra de negócio. Corrige uma

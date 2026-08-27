@@ -1,8 +1,88 @@
-# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-08-26)
+# Estado do Projeto Rocha — Handoff de sessão (atualizado 2026-08-27)
 
 > Documento para retomar o trabalho em outra máquina/sessão. Cole o conteúdo de volta
 > para o assistente ao recomeçar — a "memória" do assistente **não viaja entre máquinas**;
 > só este arquivo (via GitHub) viaja. **Nenhuma alteração de código sem aprovação do desenho.**
+
+---
+
+## 🔧 2026-08-27 — "Copiar link" nos convites pendentes (PG 50) — **aguardando commit**
+
+**Quarta causa distinta de "não consigo convidar".** As três anteriores estão registradas nos
+comentários de `gerarECompartilhar()`: autoridade por comparação de nome (14/08), número de WhatsApp
+não normalizado (24/08) e `window.open` bloqueado depois do `await` (26/08).
+
+**O caso.** PG 50 "Nutrição", coordenadora ADRIANE DOS SANTOS DA SILVA, tutor Uálace Costa. Ao tocar
+no botão de convidar, o celular dela (Android) abria a **página de download do WhatsApp**. Seis
+convites entre 08h42 e 08h46, nenhum aceito.
+
+**Como se descartou app e dado — método reutilizável.** Comparação com quem usou o mesmo caminho na
+mesma versão na mesma manhã:
+
+| Coordenador | Convites em 27/08 | Aceitos |
+|---|---|---|
+| Fabiana (PG 19), 08h05–08h10 | 4 | **1** ✅ |
+| Sérgio (PG 22), 09h20–09h24 | 9 | **2** ✅ |
+| **Adriane (PG 50), 08h42–08h46** | 6 | **0** ❌ |
+
+Dados do PG 50 impecáveis; convites sendo criados normalmente; duas tentativas com número válido
+(`5521981845125`) deram no mesmo. Logo: o que falhou foi o **aparelho dela entregar o link ao
+aplicativo WhatsApp**. Sem aplicativo de destino, o `wa.me` cai na própria página de download.
+**O usuário confirmou em 27/08: o WhatsApp ESTÁ instalado no celular da Adriane.** Isso **mata** a
+hipótese "não tem aplicativo de destino" e muda o suspeito principal.
+
+**Novo suspeito principal — pode ser regressão da própria correção de 26/08 (`0f5f0f0`).** Aquela
+correção reserva uma aba em branco DURANTE o toque (`window.open('', '_blank')`) e só define o
+endereço DEPOIS do `await` da gravação (`janela.location.href = url`). Essa navegação é
+**programática**: não carrega a credencial de "dedo do usuário". O Chrome no Android **recusa
+entregar a um aplicativo instalado** navegações sem gesto — então o `wa.me` abre como página da web
+e, **sem número no endereço**, essa página é a de download. Encaixa com o caso ser dependente de
+aparelho (no iPhone/Safari o comportamento é outro, e foi lá que a correção de 26/08 resolveu).
+
+**NÃO é conclusão, é hipótese.** Não dá para verificar pelos dados: o app detecta iOS
+(`index.html:2916`) mas **não guarda nem sincroniza nada sobre o aparelho**, então não há como saber
+se a Fabiana e o Sérgio — que conseguiram no mesmo dia — estavam em iPhone ou Android.
+
+**Teste que separa as duas explicações (a Adriane faz sozinha, custa um toque):** digitar
+`wa.me/5521981845125` direto na barra de endereço do navegador dela e confirmar.
+· Abriu o WhatsApp ⇒ o aparelho dela entrega links normalmente ⇒ **o problema é a nossa navegação
+programática**.
+· Ficou na página da web / download ⇒ é configuração do aparelho dela (links compatíveis desligados
+para o WhatsApp) ⇒ nosso código está limpo.
+
+**Não reverter a correção de 26/08** — ela conserta o iPhone. Se a hipótese se confirmar, o conserto
+certo é outro: gerar o `inviteId` no próprio aparelho ANTES da ida à rede, para que o endereço final
+já seja conhecido no instante do toque e a abertura aconteça dentro do gesto. **Contrapartida a
+pesar antes:** se a gravação falhar depois disso, a pessoa terá enviado um link que não funciona —
+hoje o link só é enviado depois da gravação confirmada. Decisão de desenho, não iniciada.
+
+**O defeito que era nosso.** A lista "Convites pendentes que você enviou" só oferecia **Revogar** —
+o convite existia, valia, e **não havia caminho na tela até o link**. A rede de segurança de 26/08
+(`ofertarEnvioConvite`) só entra quando `window.open` devolve `null`; no caso dela a aba **abriu**,
+só foi parar no lugar errado.
+
+**Correção aplicada** (`index.html`, +14/−3, só `renderMeusConvitesEnviados`): botão **📋 Copiar
+link** em cada linha + uma linha de orientação sob o título. Reaproveita `copyLink()`, que já existia
+no código e **nunca era chamada** (era código morto) — nenhuma função nova. Um ponto só conserta os
+dois caminhos (Home e Painel), porque ambos renderizam em `#meus-convites`.
+
+**Decisão do usuário:** copiar **só o link**, não a mensagem inteira. Motivo: o plano B (quando o
+navegador nega a área de transferência) é uma caixinha de **uma linha**, que exibe um endereço
+inteiro mas cortaria um texto de várias linhas — e é justamente em aparelho problemático que esse
+plano B precisa valer.
+
+**Testado** (servidor local + `?teste=1`, isolado): 38 testes internos sem falha · os dois caminhos
+da cópia provados, inclusive o de **falha** (navegador negou a área de transferência e o app mostrou
+o link exato) · cada botão amarrado ao convite da própria linha · 375px sem estouro, botões descem
+para a 2ª linha quando não cabem · `listarEscritasBloqueadas() == []`. Detalhamento no `CHANGELOG.md`.
+
+**Socorro dado à Adriane enquanto não publica:** o convite `cf348e81-0542-42b7-bb5b-487b9034205e`
+(pendente, válido até 03/09 08h46) entregue como link direto. Convite é de **uso único** — serve
+para uma pessoa só.
+
+**Observação registrada, não corrigida:** os botões da lista têm 25px de altura, abaixo dos 44px
+recomendados para toque. O botão novo copia a medida do "Revogar" existente de propósito; aumentar
+os dois é decisão à parte.
 
 ---
 

@@ -10413,7 +10413,14 @@ function ofertarEnvioConvite(url, link) {
   document.body.appendChild(fundo);
 }
 
-// Lista dos convites pendentes que EU enviei, com opção de revogar.
+// Lista dos convites pendentes que EU enviei, com opção de copiar o link e de revogar.
+// O botão de copiar é a saída para quando o WhatsApp NÃO abre: o convite já está criado e é
+// válido, mas sem ele não existe nenhum caminho na tela até o link — a única ação oferecida
+// era revogar. Achado no PG 50 (Adriane, 2026-08-27): o navegador dela ABRIU a aba do wa.me,
+// só que o celular não entregou o link ao aplicativo e o wa.me caiu na própria página de
+// download. Como a aba abriu, `window.open` não devolveu null e a rede de segurança de
+// `ofertarEnvioConvite` (que tem o link) nunca apareceu. Quarta causa distinta do sintoma
+// "não consigo convidar" — as outras três estão registradas em gerarECompartilhar().
 function renderMeusConvitesEnviados(grupoNum) {
   const el = document.getElementById('meus-convites');
   if (!el) return;
@@ -10421,9 +10428,13 @@ function renderMeusConvitesEnviados(grupoNum) {
   const pend = loadConvites().filter(c => c.deId === meuId && c.status === 'pendente' && (!grupoNum || c.grupoNum === grupoNum));
   if (!pend.length) { el.innerHTML = ''; return; }
   el.innerHTML = `<div class="share-section"><div class="share-title">Convites pendentes que você enviou</div>` +
-    pend.map(c => `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:.5rem 0;border-bottom:0.5px solid var(--border)">
+    `<div style="font-size:13px;font-family:var(--ff-body);color:var(--text3);margin-bottom:.35rem">Se o WhatsApp não abrir sozinho, copie o link aqui e envie como preferir.</div>` +
+    pend.map(c => `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:.5rem 0;border-bottom:0.5px solid var(--border)">
       <span style="font-size:14px;font-family:var(--ff-body);color:var(--text2)">${c.funcao === 'coordenador' ? '🤝 Coordenador' : '👔 Colaborador'}${c.paraWa ? ' · ' + sanitize(c.paraWa) : ''}</span>
-      <button onclick="revogarEConfirmar('${c.inviteId}', ${grupoNum})" style="background:none;border:0.5px solid #E05050;color:#E05050;border-radius:14px;padding:2px 12px;font-size:13px;cursor:pointer;font-family:var(--ff-body)">Revogar</button>
+      <span style="display:flex;gap:8px;margin-left:auto">
+        <button onclick="copyLink('${APP_URL}?conv=${c.inviteId}')" style="background:none;border:0.5px solid var(--teal);color:var(--teal);border-radius:14px;padding:2px 12px;font-size:13px;cursor:pointer;font-family:var(--ff-body)">📋 Copiar link</button>
+        <button onclick="revogarEConfirmar('${c.inviteId}', ${grupoNum})" style="background:none;border:0.5px solid #E05050;color:#E05050;border-radius:14px;padding:2px 12px;font-size:13px;cursor:pointer;font-family:var(--ff-body)">Revogar</button>
+      </span>
     </div>`).join('') + `</div>`;
 }
 
