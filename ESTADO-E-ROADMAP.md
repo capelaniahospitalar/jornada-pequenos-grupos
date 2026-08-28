@@ -77,6 +77,59 @@ matrícula e cargo de funcionários, e este repositório é público.
 
 ---
 
+## 🔒 2026-08-28 — Mapa de dados pessoais no repositório PÚBLICO (levantamento, nada decidido)
+
+**Visibilidade confirmada por medição:** a API do GitHub responde ao repositório **sem
+autenticação** (HTTP 200). É público de fato, não só de configuração.
+*Este mapa foi escrito de propósito sem citar nenhum nome — ver a regra no `CLAUDE.md`.*
+
+### 🔴 O achado mais grave: `AUDITORIA-IMD-FASE-2-MATRIZ.csv`
+50 linhas, uma por PG, com **nome completo do tutor e do coordenador** — **39 pessoas distintas** —
+ao lado da **classificação de engajamento** ("Não Engajado", "Baixo Engajamento", "Engajado"), da
+nota IMD e da **posição no ranking**. Entrou em 18/08/2026 pelo commit `2b7c4f3` ("aumento de
+slots").
+
+É **mais sério que o telefone** do item 5, por dois motivos:
+1. É uma tabela pronta, estruturada, separada por `;` — qualquer um baixa e abre no Excel.
+2. Associa **pessoa nomeada** a um **juízo sobre prática religiosa**. A LGPD trata convicção
+   religiosa como **dado pessoal sensível** (Art. 5º, II), com proteção mais rígida que dado comum.
+
+### 🟠 Documentos narrativos — 8 arquivos
+Nomes completos distintos por arquivo: `ESTADO-E-ROADMAP.md` (14) · `CHANGELOG.md` (9) ·
+`AUDITORIA-IMD-FASE-2-DADOS.md` (6) · `ESPEC-MIGRACAO-PG6-DUPLICATA.md` (3) ·
+`ESPEC-IMD-v2.1-CAPILARIDADE-PONDERADA.md` (3) · `HOMOLOGACAO-RANKING-FASE-6.md` (2) ·
+`AUDITORIA-IMD-FASE-1.md` (2) · `BASELINE-F7-PRE-IMPLEMENTACAO.md` (1).
+O contexto é sempre um caso real: quem perdeu o vínculo, quem estava duplicado, quem não conseguiu
+convidar. **A contagem é um piso:** só pega nome escrito com 2+ palavras. Menções só pelo primeiro
+nome não entram (um primeiro nome sozinho aparece 17 vezes; outro, 16).
+
+### 🟡 `index.html` — 3 nomes reais
+Todos dentro de **comentários de código**, como exemplo do caso que motivou a correção. Não aparecem
+na tela do app. Correção trivial: trocar pelo papel ("o Coordenador do PG 30").
+
+### ✅ Não encontrado em lugar nenhum
+CPF · e-mail pessoal · matrícula · endereço · data de nascimento. Telefone: **zero** (limpo em
+28/08, item 5). `memberId`: 3 UUIDs, em 2 arquivos — pseudônimos, risco baixo.
+
+### Total
+**Pelo menos 53 pessoas identificáveis pelo nome completo**, sendo 39 delas com uma avaliação de
+engajamento espiritual anexada.
+
+### Restrição que limita as saídas
+Tornar o repositório privado **tira o app do ar**: o GitHub Pages só publica a partir de repositório
+privado em plano pago. *(A confirmar no plano da organização antes de considerar essa via.)*
+
+### Caminhos possíveis — NENHUM decidido, tudo aguardando o usuário
+- **A. Tirar o `.csv` do repositório** — um arquivo, resolve o achado mais grave, não afeta o app.
+  O ranking continua sendo calculado pelo app; o `.csv` era um retrato de trabalho.
+- **B. Separar os papéis do app** — documentos de trabalho (`AUDITORIA-*`, `ESPEC-*`,
+  `HOMOLOGACAO-*`, `FASE-*`) saem do repo e vão para uma pasta fora dele. O repo fica com o app e a
+  documentação técnica. Para o histórico do Git vale o mesmo do item 5: não apaga o passado, para o
+  crescimento.
+- **C. Anonimizar onde está** — trocar nome por papel ("Coordenador do PG 4"). Preserva os
+  documentos no repo, mas perde rastreabilidade em casos que dependem de saber quem é quem.
+- **D. Não fazer nada** — registrar a decisão e seguir.
+
 ## 🔧 2026-08-27 — "Copiar link" nos convites pendentes (PG 50) — **PUBLICADO** (commit `34ce7ba`)
 
 **Quarta causa distinta de "não consigo convidar".** As três anteriores estão registradas nos

@@ -21,3 +21,10 @@
 - O usuário não é programador: explicar decisões em linguagem simples e confirmar escolhas de design antes de aplicar.
 - Publicação via GitHub Desktop (conta capelaniahospitalar) ou upload manual pela web; `git push` direto do terminal pode falhar com erro 403.
 - Processo do projeto: mudanças incrementais desenhadas→aprovadas→aplicadas, com testes de aceitação e commits isolados (ver ESTADO-E-ROADMAP.md e CHANGELOG.md).
+
+## ⚠️ Dados pessoais — este repositório é PÚBLICO
+- O `main` é servido pelo GitHub Pages e o repositório é aberto a qualquer pessoa. **Commit na main = publicação.**
+- NUNCA escrever em arquivo do repositório: telefone/WhatsApp, matrícula, CPF, e-mail pessoal ou endereço de participantes. Esses dados vão para a memória do assistente ou para arquivos FORA do repo (ex.: Área de Trabalho).
+- Ao documentar um caso real, usar o mínimo necessário: "WhatsApp idêntico nos dois registros" prova o mesmo que os dígitos, sem expor ninguém.
+- Remover o dado do arquivo **não apaga o histórico do Git**, que continua público. Por isso a regra é não escrever — a correção depois é cara e incompleta.
+- Incidente de referência: um WhatsApp real entrou em 18/08/2026 pelo commit `e38dc35` e permanece no histórico; os arquivos foram limpos em 28/08/2026 (ver item 5 do ESTADO-E-ROADMAP.md).
