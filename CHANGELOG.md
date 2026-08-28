@@ -1,5 +1,45 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-08-27] — Acesso livre aos 13 temas para os componentes do PG 47 "Diretoria"
+
+**Mudança de exibição, isolada.** Não altera gravação, permissão, papéis, Firebase, convites nem
+regra de negócio. Nenhum campo novo no grupo, nada gravado na nuvem, nada mudado na regra do
+Firestore. Uma função nova (`temAcessoLivreAosTemas`), uma condição em `renderEncList` e uma classe
+de CSS (`.badge-open`).
+
+**A necessidade.** Os componentes do PG 47 "Diretoria" percorrem vários Pequenos Grupos, e cada PG
+visitado está parado num tema diferente. O cadeado da tela de Encontros liberava só até o tema
+seguinte ao progresso pessoal de cada um — o Coordenador do PG 47 tem 2 estudos concluídos, então
+enxergava 3 dos 13 temas. Ao visitar um PG que está no tema 8, o material estava fechado para ele.
+
+**A regra.** Quem tem inscrição no PG 47 abre os 13 Encontros em qualquer ordem. O app reconhece
+pelo vínculo guardado no próprio aparelho e, como rede de segurança (vínculo limpo ou aparelho
+novo), também por constar entre os participantes ativos do PG 47. Serão 4 inscritos: Cristian,
+Leonardo, Wladimir e Ranieri — quem entrar depois passa a valer sozinho, sem nova alteração.
+
+**O que NÃO muda.** Abrir um Encontro é só leitura: `openEncDetail` não conclui estudo, não dá XP e
+não toca em `estudosConcluidos` — logo **não afeta IMD nem Ranking** de PG nenhum. A jornada pessoal
+do próprio diretor continua em sequência: `openStudy` segue recusando índice adiante, porque a
+contagem de "próximo estudo" assume que `ST.done` é contínuo. Os outros 42 grupos ficam idênticos.
+
+**Testes de aceitação (todos aprovados).** Servidor local + `?teste=1` (modo isolado);
+`listarEscritasBloqueadas() == []` ao final.
+
+| # | Cenário | Resultado |
+|---|---|---|
+| 1 | Bateria interna de regressão | **38 testes, zero falhas** (11 Fase 4 + 27 E1) |
+| 2 | Participante comum, 2 estudos | 10 cadeados, 3 cartões clicáveis — **inalterado** |
+| 3 | Inscrito no PG 47, 2 estudos | 0 cadeados, **13 clicáveis**, 10 badges "📖 Ler" |
+| 4 | Inscrito no 47 + outro PG aberto, 0 estudos | 13 clicáveis — vale pela pessoa, não pelo PG à vista |
+| 5 | Só na nuvem (vínculo local ausente) | rede de segurança casa por nome/memberId — 13 clicáveis |
+| 6 | Removida do PG 47 | volta a **11 cadeados** — o acesso cai junto com a inscrição |
+| 7 | Abrir o tema 8 estando no 3 | abre "Crescimento em Cristo" com os 6 blocos; `done` e XP intactos |
+| 8 | Tela de celular (375px) | sem estouro horizontal |
+
+**Limite conhecido:** a liberação mora no código, então só vale nos aparelhos que carregarem esta
+versão. Quem estiver com build antiga em cache precisa recarregar (ou abrir com `?v=2`).
+
+
 ## [2026-08-27] — "📋 Copiar link" nos convites pendentes: saída para quando o WhatsApp não abre
 
 **Mudança de exibição, isolada.** Não altera gravação, permissão, papéis, Firebase, geração de

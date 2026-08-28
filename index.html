@@ -663,6 +663,7 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 .badge-done{background:var(--teal-light);color:var(--teal)}
 .badge-cur{background:var(--blue-pale);color:var(--navy2)}
 .badge-lock{background:var(--bg);color:var(--text3)}
+.badge-open{background:var(--bg);color:var(--navy2);border:0.5px solid var(--border)}
 
 /* ── DETALHE DO ENCONTRO ── */
 .enc-det-hdr{background:linear-gradient(135deg,#0D2137,#1E5F8C);
@@ -8348,21 +8349,48 @@ function bbarGo(s) {
   if(s==='obstaculos') openObstaculos();
 }
 
+// ────────────────────── Acesso livre aos 13 temas — PG 47 "Diretoria" ──────────────────────
+// Quem está inscrito no PG 47 acompanha vários Pequenos Grupos, cada um parado num tema
+// diferente, e precisa abrir qualquer um dos 13 encontros na hora da visita.
+// É SÓ LEITURA: não conclui estudo, não dá XP e não toca em estudosConcluidos — portanto
+// não altera IMD nem Ranking de PG nenhum. A jornada pessoal do próprio diretor continua
+// em sequência (openStudy segue recusando índice adiante), porque a contagem de "próximo
+// estudo" assume que ST.done é contínuo.
+const PG_ACESSO_LIVRE_TEMAS = 47;
+function temAcessoLivreAosTemas() {
+  try {
+    // 1) inscrição do PG 47 registrada neste aparelho
+    if (loadMeusVinculos().some(v => v && v.grupoNum === PG_ACESSO_LIVRE_TEMAS)) return true;
+    // 2) rede de segurança: vínculo local ausente, mas a pessoa consta no PG 47 da nuvem
+    const g = (typeof PEQUENOS_GRUPOS !== 'undefined')
+      ? PEQUENOS_GRUPOS.find(x => x.num === PG_ACESSO_LIVRE_TEMAS) : null;
+    if (!g) return false;
+    const meuId   = getMyMemberId();
+    const meuNome = ((loadMeuGrupo() || {}).nome || ST.userName || '').trim().toLowerCase();
+    return (g.participantes || []).some(p => !p.removed && (
+      (p.memberId && p.memberId === meuId) ||
+      (meuNome && (p.nome || '').trim().toLowerCase() === meuNome)
+    ));
+  } catch { return false; }
+}
+
 // ── Lista de encontros ────────────────────────────────────────────────────
 function renderEncList() {
   const body=document.getElementById('enc-list-body');
   if(!body) return;
+  const livre=temAcessoLivreAosTemas();
   const cards=ENCONTROS.map((enc,i)=>{
     const done=ST.done.includes(i);
     const cur =!done && i===ST.done.length;
-    const lock=!done && i>ST.done.length;
+    const lock=!done && i>ST.done.length && !livre;
     const numCls=done?'enc-num-done':cur?'enc-num-cur':'enc-num-lock';
     const numTxt=done?'✓':String(i+1);
     const cardCls=done?'done':cur?'current':lock?'locked':'';
     const badge=done
       ?'<span class="enc-badge badge-done">✓ Concluído</span>'
       :cur?'<span class="enc-badge badge-cur">▶ Atual</span>'
-          :'<span class="enc-badge badge-lock">🔒</span>';
+          :lock?'<span class="enc-badge badge-lock">🔒</span>'
+               :'<span class="enc-badge badge-open">📖 Ler</span>';
     const hasDiario=E7.diarios[i]&&Object.values(E7.diarios[i]).some(v=>v);
     return `<div class="enc-card ${cardCls}" onclick="${lock?'':` openEncDetail(${i})`}">
       <div class="enc-card-inner">
