@@ -1575,6 +1575,9 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 
   <div class="next-area" id="next-area"></div>
 
+  <!-- Acesso da Diretoria (PG 47): lista dos 13 temas para leitura livre — renderDiretoriaTemasHome() -->
+  <div id="h-diretoria-area"></div>
+
   <!-- ═══ BLOCO 2 — Meu Pequeno Grupo ═══ (chip do grupo + progresso do PG, inseridos por renderGruposBtnHome/renderPgProgressHome) -->
   <div id="h-grupo-area"></div>
 
@@ -6923,6 +6926,7 @@ function renderHome() {
     if (typeof renderGruposBtnHome === 'function') renderGruposBtnHome();
     if (typeof renderPgProgressHome === 'function') renderPgProgressHome();
     if (typeof renderComunidadeBtnHome === 'function') renderComunidadeBtnHome();
+    if (typeof renderDiretoriaTemasHome === 'function') renderDiretoriaTemasHome();
     // O botão de recomeço fica sempre por último na Home
     if (typeof renderRestartArea === 'function') renderRestartArea();
   }, 30);
@@ -6989,6 +6993,8 @@ function updateReflectionCountdown(unlockAt) {
 }
 
 function openStudy(idx) {
+  // Abertura pela jornada normal: nunca em modo consulta (ver openStudyConsulta)
+  consultaTema = false;
   // Only allow current (next) study or previously completed ones
   const nextIdx = ST.done.length;
   if (idx > nextIdx) return;
@@ -7036,7 +7042,9 @@ function renderPhase() {
   document.getElementById('s-content').innerHTML = `<div class="content-card">${inner}</div>`;
   const nb = document.getElementById('s-navbtn');
   nb.disabled = !!(ph.choices && !answered);
-  nb.textContent = curPhase === total - 1 ? 'Concluir estudo' : 'Continuar';
+  nb.textContent = curPhase === total - 1
+    ? (consultaTema ? 'Encerrar leitura' : 'Concluir estudo')
+    : 'Continuar';
 }
 
 function selectOpt(i) {
@@ -7057,6 +7065,7 @@ function nextPhase() {
   if (s.phases[curPhase].choices && !answered) return;
   answered = false;
   if (curPhase < s.phases.length - 1) { curPhase++; renderPhase(); }
+  else if (consultaTema) { consultaTema = false; goHome(); }
   else { completeStudy(); }
 }
 
@@ -7064,6 +7073,9 @@ function nextPhase() {
 //  COMPLETE
 // ══════════════════════════════════════
 function completeStudy() {
+  // Trava de segurança: leitura da Diretoria nunca conclui estudo, nem dá XP,
+  // nem toca em ST.done / IMD / Ranking.
+  if (consultaTema) { consultaTema = false; goHome(); return; }
   const s = STUDIES[curIdx];
   let newBadge = null;
   const xpBefore = ST.xp;
@@ -7249,7 +7261,7 @@ function confirmRestart() {
   goHome();
 }
 
-function goHome() { showScreen('home'); renderHome(); }
+function goHome() { consultaTema = false; showScreen('home'); renderHome(); }
 function showScreen(n) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-' + n).classList.add('active');
@@ -8400,6 +8412,56 @@ function temAcessoLivreAosTemas() {
       (meuNome && (p.nome || '').trim().toLowerCase() === meuNome)
     ));
   } catch { return false; }
+}
+
+// Modo consulta: o diretor está lendo um tema fora da própria sequência.
+// Enquanto true, o fim do tema NÃO conclui estudo, NÃO dá XP, NÃO grava nada
+// na nuvem e NÃO mexe em ST.done — logo não afeta IMD nem Ranking de PG algum.
+let consultaTema = false;
+
+// Abre qualquer um dos 13 estudos em leitura livre (só para o PG 47).
+function openStudyConsulta(idx) {
+  if (!temAcessoLivreAosTemas()) return;
+  if (!(idx >= 0 && idx < STUDIES.length)) return;
+  consultaTema = true;
+  curIdx = idx; curPhase = 0; answered = false;
+  const s = STUDIES[idx];
+  document.getElementById('s-steplbl').textContent = 'Consulta · Tema ' + (idx + 1) + ' de 13';
+  document.getElementById('s-title').textContent   = s.title;
+  document.getElementById('s-xplbl').textContent   = '📖 Leitura';
+  showScreen('study');
+  renderPhase();
+}
+
+// Lista dos 13 temas na Home, visível só para quem está inscrito no PG 47.
+function renderDiretoriaTemasHome() {
+  const area = document.getElementById('h-diretoria-area');
+  if (!area) return;
+  if (typeof temAcessoLivreAosTemas !== 'function' || !temAcessoLivreAosTemas()) { area.innerHTML = ''; return; }
+  const itens = STUDIES.map((s, i) => `
+    <div class="prev-item" onclick="openStudyConsulta(${i})">
+      <div class="prev-num" style="background:var(--blue-pale);color:var(--navy2)">${i + 1}</div>
+      <div class="prev-info">
+        <div class="prev-title">${s.title}</div>
+        <div class="prev-sub">${FASE_LABELS[s.fase] || ''} · Toque para ler</div>
+      </div>
+      <div class="prev-arrow">›</div>
+    </div>`).join('');
+  area.innerHTML = `
+    <div class="sec-label">Acesso da Diretoria</div>
+    <div style="margin:0 1rem .75rem">
+      <button onclick="toggleSection(this)" style="background:var(--teal-light);border:1px solid var(--teal);border-radius:var(--radius-sm);color:var(--teal);font-size:17px;font-weight:600;font-family:var(--ff-body);cursor:pointer;display:flex;align-items:center;gap:6px;padding:.6rem .75rem;width:100%;text-align:left">
+        <span class="toggle-arrow" style="display:inline-block;transition:transform .2s">▸</span>
+        📚 Os 13 temas — abrir qualquer um
+      </button>
+      <div class="toggle-content" style="display:none;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-top:.4rem">
+        <div style="padding:.6rem .75rem;font-size:13px;line-height:1.45;color:var(--text3);border-bottom:0.5px solid var(--border)">
+          Leitura livre para acompanhar Pequenos Grupos que estão em temas diferentes.
+          Não conta como estudo concluído, não dá XP e não altera o Ranking.
+        </div>
+        ${itens}
+      </div>
+    </div>`;
 }
 
 // ── Lista de encontros ────────────────────────────────────────────────────
