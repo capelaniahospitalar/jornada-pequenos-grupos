@@ -1,5 +1,47 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-08-28] — PG 47 "Diretoria": os 13 temas abertos ao mesmo tempo, em leitura livre
+
+**O pedido.** Os diretores acompanham Pequenos Grupos diferentes, e cada PG está parado num tema
+diferente. Eles precisam abrir qualquer um dos 13 temas na hora da visita, sem esperar a sequência.
+
+**O que faltava.** A liberação publicada em 27/08 alcançou só a tela **Encontros** (o roteiro do
+encontro). A outra lista de 13 — os **estudos** da jornada, na tela inicial — continuava liberando
+um de cada vez para todo mundo, inclusive para o PG 47. É essa que foi aberta agora.
+
+**A decisão de desenho.** Ler um tema fora da própria sequência é **só leitura**: não conclui
+estudo, não dá XP, não grava nada na nuvem e não mexe em `ST.done`. O motivo é concreto — o app
+conta o "próximo estudo" como `ST.done.length`, assumindo que os estudos são concluídos em ordem.
+Marcar o tema 9 estando no 2 faria o app pular temas e alteraria IMD e Ranking. A jornada pessoal
+do diretor continua exatamente como antes, pelo cartão "Próximo passo na jornada".
+
+**O que mudou (5 pontos, todos locais — nenhum campo novo, nada gravado na nuvem):**
+
+1. **Nova lista "Acesso da Diretoria" na tela inicial** (`renderDiretoriaTemasHome`), logo abaixo do
+   cartão do próximo passo. É um bloco recolhido — "📚 Os 13 temas — abrir qualquer um" — que abre
+   com os 13 temas em ordem, cada um tocável. Aparece **só** para quem `temAcessoLivreAosTemas()`
+   reconhece, isto é, quem está inscrito no PG 47.
+2. **`openStudyConsulta(idx)`** abre qualquer um dos 13 em modo consulta. Reconfere a autorização na
+   entrada: chamada por quem não é do PG 47, não faz nada. O cabeçalho mostra
+   "Consulta · Tema N de 13" e "📖 Leitura" no lugar do XP, para a pessoa saber onde está.
+3. **`consultaTema`** é o interruptor desse modo. `openStudy` (a jornada normal) o desliga sempre na
+   entrada, e `goHome()` também — não há caminho de saída que deixe o modo ligado por engano.
+4. **No fim do tema, o botão diz "Encerrar leitura"** em vez de "Concluir estudo", e devolve à tela
+   inicial sem concluir nada.
+5. **Trava de segurança em `completeStudy()`**: mesmo que algum caminho futuro chegue lá em modo
+   consulta, a função sai antes de tocar em `ST.done`, XP, conquistas ou sincronização.
+
+**Testes de aceitação (modo de teste isolado, `?teste=1` — nada saiu do aparelho):**
+
+- Diretor com 2 estudos feitos abre o **tema 13** pela lista, percorre as 6 fases e encerra:
+  `ST.done` continua `[0,1]`, XP continua 200, nenhuma conquista, nada gravado. ✔
+- Reabrir pela lista um tema **já concluído** também não repete XP nem altera nada. ✔
+- **Jornada normal intacta:** o cartão "Próximo passo" abre o estudo 3, o botão final continua
+  "Concluir estudo", conclui e credita +80 XP (200 → 280). ✔
+- **Quem não é do PG 47 não vê a lista** (área vazia) e, se `openStudyConsulta` for chamada mesmo
+  assim, ela é ignorada. ✔
+- A chave de progresso da produção (`amj3`) permaneceu intocada durante todo o teste. ✔
+
 ## [2026-08-27] — Companheiro de Jornada: aparelho que perdeu a identidade volta a se reconhecer
 
 **Achado de campo.** O Coordenador do PG 27 "Esperança VivA" (Henry Henderson Cardoso silva) abriu
