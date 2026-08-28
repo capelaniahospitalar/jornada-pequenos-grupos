@@ -1,5 +1,73 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-08-27] — Companheiro de Jornada: aparelho que perdeu a identidade volta a se reconhecer
+
+**Achado de campo.** O Coordenador do PG 27 "Esperança VivA" (Henry Henderson Cardoso silva) abriu
+o Companheiro de Jornada e recebeu *"Não foi possível carregar seus dados agora"* seguido de uma
+linha técnica crua: `mg=NULO g=NULO eu=NULO · meuMemberId=a4620f07…`.
+
+**Diagnóstico — não era a tela, e não era o dado.** O cadastro dele está íntegro no PG 27
+(coordenador, `memberId` `a8cfd292…`). O `memberId` que o aparelho dele mostrou, `a4620f07…`,
+**não existe em nenhum dos 70 PGs**: é outra instalação, ou o armazenamento local daquele navegador
+foi limpo (no iPhone isso acontece sozinho após um período sem uso). Sem vínculo, `loadMeuGrupo()`
+devolve vazio e a tela não tem como saber quem é a pessoa nem em que grupo procurar.
+
+**Seis correções, todas locais — nenhum campo novo, nada de novo gravado na nuvem:**
+
+1. **`loadMeuGrupo()` ganhou uma última rede de recuperação.** Se vínculos e formato antigo estão
+   vazios mas `ST.grupoNum` e `ST.userName` existem, o grupo é reconstruído a partir daí — e essa
+   prova é sólida, porque `startJourney()` **exige** grupo para concluir as boas-vindas. Sem isso o
+   app fica anônimo para si mesmo: somem o Companheiro, o Painel e a área de convite, com o cadastro
+   intacto na nuvem. Não inventa identidade: sem nome guardado, devolve vazio como antes.
+2. **A tela deixou de despejar diagnóstico técnico no rosto do usuário.** Aquela linha estava marcada
+   como TEMPORÁRIA em 2026-07-20 e ficou em produção. Agora cada causa tem seu recado — aparelho não
+   identificado, PG fora desta versão (build antiga, `?v=2`), cadastro não encontrado — e o detalhe
+   técnico fica recolhido em "Detalhes técnicos", disponível para suporte.
+3. **Ninguém mais aparece na própria lista de candidatos a companheiro.** O filtro comparava `ts` e
+   nome por valor; com o nome guardado em outra caixa ("Cardoso silva" × "Cardoso Silva") a pessoa
+   se via na lista e podia convidar a si mesma. Passa a comparar a identidade do registro.
+   `cpFindParticipant` também ganhou reserva por nome normalizado.
+4. **Os botões do Companheiro eram MUDOS quando o aparelho não reconhecia a pessoa.**
+   `inviteCompanion` e `acceptCompanion` começavam com `if (!mg || !g) return;` — `return` seco, sem
+   aviso nenhum: a pessoa tocava em "Convidar como Companheiro de Jornada" e **nada acontecia**.
+   É exatamente o "não consigo efetivar um companheiro" relatado. Agora avisam e devolvem à tela,
+   que explica a causa e o caminho.
+5. **Fim do sucesso falso.** `declineCompanion` anunciava "Convite recusado" e `removeCompanion`
+   anunciava "Parceria encerrada" **mesmo quando não encerravam nada** (registro não encontrado).
+6. **O convite passa a ser carimbado com o registro da nuvem**, não com a cópia local: `de` e `deTs`
+   saem de `eu` (participante encontrado no PG) e não de `mg`. A cópia local pode ter o nome com
+   outra grafia — e vir sem `ts` num aparelho recuperado —, e aí quem recebe não casa o remetente.
+   O mesmo critério passou a valer no "convite enviado ⏳" da tela do remetente.
+
+**Testes de aceitação (todos aprovados).** Servidor local + `?teste=1`; `listarEscritasBloqueadas() == []`.
+
+| # | Cenário | Resultado |
+|---|---|---|
+| 1 | Bateria interna de regressão | **38 testes, zero falhas** |
+| 2 | Caso exato do PG 27 (sem vínculo, `ST` intacto) | reconhece, acha o cadastro e abre o seletor |
+| 3 | Mesmo nome com outra caixa | reconhece — e **não** se lista como candidato |
+| 4 | Aparelho realmente anônimo | "Este aparelho ainda não reconhece você" + como resolver |
+| 5 | PG fora desta versão | "Não encontramos o seu Pequeno Grupo" + `?v=2` |
+| 6 | Cadastro não encontrado no PG | "Não encontramos o seu cadastro no grupo" |
+| 7 | Aparelho normal, com vínculo | **inalterado** (`recuperadoDeST` não dispara) |
+| 8 | `ST` com grupo mas sem nome | não inventa identidade — devolve vazio |
+| 9 | Tela de erro em 375px | sem estouro horizontal |
+| 10 | Convidar/aceitar/encerrar sem identidade | os três avisam — antes o botão era mudo |
+| 11 | **Ida e volta completa**: aparelho recuperado convida → a outra pessoa vê, aceita | **companheiro efetivado**, convites pendentes zerados |
+| 12 | Remetente com o nome em outra caixa | convite carimbado com o nome da nuvem; tela mostra "convite enviado ⏳" |
+
+
+**Fato apurado na nuvem (27/08, 21h28):** em todo o PG 27, **nenhum** dos três participantes tem
+qualquer campo de companheiro — nem `compConvites`, nem `compParceiro`. Nenhum convite chegou a ser
+registrado. No app inteiro são 15 pessoas com companheiro efetivado e 7 convites pendentes; um
+deles (PG 6) é uma pessoa convidando **a si mesma**, com o nome grafado de dois jeitos — o defeito
+do item 3, capturado em produção.
+
+**Remediação para quem já está nesse estado:** entrar por um **link de convite novo** —
+`aceitarConvite` recupera o cadastro existente por nome + WhatsApp (IDENT-01) e recarimba o
+`memberId`, sem duplicar pessoa.
+
+
 ## [2026-08-27] — Acesso livre aos 13 temas para os componentes do PG 47 "Diretoria"
 
 **Mudança de exibição, isolada.** Não altera gravação, permissão, papéis, Firebase, convites nem

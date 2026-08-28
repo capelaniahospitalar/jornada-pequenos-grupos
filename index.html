@@ -7536,21 +7536,40 @@ function renderCompanionSelector(el) {
   // (ex.: tela aberta com a sincronização do Firebase ainda em andamento) e antes ficava em
   // branco sem explicação. Agora mostra uma mensagem com botão de tentar de novo.
   if (!mg || !g || !eu) {
-    // DIAGNÓSTICO TEMPORÁRIO (remover depois de achar a causa do reconhecimento falhando
-    // pós-restauração do Grupo 1, 2026-07-20) — mostra o que exatamente não bateu.
+    // Antes daqui havia um diagnóstico técnico cru ("mg=NULO g=NULO eu=NULO …"), marcado como
+    // TEMPORÁRIO em 2026-07-20 e esquecido em produção — o Coordenador do PG 27 recebeu essa
+    // linha na cara em 27/08. Agora cada causa tem o seu recado, e o detalhe técnico fica
+    // recolhido, disponível para quem der suporte sem assustar quem só quer usar o app.
     const meuIdDiag = (typeof getMyMemberId === 'function') ? getMyMemberId() : '(sem função)';
     const partsDiag = (g && g.participantes) ? g.participantes.map(p => `${p.nome}[${p.memberId || 'sem-id'}]`).join(', ') : '(sem grupo)';
-    const diag = `mg=${mg ? 'ok' : 'NULO'} g=${g ? 'ok' : 'NULO'} eu=${eu ? 'ok' : 'NULO'} · meuGrupoNum=${mg && mg.grupoNum} meuNome="${mg && mg.nome}" meuTs=${mg && mg.ts} meuMemberId=${meuIdDiag} · participantes=${partsDiag}`;
-    el.innerHTML = `<p style="font-size:15px;color:var(--text3);text-align:center;padding:2rem 1rem;font-family:var(--ff-body);line-height:1.6">
-      Não foi possível carregar seus dados agora.<br>
-      <button onclick="renderCompanionScreen()" style="margin-top:1rem;background:var(--purple);color:#fff;border:none;border-radius:8px;padding:.6rem 1.2rem;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--ff-body)">🔄 Tentar novamente</button>
-      <br><small style="display:block;margin-top:1rem;font-size:11px;color:var(--text3);word-break:break-word;opacity:.8">${sanitize(diag)}</small>
-    </p>`;
+    const diag = `mg=${mg ? 'ok' : 'NULO'} g=${g ? 'ok' : 'NULO'} eu=${eu ? 'ok' : 'NULO'} · meuGrupoNum=${mg && mg.grupoNum} meuNome="${mg && mg.nome}" meuTs=${mg && mg.ts} meuMemberId=${meuIdDiag} · participantes=${partsDiag} · v${(typeof APP_VERSION !== 'undefined' ? APP_VERSION.version : '?')}`;
+    // !mg  → o aparelho não sabe quem é a pessoa (armazenamento local limpo, aparelho novo)
+    // !g   → sabe o número do PG, mas esta versão do app não tem esse slot (build antiga em cache)
+    // !eu  → o PG existe, mas o cadastro dela não foi encontrado nele
+    const titulo = !mg ? 'Este aparelho ainda não reconhece você'
+                 : !g  ? 'Não encontramos o seu Pequeno Grupo'
+                       : 'Não encontramos o seu cadastro no grupo';
+    const recado = !mg ? 'Seu cadastro continua guardado na nuvem — o que faltou foi a ligação entre <b>este</b> aparelho e você. Peça ao Coordenador ou ao Tutor um <b>novo link de convite</b> e entre por ele: seu histórico é recuperado, sem cadastro duplicado.'
+                 : !g  ? 'Pode ser uma versão antiga do aplicativo guardada neste aparelho. Feche e abra de novo; se continuar, abra o link do app acrescentando <b>?v=2</b> no fim do endereço.'
+                       : 'Isso costuma ser sincronização ainda em andamento. Toque em “Tentar novamente”; se persistir, avise o Coordenador do seu Pequeno Grupo.';
+    el.innerHTML = `<div style="font-size:15px;color:var(--text2);text-align:center;padding:2rem 1rem;font-family:var(--ff-body);line-height:1.6">
+      <div style="font-size:34px;margin-bottom:.4rem">🤝</div>
+      <div style="font-size:17px;font-weight:600;color:var(--text);margin-bottom:.5rem">${titulo}</div>
+      <div style="max-width:34ch;margin:0 auto">${recado}</div>
+      <button onclick="renderCompanionScreen()" style="margin-top:1.2rem;background:var(--purple);color:#fff;border:none;border-radius:8px;padding:.6rem 1.2rem;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--ff-body)">🔄 Tentar novamente</button>
+      <details style="margin-top:1.4rem;text-align:left;max-width:34ch;margin-left:auto;margin-right:auto">
+        <summary style="font-size:12px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">Detalhes técnicos</summary>
+        <small style="display:block;margin-top:.5rem;font-size:11px;color:var(--text3);word-break:break-word;opacity:.8">${sanitize(diag)}</small>
+      </details>
+    </div>`;
     return;
   }
 
+  // O primeiro critério é a identidade do próprio registro (`p !== eu`): ts e nome batem por
+  // valor e falham quando o nome guardado no aparelho tem outra caixa que o da nuvem — aí a
+  // pessoa aparecia na própria lista e podia convidar a si mesma como companheiro.
   const outros = (g.participantes || []).filter(p =>
-    !((mg.ts && p.ts === mg.ts) || p.nome === mg.nome));
+    p !== eu && !((mg.ts && p.ts === mg.ts) || p.nome === mg.nome));
 
   const convitesRecebidos = eu.compConvites || [];
 
@@ -7586,7 +7605,7 @@ function renderCompanionSelector(el) {
       const icon = COMPANION_ICONS[i % COMPANION_ICONS.length];
       const pParceiros = cpParceiros(p);
       const meConvidou = convitesRecebidos.some(c => (c.deTs && p.ts && c.deTs === p.ts) || c.de === p.nome);
-      const euConvidei = (p.compConvites || []).some(c => (c.deTs && mg.ts && c.deTs === mg.ts) || c.de === mg.nome);
+      const euConvidei = (p.compConvites || []).some(c => (c.deTs && eu.ts && c.deTs === eu.ts) || c.de === eu.nome);
       const btnBase = 'width:100%;border:none;border-radius:8px;padding:.6rem .8rem;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--ff-body)';
       let acao;
       if (pParceiros.length >= 2) {
@@ -7684,7 +7703,10 @@ async function inviteCompanion(nome, ts) {
   loadGrupos();
   try { if (typeof syncFromFirebase === 'function') await syncFromFirebase(); } catch {}
   const mg = loadMeuGrupo(); const g = cpMyGroup();
-  if (!mg || !g) return;
+  // Sem identidade neste aparelho o botão era MUDO: `return` seco, sem aviso nenhum — a pessoa
+  // tocava em "Convidar" e nada acontecia (achado de campo, PG 27, 2026-08-27). Agora avisa e
+  // devolve à tela, que explica a causa e o caminho.
+  if (!mg || !g) { showCompanionToast('Este aparelho ainda não reconhece você — veja o aviso na tela.'); renderCompanionScreen(); return; }
   const eu = cpMyParticipant();
   const alvo = cpFindParticipant(g, nome, ts);
   if (!eu || !alvo) { showCompanionToast('Não foi possível enviar o convite.'); return; }
@@ -7697,8 +7719,11 @@ async function inviteCompanion(nome, ts) {
     if (existeTrio) { showCompanionToast('Este Pequeno Grupo já tem um trio de companheiros formado.'); renderCompanionScreen(); return; }
   }
   if (!alvo.compConvites) alvo.compConvites = [];
-  const jaConvidou = alvo.compConvites.some(c => (mg.ts && c.deTs === mg.ts) || c.de === mg.nome);
-  if (!jaConvidou) alvo.compConvites.push({ de: mg.nome, deTs: mg.ts || null, ts: Date.now() });
+  // Carimba o convite com o nome e o ts do REGISTRO na nuvem (`eu`), não com a cópia local:
+  // a cópia local pode ter outra grafia/caixa do nome e até vir sem `ts` (aparelho recuperado
+  // por ST), e aí quem recebe não consegue casar o remetente.
+  const jaConvidou = alvo.compConvites.some(c => (eu.ts && c.deTs === eu.ts) || c.de === eu.nome);
+  if (!jaConvidou) alvo.compConvites.push({ de: eu.nome, deTs: eu.ts || null, ts: Date.now() });
   saveGrupos();
   showCompanionToast('🤝 Convite enviado a ' + nome.split(' ')[0] + '. Aguardando o aceite.');
   renderCompanionScreen();
@@ -7708,7 +7733,7 @@ async function acceptCompanion(deNome, deTs) {
   loadGrupos();
   try { if (typeof syncFromFirebase === 'function') await syncFromFirebase(); } catch {}
   const mg = loadMeuGrupo(); const g = cpMyGroup();
-  if (!mg || !g) return;
+  if (!mg || !g) { showCompanionToast('Este aparelho ainda não reconhece você — veja o aviso na tela.'); renderCompanionScreen(); return; }
   const eu = cpMyParticipant();
   const outro = cpFindParticipant(g, deNome, deTs);
   if (!eu || !outro) { showCompanionToast('Convite não encontrado.'); renderCompanionScreen(); return; }
@@ -7768,10 +7793,9 @@ async function declineCompanion(deNome, deTs) {
   loadGrupos();
   try { if (typeof syncFromFirebase === 'function') await syncFromFirebase(); } catch {}
   const eu = cpMyParticipant();
-  if (eu) {
-    eu.compConvites = (eu.compConvites || []).filter(c => !((deTs && c.deTs === deTs) || c.de === deNome));
-    saveGrupos();
-  }
+  if (!eu) { showCompanionToast('Este aparelho ainda não reconhece você — veja o aviso na tela.'); renderCompanionScreen(); return; }
+  eu.compConvites = (eu.compConvites || []).filter(c => !((deTs && c.deTs === deTs) || c.de === deNome));
+  saveGrupos();
   showCompanionToast('Convite recusado.');
   renderCompanionScreen();
 }
@@ -7781,12 +7805,13 @@ async function removeCompanion(nome, ts) {
   loadGrupos();
   try { if (typeof syncFromFirebase === 'function') await syncFromFirebase(); } catch {}
   const g = cpMyGroup(); const eu = cpMyParticipant();
-  if (eu) {
-    const parc = cpFindParticipant(g, nome, ts);
-    eu.compParceiro = cpParceiros(eu).filter(c => !((ts && c.ts === ts) || c.nome === nome));
-    if (parc) parc.compParceiro = cpParceiros(parc).filter(c => !((eu.ts && c.ts === eu.ts) || c.nome === eu.nome));
-    saveGrupos();
-  }
+  // Antes anunciava "Parceria encerrada" mesmo sem ter encerrado nada, quando o aparelho não
+  // reconhecia a pessoa — sucesso falso, o pior tipo de aviso.
+  if (!eu) { showCompanionToast('Este aparelho ainda não reconhece você — veja o aviso na tela.'); renderCompanionScreen(); return; }
+  const parc = cpFindParticipant(g, nome, ts);
+  eu.compParceiro = cpParceiros(eu).filter(c => !((ts && c.ts === ts) || c.nome === nome));
+  if (parc) parc.compParceiro = cpParceiros(parc).filter(c => !((eu.ts && c.ts === eu.ts) || c.nome === eu.nome));
+  saveGrupos();
   if (CP.perCompanion) delete CP.perCompanion[cpKeyFor(nome, ts)];
   saveCP();
   showCompanionToast('Parceria com ' + nome.split(' ')[0] + ' encerrada.');
