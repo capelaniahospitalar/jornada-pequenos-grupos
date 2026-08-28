@@ -11994,9 +11994,12 @@ function getMeuGrupoAtivo(nome) {
   const meuId = getMyMemberId();
   const nomeNorm = nome.trim().toLowerCase();
   for (const g of PEQUENOS_GRUPOS) {
-    const p = (g.participantes || []).find(x =>
+    // C3: quem já saiu/foi removido do PG carrega o tombstone (removed:true) e NÃO conta
+    // como vínculo ativo — sem isso a pessoa removida fica travada para entrar em outro PG,
+    // e o "Sim, trocar de grupo" reabre a mesma janela em laço (não há como sair dele).
+    const p = (g.participantes || []).find(x => !x.removed && (
       (x.memberId && meuId && x.memberId === meuId) ||
-      (x.nome && x.nome.trim().toLowerCase() === nomeNorm));
+      (x.nome && x.nome.trim().toLowerCase() === nomeNorm)));
     if (p && p.tipo !== 'tutor') {
       return { existe: true, grupoNum: g.num, nomeGrupo: g.nome || ('Grupo ' + g.num), papel: p.tipo };
     }
