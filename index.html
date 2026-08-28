@@ -7648,9 +7648,12 @@ function cpMyGroup() {
 function cpGrupoImpar(g) { return !!g && ((g.participantes || []).length % 2) === 1; }
 function cpFindParticipant(g, nome, ts, memberId) {
   if (!g || !g.participantes) return null;
+  const alvo = String(nome || '').trim().toLowerCase();
   return (memberId && g.participantes.find(p => p.memberId === memberId)) ||
          (ts && g.participantes.find(p => p.ts === ts)) ||
-         g.participantes.find(p => p.nome === nome) || null;
+         g.participantes.find(p => p.nome === nome) ||
+         // Reserva: o mesmo nome com outra caixa/espaço — "Cardoso silva" × "Cardoso Silva".
+         (alvo && g.participantes.find(p => String(p.nome || '').trim().toLowerCase() === alvo)) || null;
 }
 // compParceiro guarda uma LISTA de até 2 companheiros (trio = pessoa que sobrou
 // numa dupla se junta a ela). Dados antigos gravaram um objeto único — normalizamos aqui.
@@ -9689,8 +9692,20 @@ function loadMeuGrupo() {
   const v = getGrupoAberto();
   if (v) return v;
   // Compat: antes da migração popular os vínculos, ainda usa o formato antigo
-  try { const s = localStorage.getItem(MEU_GRUPO_KEY); return s ? JSON.parse(s) : null; }
-  catch { return null; }
+  try { const s = localStorage.getItem(MEU_GRUPO_KEY); if (s) return JSON.parse(s); }
+  catch {}
+  // Última rede de recuperação (achado de campo, PG 27, 2026-08-27): vínculos e formato
+  // antigo vazios, mas a pessoa CONCLUIU as boas-vindas — e startJourney() exige grupo para
+  // concluir. Logo ST.grupoNum/ST.userName são prova de que este aparelho pertenceu a um PG.
+  // Sem isto o app fica anônimo para si mesmo: some o Companheiro de Jornada, o Painel e a
+  // área de convite, com o cadastro intacto na nuvem. Reconstrução SEM efeito colateral —
+  // não grava nada, só devolve o que ST já sabia. Sem `ts`/`wa`: quem casa participante
+  // (cpFindParticipant, getMinhaFuncaoNoGrupo) tem o nome como critério de reserva.
+  if (ST && ST.grupoNum != null && ST.userName) {
+    return { grupoNum: ST.grupoNum, grupoNome: ST.grupoNome || ('Grupo ' + ST.grupoNum),
+             nome: ST.userName, recuperadoDeST: true };
+  }
+  return null;
 }
 function saveMeuGrupo(dados) {
   // Espelho no formato antigo (rollback de 1 linha continua funcionando)
