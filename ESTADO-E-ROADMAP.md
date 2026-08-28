@@ -6,6 +6,77 @@
 
 ---
 
+# ⏰ RETOMAR EM 2026-08-28, A PARTIR DAS 08h — encerramento da sessão de 27/08
+
+## Publicado hoje
+
+**`34ce7ba` — botão "📋 Copiar link" nos convites pendentes.** Publicação verificada por `curl`
+(GitHub Pages serviu a versão nova às 12h45 GMT). Detalhes na seção de 27/08 mais abaixo.
+
+## Gravado na produção hoje (2 operações, ambas verificadas)
+
+1. **Patrícia Ferreira dos Santos (PG 24)** — `memberId` trocado para o do atalho do iPhone e
+   progresso restaurado (325 → **1430 XP**, 1 → 6 estudos, 6 → 13 missões). Delta +2 bytes previsto
+   e confirmado; prova reversa de que só o registro dela mudou.
+2. **Slot 48 zerado** — casca duplicada de "Limpando corações" (sem nenhuma pessoa). Virou o
+   **próximo slot livre**. Delta −60 bytes; 250 memberIds antes e depois. O grupo real é o **slot 49**.
+
+## 🔴 PENDÊNCIAS — por ordem de urgência
+
+### 1. PG 51 "Puro & Simples" — decisão do usuário, nada foi feito
+O slot 51 foi **ocupado por outro grupo real** ("Mãos que Curam", criado por Renan em 25/08). A
+restauração no lugar original é impossível. **Caminho recomendado, sem gravar na nuvem:** Felipe cria
+o PG pelo app (cai agora no **slot 48**), convida Adriana do Prado como coordenadora, e ela convida as
+outras duas. Backup íntegro de 19/08 na máquina do trabalho.
+⚠️ **As 3 participantes NÃO podem abrir o app** até estarem no slot novo — o merge injetaria as
+pessoas delas dentro do "Mãos que Curam". Cuidado: são **duas Adrianas diferentes**.
+
+### 2. Patrícia (PG 24) — falta o aceite
+Thays gera convite novo → Patrícia aceita **PELO ATALHO**, não pelo Safari (foi o Safari que desfez
+a correção em 26/08) → conferir na nuvem se os 1430 XP e as 13 missões se mantiveram → ela precisa
+**apagar os dados do site no Safari**, senão reverte pela 3ª vez.
+
+### 3. Jaime (PG 20 "Cristo Vive") — troca de celular, plano pronto e não executado
+Ordem obrigatória: (a) Jaime abre o app no celular **antigo** com internet — único passo sem volta;
+(b) tutor usa **"🔄 Trocar Coordenador"**, porque "Convidar Coordenador" fica escondido quando já há
+coordenador; (c) Jaime aceita no celular novo digitando **exatamente `Jaime Morais`**; (d) o celular
+antigo nunca mais é aberto. A contagem de missões pode não bater e o XP pode subir um pouco.
+
+### 4. Adriane (PG 50 "Nutrição") — pergunta em aberto
+Falta o teste de um toque: gerar convite **pelo app com o número preenchido**, no mesmo navegador em
+que o app roda. Decide se a causa é a nossa navegação programática (regressão de 26/08) ou o aparelho
+dela. Ver a seção de 27/08.
+
+### 5. ✅ Privacidade — número de WhatsApp real no repositório PÚBLICO (arquivos limpos em 28/08)
+O número aparecia **5 vezes**, sempre o mesmo, ao lado do nome da pessoa a quem pertence, em
+`HOMOLOGACAO-RANKING-FASE-6.md` (2), `ESPEC-MIGRACAO-PG6-DUPLICATA.md` (2) e neste arquivo (1).
+Nos três casos ele servia só como prova de que dois cadastros são a mesma pessoa — foi trocado por
+"WhatsApp idêntico nos dois registros", **sem perda de argumento**.
+
+**O que NÃO foi feito, por decisão do usuário em 28/08:** o histórico do Git não foi reescrito. O
+número entrou em 18/08 pelo commit `e38dc35` ("regularização") e continua visível para quem
+procurar nos commits antigos. Reescrever exigiria refazer 37 commits e forçar por cima do `main` —
+que é a produção do GitHub Pages —, apagar e rebaixar o repositório no outro PC, e ainda assim o
+GitHub serviria o commit antigo por endereço direto sem um chamado ao suporte. Risco alto e
+resultado incerto, para um número de celular.
+
+**Regra daqui em diante:** nunca escrever telefone, matrícula ou dado pessoal em arquivo do
+repositório — esses dados vão para a memória ou para arquivos fora do repo.
+
+**Assunto maior, ainda em aberto:** os `.md` de trabalho trazem nomes reais, `memberId` e XP de
+participantes, e o repositório é público. Não foi mapeado.
+
+### 6. Herdadas, sem movimento hoje
+M1 (versão do app invisível em tela) · E4 (regra do Firestore) · reconciliação dos PGs ·
+`pgStatusFiltros` desligada · Thays duplicada no PG 24 · slot 39 (BÁLSAMO) nunca esvaziado.
+
+## Fora do app (não versionar)
+Lista dos **Embaixadores da Esperança presencial 29 e 30/07** diagramada em HTML e PDF (134
+registros). Arquivos na Área de Trabalho, **de propósito fora do repositório** — contêm nome,
+matrícula e cargo de funcionários, e este repositório é público.
+
+---
+
 ## 🔧 2026-08-27 — "Copiar link" nos convites pendentes (PG 50) — **PUBLICADO** (commit `34ce7ba`)
 
 **Quarta causa distinta de "não consigo convidar".** As três anteriores estão registradas nos
@@ -26,7 +97,7 @@ mesma versão na mesma manhã:
 | **Adriane (PG 50), 08h42–08h46** | 6 | **0** ❌ |
 
 Dados do PG 50 impecáveis; convites sendo criados normalmente; duas tentativas com número válido
-(`5521981845125`) deram no mesmo. Logo: o que falhou foi o **aparelho dela entregar o link ao
+(número real da pessoa convidada, guardado fora do repositório) deram no mesmo. Logo: o que falhou foi o **aparelho dela entregar o link ao
 aplicativo WhatsApp**. Sem aplicativo de destino, o `wa.me` cai na própria página de download.
 **O usuário confirmou em 27/08: o WhatsApp ESTÁ instalado no celular da Adriane.** Isso **mata** a
 hipótese "não tem aplicativo de destino" e muda o suspeito principal.
@@ -44,7 +115,7 @@ aparelho (no iPhone/Safari o comportamento é outro, e foi lá que a correção 
 se a Fabiana e o Sérgio — que conseguiram no mesmo dia — estavam em iPhone ou Android.
 
 **Teste que separa as duas explicações (a Adriane faz sozinha, custa um toque):** digitar
-`wa.me/5521981845125` direto na barra de endereço do navegador dela e confirmar.
+`wa.me/<o número do convidado>` direto na barra de endereço do navegador dela e confirmar.
 · Abriu o WhatsApp ⇒ o aparelho dela entrega links normalmente ⇒ **o problema é a nossa navegação
 programática**.
 · Ficou na página da web / download ⇒ é configuração do aparelho dela (links compatíveis desligados
@@ -673,7 +744,7 @@ admissão (praticável, mas não descobrível). Volta ao modelo quando existir u
 reconheça. Correção de UX própria, fora do escopo do ranking.
 *O teste não tocou produção: zero chaves fora do prefixo `teste_`, Firebase bloqueado nos dois sentidos.*
 
-**Pendência 3 — o que a correção exige.** Identidade confirmada (mesmo WhatsApp `5521993558217`,
+**Pendência 3 — o que a correção exige.** Identidade confirmada (mesmo WhatsApp nos dois registros,
 mesmo dia, 65 min de diferença; registro das 13:46 abandonado, o das 14:51 é o vivo). Mas
 **identidade confirmada ≠ autorização para apagar**. A operação correta é, nesta ordem:
 preservar/transferir o histórico do registro antigo (ele guarda **Embaixadores de julho**) →

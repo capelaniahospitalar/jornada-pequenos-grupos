@@ -554,7 +554,7 @@ Levantamento de dados, sem nenhuma alteração. As decisões seguem sendo humana
 
 | | "Ketelllen Guedes" (3 L) | "Ketellen Guedes" |
 |---|---|---|
-| WhatsApp | **5521993558217** | **5521993558217** — *idêntico* |
+| WhatsApp | *(número fora do repositório)* | **idêntico** |
 | Data de inscrição | 29/07/2026 **13:46:15** | 29/07/2026 **14:51:50** |
 | Tipo / departamento | colaborador / vazio | colaborador / vazio |
 | memberId | `02e83f75…` | `54d80ba8…` |

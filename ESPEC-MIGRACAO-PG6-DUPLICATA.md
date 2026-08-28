@@ -21,7 +21,7 @@ Uma mesma pessoa possui dois cadastros no PG 6:
 | | **A — abandonado** | **B — vivo** |
 |---|---|---|
 | Nome | `Ketelllen Guedes` (3 "l") | `Ketellen Guedes` |
-| WhatsApp | `5521993558217` | `5521993558217` |
+| WhatsApp | *(número fora do repositório)* | *(idêntico ao de A)* |
 | memberId | `02e83f75-bb3c-4a5c-9296-0df2ea494d0a` | `54d80ba8-95e4-4d50-aa21-c5a31a237b1b` |
 | ts (inscrição) | 29/07/2026 13:46:15 | 29/07/2026 14:51:50 |
 | XP | 120 | 405 |
