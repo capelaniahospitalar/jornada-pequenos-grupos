@@ -9834,6 +9834,26 @@ async function autoTesteB1() {
        nomePreferido('Ana', 'Ana Paula Souza') === 'Ana Paula Souza' &&
        nomePreferido('Ana Paula', 'Marcos Silva') === 'Marcos Silva', 'correção real ainda prevalece');
 
+    // B1.2 — DESEMPATE ENTRE CANDIDATOS. Caso real da base: a MESMA pessoa cadastrada duas
+    // vezes no mesmo PG, com o mesmo WhatsApp e um nome sendo prefixo do outro. Devolver "o
+    // primeiro do array" ligaria a pessoa ao cadastro menor conforme a ordem da lista.
+    const gDup = { num: SLOT, participantes: [
+      { nome: 'Thaís Pereira Vieira', wa: '5521911110038', memberId: 'DUP-MENOR', progresso: { xp: 240 } },
+      { nome: 'Thaís Pereira',        wa: '5521911110038', memberId: 'DUP-MAIOR', progresso: { xp: 1040 } } ] };
+    ok('B1-28 duplicata real: vence o cadastro com MAIS progresso',
+       (buscarCadastroExistente(gDup, 'Thaís Pereira', '5521911110038') || {}).memberId === 'DUP-MAIOR',
+       'ordem do array não decide mais');
+    const gDupInv = { num: SLOT, participantes: gDup.participantes.slice().reverse() };
+    ok('B1-29 desempate independe da ordem da lista',
+       (buscarCadastroExistente(gDupInv, 'Thaís Pereira', '5521911110038') || {}).memberId === 'DUP-MAIOR',
+       'mesmo resultado com a lista invertida');
+    ok('B1-30 nome idêntico prevalece sobre nome apenas compatível',
+       (buscarCadastroExistente({ num: SLOT, participantes: [
+         { nome: 'Ana Paula Souza', wa: '5521911110099', memberId: 'COMPATIVEL', progresso: { xp: 9999 } },
+         { nome: 'Ana Paula',       wa: '5521911110099', memberId: 'EXATO',      progresso: { xp: 10 } } ] },
+         'Ana Paula', '5521911110099') || {}).memberId === 'EXATO',
+       'evidência mais forte ganha, mesmo com menos XP');
+
     // ── 5 (B1.5). progresso local maior que o da nuvem não é rebaixado ────
     ok('B1-26 comparação de XP não rebaixa o local', Math.max(999, 300) === 999, 'Math.max aplicado em aplicarLocal');
 
@@ -12344,18 +12364,28 @@ function buscarCadastroExistente(g, nome, waDigitado) {
   const nomeNorm = nome.trim().toLowerCase();
   const waNorm = String(waDigitado).replace(/\D/g, '');
   if (!waNorm) return null;
-  return (g.participantes || []).find(p => {
-    const pNome = (p.nome || '').trim().toLowerCase();
+  const waBate = (pWa) => pWa === waNorm || pWa.endsWith(waNorm) || waNorm.endsWith(pWa);
+  const candidatos = (g.participantes || []).filter(p => {
     const pWa = String(p.wa || '').replace(/\D/g, '');
-    if (!pWa) return false;
+    if (!pWa || !waBate(pWa)) return false;
     // B1.2: o nome passa a ser comparado pela MESMA régua que o app já usa para decidir
     // autoridade — nomesCorrespondem() ignora acento e aceita nome curto como prefixo de
     // palavra inteira. A comparação estrita anterior recusava "Jose Antonio" diante de
     // "José Antônio" e criava duplicata com XP zerado (auditoria: F-11, testes T6/T6-acento).
     // A prova de identidade continua sendo DUPLA: nome compatível E WhatsApp compatível.
-    if (!nomesCorrespondem(pNome, nomeNorm)) return false;
-    return pWa === waNorm || pWa.endsWith(waNorm) || waNorm.endsWith(pWa);
-  }) || null;
+    return nomesCorrespondem((p.nome || '').trim().toLowerCase(), nomeNorm);
+  });
+  if (!candidatos.length) return null;
+  // Mais de um candidato acontece de verdade: um PG da base tem a MESMA pessoa cadastrada
+  // duas vezes, com o mesmo WhatsApp e um nome sendo prefixo do outro (1040 XP e 240 XP).
+  // Devolver "o primeiro do array" faria a pessoa ser ligada a um cadastro ou a outro conforme
+  // a ORDEM da lista — e, na ordem errada, ela pareceria ter perdido 800 pontos.
+  // Critério determinístico: nome idêntico ganha do nome apenas compatível; entre iguais,
+  // ganha o cadastro com MAIS progresso. Assim a reentrada nunca rebaixa ninguém.
+  const exatos = candidatos.filter(p => (p.nome || '').trim().toLowerCase() === nomeNorm);
+  const pool = exatos.length ? exatos : candidatos;
+  const xpDe = (p) => (p && p.progresso && Number(p.progresso.xp)) || 0;
+  return pool.reduce((melhor, p) => xpDe(p) > xpDe(melhor) ? p : melhor, pool[0]);
 }
 
 // FUNC-02d: recuperarIdentidade()/renderRecuperarIdentidadeModal() removidas — só eram chamadas
