@@ -184,27 +184,34 @@ permanente**.
 | Identidade **não aparece ativa em lugar nenhum** | **20** |
 | **XP preso nesses 20 registros órfãos** | **3 805** |
 
-Prazos até a exclusão permanente (contados do `updatedAt`, referência 31/08):
+Distribuição dos prazos até a exclusão permanente (contados do `updatedAt`, referência 31/08):
 
-| Remoção | PG | XP em risco | Apagado em |
-|---|---|---|---|
-| 14/08 | 1 | **665** | ~13/09 |
-| 14/08 | 1 | 0 | ~13/09 |
-| 15/08 | 12 | 160 | ~14/09 |
-| 17/08 | 8 | 320 | ~16/09 |
-| 18/08 | 6 | 120 | ~17/09 |
-| 20/08 | 24 | 190 | ~19/09 |
-| 20/08 | 4 | 270 | ~19/09 |
-| 28/08 | 41 | **950** | ~27/09 |
-| 28/08 | 41 | 490 | ~27/09 |
-| 28/08 | 32 | 270 | ~27/09 |
-| 28/08 | 10 | 210 | ~27/09 |
-| 28/08 | 49 | 50 | ~27/09 |
-| (demais 9) | vários | 0 | 20/09 a 27/09 |
+| Janela de vencimento | Registros | Faixa alta | Faixa média | Sem progresso |
+|---|---|---|---|---|
+| **13 a 17/09** | **5** | **1** | 3 | 1 |
+| 19 a 20/09 | 5 | — | 2 | 3 |
+| 24 a 25/09 | 3 | — | — | 3 |
+| **27/09** | **7** | **1** | 4 | 2 |
+| **Total** | **20** | **2** | **9** | **9** |
+
+*Faixa alta = acima de 500 pontos · faixa média = 50 a 500 · sem progresso = zero.*
+**Total em risco: 3 805 pontos.** Primeiro vencimento **13/09**, último **27/09**.
+
+**Onde a urgência se concentra:** os **dois** registros de faixa alta vencem em pontas opostas —
+um em **13/09** e outro em **27/09**. Os 9 registros sem progresso nenhum não representam perda
+material; a decisão que importa é sobre os **11 com progresso**.
+
+> **Nota sobre a granularidade destes números.** A lista completa — data de remoção, número do PG e
+> progresso exato de cada registro — **não é publicada neste repositório**, que é aberto. Cruzar
+> PG, data e valor permitiria deduzir, dentro do hospital, quem saiu de qual grupo e quando.
+>
+> Isso não enfraquece a auditoria: o mecanismo (§ acima), o total em risco e as datas-limite são o
+> que sustentam a conclusão e o que orienta a decisão. **A lista nominal fica com o responsável
+> pelo projeto**, fora do repositório, e é o que ele usa para decidir quem resgatar.
 
 **Depois da data, o registro deixa de existir.** Se a pessoa voltar, `buscarCadastroExistente` não
-acha nada, ela é cadastrada como nova e o XP se perde em definitivo. **O primeiro prazo vence em
-13 dias.**
+acha nada, ela é cadastrada como nova e o progresso se perde em definitivo. **O primeiro prazo
+vence em 13 dias.**
 
 ### Veredito: ❌ **falha**
 

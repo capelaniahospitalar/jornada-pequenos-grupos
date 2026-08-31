@@ -37,22 +37,31 @@ A sonda **R1**, executada contra os **258 participantes ativos reais** de produ�
 R1 — cada pessoa, digitando os PRÓPRIOS dados, cai no PRÓPRIO cadastro?
      testadas: 249 (9 sem WhatsApp, não testáveis)
      acertos : 248
-     ERROS   : 1        ← PG 24
+     ERROS   : 1
 ```
 
 ### Diagnóstico
 
-O PG 24 tem **duas fichas da mesma pessoa**: mesmo WhatsApp, ambas com `papel = coordenador`,
-uma com **1040 XP** e outra com **240 XP**, e o nome de uma é prefixo do nome da outra. É a
-duplicidade já conhecida daquele PG.
+Um dos PGs tem **duas fichas da mesma pessoa** — é uma duplicidade já conhecida e registrada fora
+deste repositório. A assinatura que importa para a auditoria é esta:
+
+| Característica das duas fichas | |
+|---|---|
+| WhatsApp | **o mesmo** nas duas |
+| Nome | o de uma é **prefixo de palavra inteira** do da outra |
+| Papel | idêntico nas duas |
+| Progresso | **muito diferente** — uma tem várias vezes o da outra |
 
 Com a comparação estrita anterior, os dois nomes nunca casavam e o problema ficava latente. Com a
 régua tolerante do B1.2, **os dois passam a ser reconhecidos como a mesma pessoa — o que está
 correto** — mas `buscarCadastroExistente` devolvia **o primeiro do array**.
 
-> **O risco real:** se a ordem da lista fosse outra, a pessoa seria religada à ficha de 240 XP e
-> **pareceria ter perdido 800 pontos**. Fazer a identidade de alguém depender da ordem de um array
-> é inaceitável.
+> **O risco real:** se a ordem da lista fosse outra, a pessoa seria religada à ficha de progresso
+> menor e **pareceria ter perdido a maior parte do que conquistou**. Fazer a identidade de alguém
+> depender da ordem de um array é inaceitável.
+
+*Os valores exatos e a identificação do PG ficam fora deste repositório, que é público: eles não
+acrescentam nada ao raciocínio nem à reprodução, e permitiriam identificar a pessoa.*
 
 ### Correção aplicada
 
@@ -172,7 +181,7 @@ Os riscos declarados no [AUDIT-13](AUDIT-13-IMPLEMENTACAO-B1.md) §8 foram testa
 ### R1 — régua de nome mais tolerante · 🟢 **RESOLVIDO**
 
 Contra os 258 nomes reais: 21 pares de nomes distintos que a régua une; **apenas 1 par com
-WhatsApp também compatível** — e esse par é a duplicidade conhecida do PG 24, isto é, a **mesma
+WhatsApp também compatível** — e esse par é uma duplicidade já conhecida, isto é, a **mesma
 pessoa**. Com o desempate determinístico, 249/249 acertam.
 
 ### R2 — o carimbo inverte quem vence o merge · 🟡 **verificado, aceito**
