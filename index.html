@@ -10978,7 +10978,14 @@ let _fbAvisouSchemaNovo = false;   // o aviso de "recarregue o app" só aparece 
 // alterações. Efeito prático, sentido na perícia do PG 51: o log de conflitos carimbava sempre
 // a mesma versão, e foi impossível saber qual app gravou o quê. Agora a versão acompanha a
 // entrega, e `schema` registra o formato de dados que este app entende (ver SCHEMA_VERSION).
-const APP_VERSION = Object.freeze({ version: '1.2.0-rc1', build: '2026-08-21', schema: 2 });
+// FASE 16: o carimbo estava congelado em 1.2.0-rc1/2026-08-21 havia 10 commits, com quatro
+// correções de entrada/reentrada no meio — o que tornava IMPOSSÍVEL distinguir na tela um
+// aparelho atualizado de um desatualizado, justamente o primeiro suspeito de toda queixa de
+// "não consigo entrar" (auditoria: F-75). Incrementar aqui é pré-requisito de publicação:
+// sem isto não há como confirmar que a correção chegou aos aparelhos.
+// ⚠️ AINDA PENDENTE: exibir esta versão numa tela normal do app. Hoje ela só aparece dentro do
+// "Detalhes técnicos" da tela de erro do Companheiro de Jornada — praticamente invisível.
+const APP_VERSION = Object.freeze({ version: '1.3.0-rc1', build: '2026-08-31', schema: 2 });
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function uuid() {
