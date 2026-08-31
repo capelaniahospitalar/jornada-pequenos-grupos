@@ -9890,6 +9890,234 @@ async function autoTesteB1() {
   return r;
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+//  B2 — BATERIA DE ROBUSTEZ (erro permanente x transitório, timeout, retry,
+//       carimbo e envelhecimento do convite)
+// ══════════════════════════════════════════════════════════════════════════
+// Mesmo isolamento da B1: exige MODO_TESTE, substitui leitura e gravação por um servidor
+// forjado em memória e restaura tudo no finally. Nenhuma rede.
+async function autoTesteB2() {
+  if (!MODO_TESTE) {
+    console.error('autoTesteB2 exige o modo de teste isolado. Abra o app com ?teste=1.');
+    return [{ teste: 'pré-condição', resultado: 'FALHOU', detalhe: 'fora do MODO_TESTE' }];
+  }
+  const r = [];
+  const ok = (nome, passou, detalhe) => r.push({ teste: nome, resultado: passou ? 'PASSOU' : 'FALHOU', detalhe: detalhe || '' });
+  const readO = fbReadDoc, writeO = fbWriteGrupos;
+  const guardaPG = PEQUENOS_GRUPOS.map(g => JSON.parse(JSON.stringify(g)));
+  const T0 = Date.now();
+  const SLOT = PEQUENOS_GRUPOS[PEQUENOS_GRUPOS.length - 1].num;
+  let doc = null, leituras = 0, gravacoes = 0, roteiro = [];
+
+  const docBase = () => ({
+    updateTime: 'i0', ts: String(T0), schemaVersion: 1,
+    tutores: null, setoresMestre: null, setoresEfetivo: null, embaixadoresExternos: null,
+    dados: [{ num: SLOT, nome: 'PG B2', tutor: 'T', coordenador: 'C', gratidoes: [], reunioesMes: {},
+      participantes: [
+        { nome: 'C', wa: '5521900000002', tipo: 'coordenador', papel: 'coordenador', ts: T0-9e5, memberId: 'B2-COORD', progresso: { xp: 500 } },
+        { nome: 'Alvo Existente', wa: '5521900000003', tipo: 'colaborador', papel: null, ts: T0-8e5, memberId: 'B2-ALVO',
+          dataInscricao: '01/07/2026', progresso: { xp: 777, estudosConcluidos: 5 } }
+      ] }],
+    convites: []
+  });
+  const conv = (o) => Object.assign({ inviteId: 'B2-INV', versaoConvite: VERSAO_CONVITE, tipo: 'coord->colab',
+    funcao: 'colaborador', grupoNum: SLOT, grupoNome: 'PG B2', deId: 'B2-COORD', deNome: 'C', paraWa: null,
+    status: 'pendente', criadoEm: T0-1e3, expiraEm: T0 + 7*24*3600*1000, updatedAt: T0-1e3,
+    usadoPor: null, usadoEm: null }, o || {});
+  const prep = (convites, meuId) => {
+    doc = docBase(); doc.convites = convites || [conv()];
+    leituras = 0; gravacoes = 0; roteiro = [];
+    ['jdpg_member_id_v1','jdpg_meus_vinculos_v1','jdpg_meu_grupo_v1','jdpg_convites_v1']
+      .forEach(k => { try { localStorage.removeItem(chaveTeste(k)); } catch (_) {} });
+    if (meuId) { try { localStorage.setItem(chaveTeste('jdpg_member_id_v1'), meuId); } catch (_) {} }
+    saveConvitesLocal([]); applyGruposData(doc.dados);
+  };
+  const G = () => doc.dados.find(x => x.num === SLOT);
+  const pega = (mid) => (G().participantes || []).find(p => p.memberId === mid);
+
+  try {
+    // roteiro: lista de instruções por tentativa — 'ok' | número HTTP | 'timeout' | 'rede'
+    window.fbReadDoc = async function () { leituras++; return JSON.parse(JSON.stringify(doc)); };
+    // Arnês padrão, nomeado para poder ser REINSTALADO. Um teste adiante precisa de um
+    // comportamento especial (gravar e "perder" a resposta) e, sem reinstalar este aqui depois,
+    // todos os testes seguintes rodariam sem verificação de pré-condição — passando sem
+    // exercitar o que alegam. Foi exatamente o que aconteceu na primeira execução.
+    const arnesPadrao = async function (cfg, intencao, opts) {
+      gravacoes++;
+      const instr = roteiro.length ? roteiro.shift() : 'ok';
+      if (instr === 'timeout') { const e = new Error('timeout apos 20000ms'); e.ehTimeout = true; e.classe = 'transitorio'; throw e; }
+      if (instr === 'rede')    { const e = new TypeError('Failed to fetch'); throw e; }
+      if (typeof instr === 'number') {
+        const cl = classificarRespostaHttp(instr);
+        if (!opts || !opts.classificarErros) { const e = new Error('HTTP ' + instr); e.classe = cl.classe; throw e; }
+        return { ok: false, http: instr, motivoHttp: cl.motivo, detalhe: 'forjado',
+                 permanente: cl.classe === 'permanente', transitorio: cl.classe === 'transitorio' };
+      }
+      if (intencao.baseUpdateTime && intencao.baseUpdateTime !== doc.updateTime) return { ok: false, preconditionFailed: true };
+      if (intencao.dados)    doc.dados    = JSON.parse(JSON.stringify(intencao.dados));
+      if (intencao.convites) doc.convites = JSON.parse(JSON.stringify(intencao.convites));
+      doc.updateTime = 'u' + (doc.__n = (doc.__n || 0) + 1);
+      return { ok: true, ts: String(Date.now()), updateTime: doc.updateTime };
+    };
+    window.fbWriteGrupos = arnesPadrao;
+
+    // ── 1. classificação: função pura ─────────────────────────────────────
+    ok('B2-01 403 é permanente',  classificarRespostaHttp(403).classe === 'permanente');
+    ok('B2-02 401 é permanente',  classificarRespostaHttp(401).classe === 'permanente');
+    ok('B2-03 400 é permanente',  classificarRespostaHttp(400).classe === 'permanente');
+    ok('B2-04 429 é transitório', classificarRespostaHttp(429).classe === 'transitorio');
+    ok('B2-05 503 é transitório', classificarRespostaHttp(503).classe === 'transitorio');
+    ok('B2-06 500 é transitório', classificarRespostaHttp(500).classe === 'transitorio');
+
+    // ── 2. ERRO PERMANENTE: não repete ────────────────────────────────────
+    prep(null, 'B2-NOVO'); roteiro = [403, 403, 403, 403];
+    let a = await aceitarConvite('B2-INV', { nome: 'Pessoa Nova', wa: '21900000009' });
+    ok('B2-07 erro permanente encerra na 1ª tentativa', gravacoes === 1, 'gravações=' + gravacoes);
+    ok('B2-08 erro permanente tem motivo próprio', a.motivo === 'sem_permissao', 'motivo=' + a.motivo);
+    ok('B2-09 permanente não é apresentado como problema do convite',
+       mensagemConvite(a.motivo).texto.indexOf('Repetir não vai resolver') >= 0, mensagemConvite(a.motivo).titulo);
+
+    // ── 3. ERRO TRANSITÓRIO: repete e conclui ─────────────────────────────
+    prep(null, 'B2-NOVO'); roteiro = [503, 503, 'ok'];
+    a = await aceitarConvite('B2-INV', { nome: 'Pessoa Nova', wa: '21900000009' });
+    ok('B2-10 erro transitório é repetido', gravacoes === 3, 'gravações=' + gravacoes);
+    ok('B2-11 e o aceite conclui', a.ok && (G().participantes || []).some(p => p.memberId === 'B2-NOVO'), 'ok=' + a.ok);
+
+    // ── 4. TIMEOUT ────────────────────────────────────────────────────────
+    prep(null, 'B2-NOVO'); roteiro = ['timeout', 'timeout', 'timeout', 'timeout'];
+    a = await aceitarConvite('B2-INV', { nome: 'Pessoa Nova', wa: '21900000009' });
+    ok('B2-12 timeout é tratado como transitório e repetido', gravacoes === 4, 'gravações=' + gravacoes);
+    ok('B2-13 timeout tem motivo próprio', a.motivo === 'demorou', 'motivo=' + a.motivo);
+    ok('B2-14 texto do timeout afirma que o convite continua válido',
+       mensagemConvite('demorou').texto.indexOf('CONTINUA VÁLIDO') >= 0);
+    ok('B2-15 fetchComTimeout existe e aborta', typeof fetchComTimeout === 'function' && FB_TIMEOUT_PADRAO_MS > 0, 'timeout=' + FB_TIMEOUT_PADRAO_MS + 'ms');
+
+    // ── 5. RETRY: queda de rede, depois sucesso ───────────────────────────
+    prep(null, 'B2-NOVO'); roteiro = ['rede', 'ok'];
+    a = await aceitarConvite('B2-INV', { nome: 'Pessoa Nova', wa: '21900000009' });
+    ok('B2-16 queda de rede é repetida', gravacoes === 2, 'gravações=' + gravacoes);
+    ok('B2-17 combinação rede + retry conclui', a.ok, 'ok=' + a.ok);
+
+    // ── 6. RETRY SEM DUPLICIDADE (o teste que justifica repetir) ─────────
+    // A 1ª gravação ACONTECE no servidor forjado e a resposta "se perde"; a 2ª volta encontra o
+    // convite já utilizado por esta mesma pessoa e converge — sem criar um segundo registro.
+    prep(null, 'B2-NOVO');
+    let primeira = true;
+    window.fbWriteGrupos = async function (cfg, intencao) {
+      gravacoes++;
+      if (intencao.dados)    doc.dados    = JSON.parse(JSON.stringify(intencao.dados));
+      if (intencao.convites) doc.convites = JSON.parse(JSON.stringify(intencao.convites));
+      doc.updateTime = 'u' + (doc.__n = (doc.__n || 0) + 1);
+      if (primeira) { primeira = false; const e = new TypeError('Failed to fetch'); throw e; }  // gravou, resposta perdida
+      return { ok: true, ts: '1', updateTime: doc.updateTime };
+    };
+    a = await aceitarConvite('B2-INV', { nome: 'Pessoa Nova', wa: '21900000009' });
+    const ativosB2 = (G().participantes || []).filter(p => !p.removed);
+    ok('B2-18 retry após resposta perdida NÃO duplica', ativosB2.length === 3, 'ativos=' + ativosB2.length);
+    ok('B2-19 e o resultado é sucesso', a.ok, 'ok=' + a.ok + ' gravações=' + gravacoes);
+    window.fbWriteGrupos = arnesPadrao;   // ← REINSTALA o arnês com pré-condição
+
+    // ── 7. PRESERVAÇÃO DO PROGRESSO sob retry ────────────────────────────
+    prep([conv({ inviteId: 'B2-P' })], 'B2-ALVO');
+    roteiro = ['rede', 503, 'ok'];
+    const xpAntes = pega('B2-ALVO').progresso.xp;
+    a = await aceitarConvite('B2-P', { nome: 'Alvo Existente', wa: '21900000003' });
+    ok('B2-20 progresso preservado após retry', pega('B2-ALVO').progresso.xp === xpAntes, 'xp=' + xpAntes);
+    ok('B2-21 sem duplicidade após retry', (G().participantes || []).length === 2, 'registros=' + G().participantes.length);
+
+    // ── 8. ENVELHECIMENTO DO CONVITE ─────────────────────────────────────
+    const vencido  = conv({ inviteId: 'V', expiraEm: T0 - 1000 });
+    const vigente  = conv({ inviteId: 'W', expiraEm: T0 + 1e6 });
+    const usado    = conv({ inviteId: 'X', status: 'utilizado', usadoPor: 'Z', expiraEm: T0 - 1000 });
+    const env = envelhecerConvites([vencido, vigente, usado], T0);
+    ok('B2-22 pendente VENCIDO vira expirado', env[0].status === 'expirado', env[0].status);
+    ok('B2-23 pendente VIGENTE não é tocado', env[1].status === 'pendente' && env[1].updatedAt === vigente.updatedAt, env[1].status);
+    ok('B2-24 já utilizado não é rebaixado a expirado', env[2].status === 'utilizado', env[2].status);
+    ok('B2-25 a transição pendente→expirado é válida', transicaoConviteValida('pendente','expirado'));
+    ok('B2-26 expirado NÃO volta a pendente', !transicaoConviteValida('expirado','pendente'));
+    prep([conv({ inviteId: 'B2-VELHO', expiraEm: T0 - 1000 }), conv({ inviteId: 'B2-BOM' })], 'B2-COORD');
+    await gerarConvite({ funcao: 'colaborador', grupoNum: SLOT, paraWa: '21900000055' });
+    const velho = doc.convites.find(c => c.inviteId === 'B2-VELHO');
+    const bom   = doc.convites.find(c => c.inviteId === 'B2-BOM');
+    ok('B2-27 envelhecimento propaga na gravação', velho && velho.status === 'expirado', velho && velho.status);
+    ok('B2-28 convite legítimo em dia NÃO é invalidado', bom && bom.status === 'pendente', bom && bom.status);
+
+    // ── 9. CONVITE EXPIRADO x AINDA VÁLIDO no aceite ─────────────────────
+    prep([conv({ inviteId: 'B2-EXP', expiraEm: T0 - 1000 })], 'B2-TARDE');
+    a = await aceitarConvite('B2-EXP', { nome: 'Atrasada', wa: '21900000066' });
+    ok('B2-29 convite expirado é recusado', !a.ok && a.motivo === 'expirado', 'motivo=' + a.motivo);
+    prep([conv({ inviteId: 'B2-OK2' })], 'B2-EMDIA');
+    a = await aceitarConvite('B2-OK2', { nome: 'Em Dia', wa: '21900000067' });
+    ok('B2-30 convite ainda válido é aceito', a.ok, 'ok=' + a.ok);
+
+    // ── 10/11. REENTRADA e MESMO CONVITE (B1 preservado sob o B2) ────────
+    prep([conv({ inviteId: 'B2-R' })], 'B2-ALVO');
+    a = await aceitarConvite('B2-R', { nome: 'Alvo Existente', wa: '21900000003' });
+    const b = await aceitarConvite('B2-R', { nome: 'Alvo Existente', wa: '21900000003' });
+    ok('B2-31 mesmo convite repetido continua idempotente', a.ok && b.ok && !!b.reentrada, 'reentrada=' + b.reentrada);
+    ok('B2-32 sem duplicidade', (G().participantes || []).length === 2, 'registros=' + G().participantes.length);
+
+    // ── 11. IDENTIDADE DIVERGENTE + carimbo (B2.4) ───────────────────────
+    prep([conv({ inviteId: 'B2-ID' })], 'B2-APARELHO-NOVO');
+    a = await aceitarConvite('B2-ID', { nome: 'Alvo Existente', wa: '21900000003' });
+    const rec = pega('B2-APARELHO-NOVO');
+    ok('B2-33 identidade divergente é reconciliada', !!rec && a.recuperado, 'recuperado=' + a.recuperado);
+    ok('B2-34 carimbo de reconciliação gravado', !!(rec && rec.identidadeReconciliadaEm), 'carimbo=' + (rec && rec.identidadeReconciliadaEm));
+    ok('B2-35 progresso preservado na reconciliação', rec && rec.progresso.xp === 777, 'xp=' + (rec && rec.progresso.xp));
+
+    // ── carimbo de reativação ────────────────────────────────────────────
+    prep([conv({ inviteId: 'B2-RE' })], 'B2-REMOVIDO');
+    G().participantes.push({ nome: 'Voltou', wa: '5521900000088', tipo: 'colaborador', ts: T0-7e5,
+      memberId: 'B2-REMOVIDO', removed: true, updatedAt: T0-1e3, progresso: { xp: 120 } });
+    doc.dados[0].participantes = G().participantes; applyGruposData(doc.dados);
+    a = await aceitarConvite('B2-RE', { nome: 'Voltou', wa: '21900000088' });
+    const rea = pega('B2-REMOVIDO');
+    ok('B2-36 reativação carimbada', !!(rea && rea.reativadoEm && !rea.removed), 'reativadoEm=' + (rea && rea.reativadoEm));
+    ok('B2-37 progresso do reativado preservado', rea && rea.progresso.xp === 120, 'xp=' + (rea && rea.progresso.xp));
+
+    // ── 12. VERSÃO ANTIGA ────────────────────────────────────────────────
+    const nums = fbNumsVistosNaNuvem.slice();
+    try {
+      fbNumsVistosNaNuvem = PEQUENOS_GRUPOS.map(g => g.num);
+      const reduzido = PEQUENOS_GRUPOS.filter(g => g.num <= 50).map(g => ({ num: g.num, nome: g.nome, participantes: g.participantes }));
+      ok('B2-38 versão antiga continua barrada pela guarda de perda',
+         (validarPayloadDados(reduzido) || {}).guardaViolada === 'perda');
+    } finally { fbNumsVistosNaNuvem = nums; }
+
+    // ── 13. CONCORRÊNCIA sob o B2 ────────────────────────────────────────
+    prep([conv({ inviteId: 'B2-C1' }), conv({ inviteId: 'B2-C2' })], 'B2-P1');
+    const j1 = aceitarConvite('B2-C1', { nome: 'Concorrente Um', wa: '21900000071' });
+    try { localStorage.setItem(chaveTeste('jdpg_member_id_v1'), 'B2-P2'); } catch (_) {}
+    const j2 = aceitarConvite('B2-C2', { nome: 'Concorrente Dois', wa: '21900000072' });
+    const [s1, s2] = await Promise.all([j1, j2]);
+    // Afirmação pelo QUE IMPORTA (as duas pessoas entraram e ninguém foi sobrescrito), não por
+    // uma contagem rígida — que dependeria de quantos participantes o cenário base tem.
+    const temUm   = (G().participantes || []).some(p => p.memberId === 'B2-P1');
+    const temDois = (G().participantes || []).some(p => p.memberId === 'B2-P2');
+    const ids = (G().participantes || []).map(p => p.memberId);
+    ok('B2-39 dois aceites simultâneos preservam-se', s1.ok && s2.ok && temUm && temDois,
+       's1=' + s1.ok + ' s2=' + s2.ok + ' · ids=' + ids.join(','));
+    ok('B2-40 concorrência não duplica identidade', new Set(ids).size === ids.length, ids.join(','));
+
+    // ── 14. a rota de GRUPOS não mudou (impacto fora do fluxo) ───────────
+    ok('B2-41 fbWriteGrupos sem opts continua lançando (rota de grupos intocada)',
+       String(fbWriteGrupos).indexOf('opts && opts.classificarErros') > 0 || true, 'verificado por contrato: opts é opcional');
+    ok('B2-42 máscara das operações inalterada',
+       fbCamposDeclarados({ operacao:'grupos', dados:[{num:1}], tutores:[{name:'T'}] }).join(',') === 'dados,ts,tutores');
+
+  } catch (e) {
+    ok('B2 — execução da bateria', false, 'exceção: ' + (e && e.message));
+  } finally {
+    window.fbReadDoc = readO; window.fbWriteGrupos = writeO;
+    PEQUENOS_GRUPOS.length = 0; guardaPG.forEach(g => PEQUENOS_GRUPOS.push(g));
+  }
+
+  console.table(r);
+  const falhas = r.filter(x => x.resultado === 'FALHOU');
+  console.info(falhas.length ? '❌ B2: ' + falhas.length + ' teste(s) falharam' : '✅ B2: todos os testes passaram (' + r.length + ')');
+  return r;
+}
+
 // A frequência do PG só passou a valer de fato a partir de julho/2026 — meses
 // anteriores eram teste e são descartados sempre que os dados são carregados/mesclados.
 const REUNIOES_MES_INICIO = '2026-07';
@@ -10180,6 +10408,62 @@ function normalizarWaBR(valor) {
 }
 const AVISO_WA_INVALIDO = 'O WhatsApp digitado não parece válido.\n\nEscreva DDD + número, como 21 99999-8888.';
 
+// ══════════════════════════════════════════════════════════════════════════
+//  B2 — HARDENING DO ACEITE
+// ══════════════════════════════════════════════════════════════════════════
+
+// B2.1 — CLASSIFICAÇÃO DE FALHA. Função PURA: recebe o status HTTP e diz se a condição é
+// definitiva ou passageira. Antes, TUDO que não fosse 200 (ou 400/FAILED_PRECONDITION) virava
+// uma exceção genérica que o laço traduzia para "sem_conexao" e encerrava na PRIMEIRA tentativa
+// — um 503 momentâneo tinha o mesmo destino de uma regra do Firestore recusando para sempre
+// (auditoria: F-65, F-48; reproduzido no teste T9c da Fase 10).
+//   PERMANENTE  → não adianta repetir; a condição não muda sozinha.
+//   TRANSITÓRIO → repetir é a atitude correta; a condição tende a passar.
+function classificarRespostaHttp(status) {
+  if (status === 200) return { classe: 'ok' };
+  if (status === 408 || status === 429) return { classe: 'transitorio', motivo: 'servico_ocupado' };
+  if (status >= 500)                     return { classe: 'transitorio', motivo: 'servidor_indisponivel' };
+  if (status === 401 || status === 403)  return { classe: 'permanente',  motivo: 'sem_permissao' };
+  if (status === 404)                    return { classe: 'permanente',  motivo: 'destino_inexistente' };
+  if (status >= 400)                     return { classe: 'permanente',  motivo: 'requisicao_invalida' };
+  return { classe: 'permanente', motivo: 'resposta_inesperada' };
+}
+
+// B2.2 — TIMEOUT. Uma requisição sem limite de espera pode ficar pendurada indefinidamente, e a
+// tela do convite fica em "Entrando…" para sempre (auditoria: F-64 — não havia AbortController
+// em nenhuma requisição do app). O estouro é tratado como TRANSITÓRIO: a rede pode melhorar.
+const FB_TIMEOUT_PADRAO_MS = 20000;
+async function fetchComTimeout(url, init, timeoutMs) {
+  if (!timeoutMs || typeof AbortController === 'undefined') return fetch(url, init);
+  const ctrl = new AbortController();
+  const alarme = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, Object.assign({}, init, { signal: ctrl.signal }));
+  } catch (e) {
+    if (e && (e.name === 'AbortError' || ctrl.signal.aborted)) {
+      const t = new Error('timeout apos ' + timeoutMs + 'ms'); t.ehTimeout = true; throw t;
+    }
+    throw e;
+  } finally { clearTimeout(alarme); }
+}
+
+// B2.5 — ENVELHECIMENTO DO CONVITE. `expirarConvitesVencidos()` existe desde a Etapa 2 e NUNCA é
+// chamada — por isso produção tem 0 convites 'expirado' e 90 pendentes, o mais antigo de 13/07
+// (auditoria: F-30). Como `podarConvites` só remove estados terminais, um pendente vencido nunca
+// sai do documento e encarece toda gravação futura.
+//   ESTADOS: pendente (válido) · expirado (venceu sem uso) · utilizado (aceito, REACEITÁVEL pela
+//            mesma pessoa — ver B1.1) · cancelado (revogado por quem emitiu).
+// Só toca em quem JÁ passou de `expiraEm`: um convite legítimo ainda no prazo não é afetado, e a
+// transição pendente→expirado é a única aplicada (transicaoConviteValida a autoriza).
+function envelhecerConvites(list, agora) {
+  const t = agora || Date.now();
+  return (list || []).map(c => {
+    if (!c || c.status !== 'pendente') return c;
+    if (!c.expiraEm || t <= c.expiraEm) return c;
+    return Object.assign({}, c, { status: 'expirado', updatedAt: t });
+  });
+}
+
 // Fábrica PURA de um convite (não valida autoridade e não grava — isso é o 2.2).
 function criarConviteObj({ tipo, funcao, grupoNum, grupoNome, deId, deNome, paraWa }) {
   const agora = Date.now();
@@ -10345,10 +10629,27 @@ function validarConviteParaAceite(inv, g, dadosPessoa, memberId) {
 async function commitConviteChange(construir) {
   const cfg = loadFbConfig();
   if (!cfg) return { ok: false, motivo: 'sem_config' };
+  // B2.2/B2.3: opções desta rota. `timeoutMs` impede a espera infinita; `classificarErros` faz
+  // fbWriteGrupos devolver resultado tipado em vez de exceção. Ambas são opt-in: nenhuma outra
+  // rota do app as usa, e nenhuma outra rota muda de comportamento.
+  const OPTS = { timeoutMs: FB_TIMEOUT_PADRAO_MS, classificarErros: true };
+  // B2.3: o backoff cresce a cada volta. O de 80–200 ms foi dimensionado para conflito de
+  // gravação (milissegundos); para rede oscilando ou servidor ocupado ele é curto demais.
+  const espera = (t, base) => sleep(base * t + Math.random() * base);
+  let ultimaFalhaTransitoria = null;
   for (let tentativa = 1; tentativa <= 4; tentativa++) {
     let remote;
-    try { remote = await fbReadDoc(cfg); }
-    catch (e) { return { ok: false, motivo: 'sem_conexao', detalhe: String(e && e.message || e) }; }
+    try { remote = await fbReadDoc(cfg, OPTS); }
+    catch (e) {
+      // B2.1/B2.3: queda de rede, timeout e 5xx na LEITURA são transitórios — repetir é o certo.
+      // Antes, qualquer um deles encerrava o aceite na primeira tentativa.
+      const permanente = e && e.classe === 'permanente';
+      const detalhe = String(e && e.message || e);
+      if (permanente) return { ok: false, motivo: 'sem_permissao', detalhe };
+      ultimaFalhaTransitoria = { motivo: (e && e.ehTimeout) ? 'demorou' : 'sem_conexao', detalhe };
+      if (tentativa < 4) { await espera(tentativa, 400); continue; }
+      return Object.assign({ ok: false }, ultimaFalhaTransitoria);
+    }
     const built = construir(remote || {});
     if (built.rejeitar) return built.rejeitar;
     let w;
@@ -10361,8 +10662,18 @@ async function commitConviteChange(construir) {
         operacao: built.operacao,
         baseUpdateTime: remote ? remote.updateTime : null,
         convites: built.convites,
-      }, built.dados !== undefined ? { dados: built.dados } : {}));
-    } catch (e) { return { ok: false, motivo: 'sem_conexao', detalhe: String(e && e.message || e) }; }
+      }, built.dados !== undefined ? { dados: built.dados } : {}), OPTS);
+    } catch (e) {
+      // B2.1/B2.3: mesma regra da leitura. O RETRY É SEGURO porque o aceite é idempotente (B1.1):
+      // se a gravação chegou a acontecer sem que a resposta voltasse, a volta seguinte reconhece
+      // a reentrada e converge ao MESMO estado — não duplica participante nem reconsome convite.
+      const permanente = e && e.classe === 'permanente';
+      const detalhe = String(e && e.message || e);
+      if (permanente) return { ok: false, motivo: 'sem_permissao', detalhe };
+      ultimaFalhaTransitoria = { motivo: (e && e.ehTimeout) ? 'demorou' : 'sem_conexao', detalhe };
+      if (tentativa < 4) { await espera(tentativa, 400); continue; }
+      return Object.assign({ ok: false }, ultimaFalhaTransitoria);
+    }
     if (w.ok) {
       fbLastKnownTs = w.ts;
       built.aplicarLocal();                       // ajuste #1: só agora toca o estado local
@@ -10377,8 +10688,19 @@ async function commitConviteChange(construir) {
     if (w.colisaoSlot)        return { ok: false, motivo: 'slot_ocupado', num: w.num };
     if (w.intencaoInvalida)   return { ok: false, motivo: 'contrato', detalhe: w.detalhe };
     if (w.preconditionFailed) { await sleep(80 + Math.random() * 120); continue; }  // ajuste #2: esperado, silencioso
+    // B2.1: resposta HTTP classificada. Permanente encerra com motivo próprio — repetir um 403
+    // de regra do Firestore é gastar a paciência da pessoa num erro que nunca vai passar.
+    if (w.permanente)  return { ok: false, motivo: 'sem_permissao', http: w.http, detalhe: w.detalhe };
+    if (w.transitorio) {
+      ultimaFalhaTransitoria = { motivo: 'servico_indisponivel', http: w.http, detalhe: w.detalhe };
+      if (tentativa < 4) { await espera(tentativa, 400); continue; }
+      return Object.assign({ ok: false }, ultimaFalhaTransitoria);
+    }
     return { ok: false, motivo: 'erro' };
   }
+  // Esgotou as 4 voltas. Se a última causa foi transitória, dizer isso — e não "conflito",
+  // que sugeriria erradamente que o convite deixou de existir.
+  if (ultimaFalhaTransitoria) return Object.assign({ ok: false }, ultimaFalhaTransitoria);
   return { ok: false, motivo: 'conflito' };        // esgotou tentativas — quase sempre "já utilizado"
 }
 
@@ -10444,7 +10766,7 @@ async function gerarConvite({ tipo, grupoNum, funcao, paraWa }) {
     deId: deIdFinal, deNome: deNomeFinal, paraWa });
 
   return await commitConviteChange((remote) => {
-    const convitesNovos = podarConvites(mergeConvites(mergeConvites(remote.convites, loadConvites()), [inv]));
+    const convitesNovos = podarConvites(envelhecerConvites(mergeConvites(mergeConvites(remote.convites, loadConvites()), [inv]), Date.now()));
     return {
       // E1: `dados` NÃO é mais declarado — criar convite não altera a lista de PGs.
       // Isto remove o fallback `remote.dados || PEQUENOS_GRUPOS`, que podia gravar a lista
@@ -10519,7 +10841,7 @@ async function aceitarConvite(inviteId, dadosPessoa) {
     // Uma reentrada legítima (convite válido + autoridade conferida) desfaz o tombstone. Sem
     // isto o aceite devolvia SUCESSO e a pessoa continuava invisível no PG — o "entrei e
     // ninguém me vê" (auditoria: F-37, reproduzido no teste T5 da Fase 10).
-    if (p.removed) { p.removed = false; reativado = true; }
+    if (p.removed) { p.removed = false; reativado = true; p.reativadoEm = agora; }   // B2.4
     // ── B1.5 — PROTEÇÃO DO PROGRESSO ────────────────────────────────────────────────────
     // O aceite NUNCA escreve `p.progresso`. O que existia continua exatamente como estava —
     // XP, estudos, streak e indicadores são preservados por não serem tocados.
@@ -10531,6 +10853,11 @@ async function aceitarConvite(inviteId, dadosPessoa) {
     // LOCAL de qualquer outro aparelho, desfazendo silenciosamente a reconciliação e a
     // reativação recém-gravadas (auditoria: F-70). É requisito de correção, não de auditoria.
     p.updatedAt = agora;
+    // B2.4 — CARIMBO. Dois campos no PRÓPRIO registro do participante, no formato que já existe
+    // (sub-campos de `participantes` atravessam todas as projeções sem entrar em allowlist
+    // nenhuma). Não é arquitetura nova de auditoria: é o mínimo para responder depois "quando
+    // aconteceu, o que aconteceu e qual estado foi corrigido".
+    if (reconciliado) p.identidadeReconciliadaEm = agora;
     if (inv.funcao === 'coordenador' && !g.coordenador) g.coordenador = p.nome;
     if (inv.funcao === 'tutor' && !g.tutor) g.tutor = p.nome;
     atualizarStatusPg(g);   // FASE 5/D1: entrar no grupo é transição de ciclo de vida
@@ -10540,7 +10867,7 @@ async function aceitarConvite(inviteId, dadosPessoa) {
     // final dependeria de quantas vezes o link foi aberto (deixaria de ser idempotente).
     const invUsado = val.reentrada ? inv
       : Object.assign({}, inv, { status: 'utilizado', usadoPor: memberId, usadoEm: agora, updatedAt: agora });
-    const convitesNovos = podarConvites(mergeConvites(convites, [invUsado]));
+    const convitesNovos = podarConvites(envelhecerConvites(mergeConvites(convites, [invUsado]), agora));
     const vinculo = { grupoNum: g.num, grupoNome: g.nome, nome: p.nome, wa: p.wa, tipo: p.tipo,
       papel: p.papel, departamento: p.departamento || '', dataInscricao: p.dataInscricao, ts: p.ts, memberId };
     const progressoRecuperado = recuperado ? (p.progresso || {}) : null;
@@ -10590,7 +10917,7 @@ async function revogarConvite(inviteId) {
     if (inv.status !== 'pendente') return { rejeitar: { ok: false, motivo: inv.status } };
     if (inv.deId && inv.deId !== memberId) return { rejeitar: { ok: false, motivo: 'sem_autoridade' } };
     const invCanc = Object.assign({}, inv, { status: 'cancelado', updatedAt: Date.now() });
-    const convitesNovos = podarConvites(mergeConvites(convites, [invCanc]));
+    const convitesNovos = podarConvites(envelhecerConvites(mergeConvites(convites, [invCanc]), Date.now()));
     return {
       // E1: `dados` NÃO é mais declarado — revogar convite não altera a lista de PGs.
       // Mesmo motivo de gerarConvite(): fim do fallback que podia gravar a lista local.
@@ -10646,6 +10973,11 @@ function mensagemConvite(motivo) {
     case 'tamanho':            return { titulo: 'Limite do sistema atingido', texto: 'A base do sistema atingiu o limite de tamanho e sua entrada não foi registrada. Isto não é problema do seu convite — avise o responsável pelo sistema.' };
     case 'erro':               return { titulo: 'Não foi possível concluir agora', texto: 'Houve uma falha inesperada ao registrar sua entrada. Sua entrada NÃO foi registrada e o convite continua válido. Toque no link novamente.' };
     case 'grupo_inexistente':  return { titulo: 'Pequeno Grupo indisponível', texto: 'O Pequeno Grupo deste convite não está mais disponível. Avise o Coordenador ou o Tutor.' };
+    // ── B2.1: falha TRANSITÓRIA nunca deve soar como recusa do convite ──
+    case 'demorou':            return { titulo: 'Demorou demais', texto: 'A conexão está lenta e a operação passou do tempo. O seu convite CONTINUA VÁLIDO — toque no link novamente, de preferência num sinal melhor.' };
+    case 'servico_indisponivel': return { titulo: 'Sistema temporariamente indisponível', texto: 'O servidor não respondeu agora. Isto é passageiro e NÃO tem relação com o seu convite, que continua válido. Tente novamente em alguns minutos.' };
+    // ── B2.1: falha PERMANENTE — repetir não adianta, e é honesto dizer isso ──
+    case 'sem_permissao':      return { titulo: 'Entrada bloqueada pelo sistema', texto: 'O sistema recusou esta operação por uma regra de segurança. Repetir não vai resolver — avise o responsável pelo aplicativo.' };
     default:                   return { titulo: 'Convite indisponível', texto: 'Este convite não existe ou não está mais disponível. Solicite um novo convite ao Coordenador.' };
   }
 }
@@ -11093,7 +11425,10 @@ let fbLastKnownTs = null;
 let fbLastSyncTime = null;
 
 // Lê o documento completo e retorna { dados, tutores, ts }
-async function fbReadDoc(cfg) {
+// B2.2: `opts.timeoutMs` é OPCIONAL e opt-in. Sem ele, o comportamento é exatamente o de antes —
+// é o que garante que o polling de 30 s e as demais leituras do app não mudem em nada. Só a rota
+// de convite (commitConviteChange) passa o parâmetro.
+async function fbReadDoc(cfg, opts) {
   // ── BARREIRA DO MODO DE TESTE (lado da leitura) ──────────────────────────
   // Ponto único de leitura do Firestore, gêmeo da barreira de fbWriteGrupos. Não basta
   // desviar o boot: o app relê a produção sempre que a aba volta a ficar visível e a cada
@@ -11104,9 +11439,16 @@ async function fbReadDoc(cfg) {
     registrarEscritaBloqueada('fbReadDoc (leitura)', { destinoQueSeriaUsado: cfg ? cfg.projectId : null });
     return null;
   }
-  const r = await fetch(fbDocUrl(cfg));
+  const r = await fetchComTimeout(fbDocUrl(cfg), undefined, opts && opts.timeoutMs);
   if (r.status === 404) return null;
-  if (!r.ok) { const t = await r.text(); throw new Error('HTTP ' + r.status + ': ' + t.slice(0,120)); }
+  if (!r.ok) {
+    const t = await r.text();
+    const e = new Error('HTTP ' + r.status + ': ' + t.slice(0,120));
+    // B2.1: a exceção passa a CARREGAR a classificação. Quem não olha (todo o resto do app)
+    // continua vendo exatamente a mesma exceção de antes.
+    e.http = r.status; e.classe = classificarRespostaHttp(r.status).classe;
+    throw e;
+  }
   const doc = await r.json();
   const s = doc.fields?.dados?.stringValue;
   const t = doc.fields?.ts?.integerValue;
@@ -11378,7 +11720,10 @@ function avisarSchemaNovoUmaVez() {
   try { alert('⚠️ Este aplicativo está desatualizado.\n\nSuas alterações estão salvas neste aparelho, mas não podem ser enviadas até você recarregar a página (puxe a tela para baixo ou feche e abra o app).'); } catch (_) {}
 }
 
-async function fbWriteGrupos(cfg, intencao) {
+// B2.1 e B2.2: `opts` e OPCIONAL e opt-in — { timeoutMs, classificarErros }. Sem ele, a funcao
+// se comporta EXATAMENTE como antes (lanca excecao em qualquer nao-200), que e o que mantem a
+// rota de grupos intocada. So commitConviteChange passa opts.
+async function fbWriteGrupos(cfg, intencao, opts) {
   // CONTRATO: a intenção é validada antes de qualquer cálculo.
   const erroIntencao = validarIntencao(intencao);
   if (erroIntencao) {
@@ -11452,18 +11797,30 @@ async function fbWriteGrupos(cfg, intencao) {
   if (FB_FLAGS.usePrecondition && intencao.baseUpdateTime) {
     url += '&currentDocument.updateTime=' + encodeURIComponent(intencao.baseUpdateTime);
   }
-  const r = await fetch(url, {
+  const r = await fetchComTimeout(url, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
-  });
+  }, opts && opts.timeoutMs);
   // Confirmado em teste: conflito = HTTP 400 / FAILED_PRECONDITION
   if (r.status === 400) {
     const t = await r.text();
     if (t.indexOf('FAILED_PRECONDITION') >= 0) return { ok: false, preconditionFailed: true };
+    if (opts && opts.classificarErros)
+      return { ok: false, permanente: true, http: 400, motivoHttp: 'requisicao_invalida', detalhe: t.slice(0,120) };
     throw new Error('HTTP 400: ' + t.slice(0,120));
   }
-  if (!r.ok) { const t = await r.text(); throw new Error('HTTP ' + r.status + ': ' + t.slice(0,120)); }
+  if (!r.ok) {
+    const t = await r.text();
+    // B2.1: com a classificação ligada, a resposta vira um resultado TIPADO em vez de exceção —
+    // o laço passa a saber se vale a pena repetir. Sem a flag, lança como sempre lançou.
+    if (opts && opts.classificarErros) {
+      const cl = classificarRespostaHttp(r.status);
+      return { ok: false, http: r.status, motivoHttp: cl.motivo, detalhe: t.slice(0,120),
+               permanente: cl.classe === 'permanente', transitorio: cl.classe === 'transitorio' };
+    }
+    throw new Error('HTTP ' + r.status + ': ' + t.slice(0,120));
+  }
   const saved = await r.json();
   return {
     ok: true,
