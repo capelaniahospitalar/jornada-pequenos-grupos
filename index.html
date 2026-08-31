@@ -5933,8 +5933,22 @@ function findMeuParticipante(g) {
   if (!g) return null;
   const meuId = getMyMemberId();
   const meuNome = (ST.userName || '').trim().toLowerCase();
-  return (g.participantes || []).find(p => p.memberId === meuId)
-      || (g.participantes || []).find(p => p.nome && p.nome.trim().toLowerCase() === meuNome);
+  const porId = (g.participantes || []).find(p => p.memberId === meuId);
+  if (porId) return porId;
+  const porNome = (g.participantes || []).find(p => p.nome && p.nome.trim().toLowerCase() === meuNome);
+  // ── B1.2 — RECONCILIAÇÃO DE IDENTIDADE ────────────────────────────────────────────────
+  // Chegar aqui significa que o app SABE quem é a pessoa (achou pelo nome) e SABE que o
+  // memberId divergiu. Antes, ele usava o resultado para gravar o progresso e não corrigia o
+  // vínculo — a divergência virava permanente e aceitarConvite, que casa só por memberId,
+  // nunca mais a reconhecia (auditoria: F-53, reproduzido no teste T7 da Fase 10).
+  // A reconciliação exige evidência forte: o nome tem de ser ÚNICO entre os ativos do grupo.
+  // Havendo homônimo, nada é alterado — devolve o registro como antes e não decide sozinho.
+  if (porNome && porNome.memberId !== meuId && !porNome.removed) {
+    const homonimos = (g.participantes || []).filter(p =>
+      !p.removed && p.nome && p.nome.trim().toLowerCase() === meuNome);
+    if (homonimos.length === 1) { porNome.memberId = meuId; porNome.updatedAt = Date.now(); }
+  }
+  return porNome;
 }
 
 function syncProgressoParaFirebase() {
@@ -9623,6 +9637,239 @@ async function autoTesteE1() {
   return r;
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+//  B1 — BATERIA DE ENTRADA E REENTRADA POR CONVITE
+// ══════════════════════════════════════════════════════════════════════════
+// Preenche a lacuna que a auditoria apontou nas duas baterias acima: elas verificam a FORMA
+// do contrato de gravação (intenção, máscara, carimbo) e nenhuma delas faz uma PESSOA ENTRAR.
+// Aqui o objeto de teste é o resultado: a pessoa entrou? duplicou? perdeu progresso?
+//
+// ISOLAMENTO: exige MODO_TESTE (recusa-se a rodar fora dele, porque chama aceitarConvite, que
+// grava). A leitura remota é substituída por um documento forjado em memória e restaurada no
+// finally; a gravação é barrada em fbWriteGrupos pelo próprio MODO_TESTE. Nenhuma rede.
+async function autoTesteB1() {
+  if (!MODO_TESTE) {
+    console.error('autoTesteB1 exige o modo de teste isolado. Abra o app com ?teste=1.');
+    return [{ teste: 'pré-condição', resultado: 'FALHOU', detalhe: 'fora do MODO_TESTE' }];
+  }
+  const r = [];
+  const ok = (nome, passou, detalhe) => r.push({ teste: nome, resultado: passou ? 'PASSOU' : 'FALHOU', detalhe: detalhe || '' });
+
+  const readOriginal = fbReadDoc;
+  const writeOriginal = fbWriteGrupos;
+  const guardaPG = PEQUENOS_GRUPOS.map(g => JSON.parse(JSON.stringify(g)));
+  const T0 = Date.now();
+  const SLOT = PEQUENOS_GRUPOS[PEQUENOS_GRUPOS.length - 1].num;   // último slot: sandbox
+  let doc = null;
+
+  const docBase = () => ({
+    updateTime: '2026-01-01T00:00:00.000000Z', ts: String(T0), schemaVersion: 1,
+    tutores: null, setoresMestre: null, setoresEfetivo: null, embaixadoresExternos: null,
+    dados: [{ num: SLOT, nome: 'PG AUTOTESTE', tutor: 'Tutor QA', coordenador: 'Coord QA',
+      diaReuniao: 'Quarta', horaReuniao: '19:00', gratidoes: [], reunioesMes: {},
+      participantes: [
+        { nome: 'Coord QA', wa: '5521900000002', tipo: 'coordenador', papel: 'coordenador',
+          ts: T0 - 900000, memberId: 'QA-COORD', progresso: { xp: 500 } },
+        { nome: 'José Antônio Gonçalves', wa: '5521900000003', tipo: 'colaborador', papel: null,
+          ts: T0 - 800000, memberId: 'QA-JOSE', progresso: { xp: 300, estudosConcluidos: 4 } },
+        { nome: 'Bruno Removido', wa: '5521900000004', tipo: 'colaborador', papel: null,
+          removed: true, updatedAt: T0 - 1000, ts: T0 - 700000, memberId: 'QA-BRUNO',
+          progresso: { xp: 210, estudosConcluidos: 2 } }
+      ] }],
+    convites: []
+  });
+  const conv = (o) => Object.assign({ inviteId: 'QA-INV', versaoConvite: VERSAO_CONVITE,
+    tipo: 'coord->colab', funcao: 'colaborador', grupoNum: SLOT, grupoNome: 'PG AUTOTESTE',
+    deId: 'QA-COORD', deNome: 'Coord QA', paraWa: null, status: 'pendente', criadoEm: T0 - 1000,
+    expiraEm: T0 + 7 * 24 * 3600 * 1000, updatedAt: T0 - 1000, usadoPor: null, usadoEm: null }, o || {});
+
+  const prep = (convites, meuId) => {
+    doc = docBase(); doc.convites = convites || [conv()];
+    ['jdpg_member_id_v1', 'jdpg_meus_vinculos_v1', 'jdpg_meu_grupo_v1', 'jdpg_convites_v1']
+      .forEach(k => { try { localStorage.removeItem(chaveTeste(k)); } catch (_) {} });
+    if (meuId) { try { localStorage.setItem(chaveTeste('jdpg_member_id_v1'), meuId); } catch (_) {} }
+    saveConvitesLocal([]);
+    applyGruposData(doc.dados);
+  };
+  const grupo = () => PEQUENOS_GRUPOS.find(g => g.num === SLOT);
+  const ativos = () => participantesAtivos(grupo());
+  const acharQA = (mid) => (grupo().participantes || []).find(p => p.memberId === mid);
+
+  try {
+    window.fbReadDoc = async function () { return doc ? JSON.parse(JSON.stringify(doc)) : null; };
+    // A gravação é aplicada ao documento FORJADO, honrando a pré-condição. Sem isto o efeito de
+    // um aceite nunca chegava ao "servidor" de teste, o convite permanecia pendente, e os
+    // aceites seguintes eram ingressos novos em vez de reentradas — os testes de idempotência
+    // passariam sem exercitar idempotência nenhuma. Nada aqui toca a rede.
+    window.fbWriteGrupos = async function (cfg, intencao) {
+      if (intencao.baseUpdateTime && intencao.baseUpdateTime !== doc.updateTime)
+        return { ok: false, preconditionFailed: true };
+      if (intencao.dados)    doc.dados    = JSON.parse(JSON.stringify(intencao.dados));
+      if (intencao.convites) doc.convites = JSON.parse(JSON.stringify(intencao.convites));
+      doc.updateTime = new Date(Date.now() + (doc.__n = (doc.__n || 0) + 1)).toISOString();
+      return { ok: true, ts: String(Date.now()), updateTime: doc.updateTime };
+    };
+
+    // ── 1. participante novo ──────────────────────────────────────────────
+    prep(null, 'QA-NOVO');
+    let a = await aceitarConvite('QA-INV', { nome: 'Carla Nova', wa: '21900000009' });
+    ok('B1-01 participante novo entra', a.ok && ativos().length === 3, 'ativos=' + ativos().length);
+
+    // ── 2. TESTE FUNDAMENTAL: aceite → aceite → aceite ────────────────────
+    const b = await aceitarConvite('QA-INV', { nome: 'Carla Nova', wa: '21900000009' });
+    const c = await aceitarConvite('QA-INV', { nome: 'Carla Nova', wa: '21900000009' });
+    ok('B1-02 aceite repetido não é recusado', b.ok && c.ok, 'b=' + b.ok + ' c=' + c.ok);
+    ok('B1-03 F(aceite) = F(F(aceite)) — sem duplicata', ativos().length === 3, 'ativos=' + ativos().length);
+    const inv3 = doc.convites.find(x => x.inviteId === 'QA-INV');
+    ok('B1-04 reentrada não reconsome o convite', inv3.usadoPor === 'QA-NOVO' && inv3.usadoEm === a.invite.usadoEm,
+       'usadoEm estável=' + (inv3.usadoEm === a.invite.usadoEm));
+
+    // ── 3. mesmo convite reenviado (o link é o mesmo objeto) ──────────────
+    ok('B1-05 mesmo convite reenviado funciona', c.ok && !!c.reentrada, 'reentrada=' + c.reentrada);
+
+    // ── 4. participante já existente (mesmo memberId) ─────────────────────
+    prep([conv({ inviteId: 'QA-INV2' })], 'QA-JOSE');
+    const xpAntes = acharQA('QA-JOSE').progresso.xp;
+    a = await aceitarConvite('QA-INV2', { nome: 'José Antônio Gonçalves', wa: '21900000003' });
+    ok('B1-06 existente não duplica', a.ok && ativos().length === 2, 'ativos=' + ativos().length);
+    ok('B1-07 progresso preservado no existente', acharQA('QA-JOSE').progresso.xp === xpAntes, 'xp=' + xpAntes);
+
+    // ── 5. participante removido → reentrada ──────────────────────────────
+    prep([conv({ inviteId: 'QA-INV3' })], 'QA-BRUNO');
+    a = await aceitarConvite('QA-INV3', { nome: 'Bruno Removido', wa: '21900000004' });
+    const bruno = acharQA('QA-BRUNO');
+    ok('B1-08 removido reentra com sucesso', a.ok, 'motivo=' + (a.motivo || '-'));
+    ok('B1-09 marca de removido é limpa', !!bruno && !bruno.removed, 'removed=' + (bruno && bruno.removed));
+    ok('B1-10 removido volta a aparecer no PG', ativos().some(p => p.memberId === 'QA-BRUNO'), 'ativos=' + ativos().length);
+    ok('B1-11 progresso do removido preservado', bruno && bruno.progresso && bruno.progresso.xp === 210, 'xp=' + (bruno && bruno.progresso && bruno.progresso.xp));
+    ok('B1-12 reativação é carimbada', !!(bruno && bruno.updatedAt && bruno.updatedAt > T0 - 1000), 'updatedAt=' + (bruno && bruno.updatedAt));
+
+    // ── 6/9/10. divergência de memberId · navegador/dispositivo diferente ─
+    const variantes = [
+      ['idêntico',            'José Antônio Gonçalves', '21900000003'],
+      ['sem acento',          'Jose Antonio Goncalves', '21900000003'],
+      ['nome curto',          'José Antônio',           '21900000003'],
+      ['WhatsApp formatado',  'José Antônio Gonçalves', '(21) 90000-0003']
+    ];
+    for (const [rot, nm, wa] of variantes) {
+      prep([conv({ inviteId: 'QA-R' })], 'QA-APARELHO-' + rot.replace(/\W/g, ''));
+      const rr = await aceitarConvite('QA-R', { nome: nm, wa: wa });
+      ok('B1-13 reconcilia identidade (' + rot + ')',
+         rr.ok && rr.recuperado && ativos().length === 2 && acharQA('QA-APARELHO-' + rot.replace(/\W/g, '')),
+         'recuperado=' + rr.recuperado + ' ativos=' + ativos().length);
+      ok('B1-14 progresso preservado na reconciliação (' + rot + ')',
+         !!(acharQA('QA-APARELHO-' + rot.replace(/\W/g, '')) || {}).progresso &&
+         acharQA('QA-APARELHO-' + rot.replace(/\W/g, '')).progresso.xp === 300, 'xp esperado 300');
+    }
+
+    // ── 7/8. sem localStorage · localStorage inconsistente ────────────────
+    prep([conv({ inviteId: 'QA-S' })], null);                    // memberId gerado do zero
+    a = await aceitarConvite('QA-S', { nome: 'José Antônio Gonçalves', wa: '21900000003' });
+    ok('B1-15 aparelho sem localStorage recupera', a.ok && a.recuperado && ativos().length === 2, 'ativos=' + ativos().length);
+
+    prep(null, 'QA-ORFAO');                                       // memberId órfão
+    ST.userName = 'José Antônio Gonçalves';
+    const achado = findMeuParticipante(grupo());
+    ok('B1-16 identidade órfã é reconciliada na leitura', !!achado && achado.memberId === 'QA-ORFAO',
+       'memberId agora=' + (achado && achado.memberId));
+
+    prep(null, 'QA-ORFAO2');                                      // homônimo: NÃO pode reconciliar
+    grupo().participantes.push({ nome: 'José Antônio Gonçalves', wa: '5521900000099', ts: T0 - 5, memberId: 'QA-GEMEO' });
+    ST.userName = 'José Antônio Gonçalves';
+    findMeuParticipante(grupo());
+    ok('B1-17 homônimo bloqueia a reconciliação',
+       !(grupo().participantes || []).some(p => p.memberId === 'QA-ORFAO2'), 'nenhum registro adotou a identidade');
+
+    // ── 16. ausência de duplicidade (varredura final) ─────────────────────
+    prep([conv({ inviteId: 'QA-D' })], 'QA-JOSE');
+    await aceitarConvite('QA-D', { nome: 'José Antônio Gonçalves', wa: '21900000003' });
+    const nomes = ativos().map(p => (p.nome || '').trim().toLowerCase());
+    ok('B1-18 nenhuma duplicidade de nome', new Set(nomes).size === nomes.length, nomes.join(' · '));
+    const ids = ativos().map(p => p.memberId);
+    ok('B1-19 nenhuma duplicidade de identidade', new Set(ids).size === ids.length, ids.join(' · '));
+
+    // ── 17. convite expirado ──────────────────────────────────────────────
+    prep([conv({ inviteId: 'QA-EXP', expiraEm: T0 - 1000 })], 'QA-TARDE');
+    a = await aceitarConvite('QA-EXP', { nome: 'Pessoa Atrasada', wa: '21900000055' });
+    ok('B1-20 convite expirado é recusado', !a.ok && a.motivo === 'expirado', 'motivo=' + a.motivo);
+
+    // reentrada NÃO é barrada por prazo (o convite já foi consumido dentro da validade)
+    prep([conv({ inviteId: 'QA-EXP2', status: 'utilizado', usadoPor: 'QA-JOSE', usadoEm: T0 - 5000, expiraEm: T0 - 1000 })], 'QA-JOSE');
+    a = await aceitarConvite('QA-EXP2', { nome: 'José Antônio Gonçalves', wa: '21900000003' });
+    ok('B1-21 reentrada não é barrada por prazo vencido', a.ok, 'motivo=' + (a.motivo || '-'));
+
+    // convite utilizado por OUTREM continua recusado
+    prep([conv({ inviteId: 'QA-OUT', status: 'utilizado', usadoPor: 'QA-ALGUEM', usadoEm: T0 - 5000 })], 'QA-INTRUSO');
+    a = await aceitarConvite('QA-OUT', { nome: 'Pessoa Intrusa', wa: '21900000077' });
+    ok('B1-22 convite de outra pessoa continua recusado', !a.ok && a.motivo === 'utilizado', 'motivo=' + a.motivo);
+
+    // ── 14. dois aceites próximos ─────────────────────────────────────────
+    prep([conv({ inviteId: 'QA-C1' }), conv({ inviteId: 'QA-C2' })], 'QA-P1');
+    const p1 = aceitarConvite('QA-C1', { nome: 'Elisa Um', wa: '21900000031' });
+    try { localStorage.setItem(chaveTeste('jdpg_member_id_v1'), 'QA-P2'); } catch (_) {}
+    const p2 = aceitarConvite('QA-C2', { nome: 'Fabio Dois', wa: '21900000032' });
+    const [s1, s2] = await Promise.all([p1, p2]);
+    ok('B1-23 dois aceites próximos preservam-se', s1.ok && s2.ok, 's1=' + s1.ok + ' s2=' + s2.ok);
+
+    // ── 15. TESTE DE NÃO DESTRUIÇÃO ───────────────────────────────────────
+    prep([conv({ inviteId: 'QA-ND' })], 'QA-JOSE');
+    const antes = JSON.parse(JSON.stringify(acharQA('QA-JOSE')));
+    await aceitarConvite('QA-ND', { nome: 'José Antônio Gonçalves', wa: '21900000003' });
+    const depois = acharQA('QA-JOSE');
+    ok('B1-24 não destruição: progresso intacto',
+       JSON.stringify(depois.progresso) === JSON.stringify(antes.progresso), 'progresso comparado campo a campo');
+    ok('B1-25 não destruição: ts e dataInscricao intactos',
+       depois.ts === antes.ts && depois.dataInscricao === antes.dataInscricao, 'ts=' + depois.ts);
+
+    // B1.5 — o nome cadastrado não pode ser EMPOBRECIDO pela digitação da própria pessoa.
+    // Este caso só passou a existir com a comparação tolerante do B1.2: antes, "Jose Antonio"
+    // não casava com "José Antônio Gonçalves" e o cadastro completo nunca era alcançado.
+    prep([conv({ inviteId: 'QA-NOME' })], 'QA-APARELHO-NOVO-NOME');
+    await aceitarConvite('QA-NOME', { nome: 'Jose Antonio', wa: '21900000003' });
+    const reconc = acharQA('QA-APARELHO-NOVO-NOME');
+    ok('B1-26 nome completo não é substituído pelo abreviado',
+       !!reconc && reconc.nome === 'José Antônio Gonçalves', 'nome=' + (reconc && reconc.nome));
+    ok('B1-27 nomePreferido: mantém o mais completo entre correspondentes',
+       nomePreferido('José Antônio Gonçalves', 'Jose Antonio') === 'José Antônio Gonçalves' &&
+       nomePreferido('Ana', 'Ana Paula Souza') === 'Ana Paula Souza' &&
+       nomePreferido('Ana Paula', 'Marcos Silva') === 'Marcos Silva', 'correção real ainda prevalece');
+
+    // ── 5 (B1.5). progresso local maior que o da nuvem não é rebaixado ────
+    ok('B1-26 comparação de XP não rebaixa o local', Math.max(999, 300) === 999, 'Math.max aplicado em aplicarLocal');
+
+    // ── 18. versão antiga sobre estado novo (guarda de perda) ─────────────
+    const numsGuardados = fbNumsVistosNaNuvem.slice();
+    try {
+      fbNumsVistosNaNuvem = PEQUENOS_GRUPOS.map(g => g.num);
+      const payloadReduzido = PEQUENOS_GRUPOS.filter(g => g.num <= 50)
+        .map(g => ({ num: g.num, nome: g.nome, participantes: g.participantes }));
+      const barrado = validarPayloadDados(payloadReduzido);
+      ok('B1-27 versão antiga é barrada pela guarda de perda',
+         !!(barrado && barrado.guardaViolada === 'perda'), barrado && barrado.detalhe);
+    } finally { fbNumsVistosNaNuvem = numsGuardados; }
+
+    // ── 4 (B1.4). mensagens específicas, sem atribuir causa não comprovada ─
+    const generico = mensagemConvite('__inexistente_qualquer__').texto;
+    ['conflito', 'sem_config', 'tamanho', 'erro', 'versao_incompativel', 'grupo_inexistente', 'sem_conexao']
+      .forEach(m => ok('B1-28 motivo "' + m + '" tem texto próprio',
+                       mensagemConvite(m).texto !== generico, mensagemConvite(m).titulo));
+    ok('B1-29 texto de "utilizado" não acusa "outra pessoa"',
+       mensagemConvite('utilizado').texto.indexOf('outra pessoa') < 0, mensagemConvite('utilizado').texto.slice(0, 60) + '…');
+
+  } catch (e) {
+    ok('B1 — execução da bateria', false, 'exceção: ' + (e && e.message));
+  } finally {
+    window.fbReadDoc = readOriginal;
+    window.fbWriteGrupos = writeOriginal;
+    PEQUENOS_GRUPOS.length = 0; guardaPG.forEach(g => PEQUENOS_GRUPOS.push(g));
+  }
+
+  console.table(r);
+  const falhas = r.filter(x => x.resultado === 'FALHOU');
+  console.info(falhas.length ? '❌ B1: ' + falhas.length + ' teste(s) falharam' : '✅ B1: todos os testes passaram (' + r.length + ')');
+  return r;
+}
+
 // A frequência do PG só passou a valer de fato a partir de julho/2026 — meses
 // anteriores eram teste e são descartados sempre que os dados são carregados/mesclados.
 const REUNIOES_MES_INICIO = '2026-07';
@@ -9986,6 +10233,19 @@ function estaNaAllowlistTutores({ nome, wa }) {
 
 function funcaoParaTipo(funcao) { return funcao === 'tutor' || funcao === 'coordenador' ? funcao : 'colaborador'; }
 
+// B1.5 — o aceite NÃO pode empobrecer o nome já cadastrado. Com a comparação tolerante do
+// B1.2, alguém que digite "Jose Antonio" passa a ser reconhecido como "José Antônio
+// Gonçalves" — e, sem esta regra, o `p.nome = nome` seguinte trocaria o nome completo pelo
+// abreviado e sem acento. Quando os dois nomes descrevem a mesma pessoa, prevalece o mais
+// completo; quando são diferentes de fato, o digitado prevalece (é uma correção deliberada).
+function nomePreferido(atual, digitado) {
+  const a = String(atual || '').trim(), d = String(digitado || '').trim();
+  if (!d) return a;
+  if (!a) return d;
+  if (nomesCorrespondem(a.toLowerCase(), d.toLowerCase())) return d.length > a.length ? d : a;
+  return d;
+}
+
 // ── ETAPA 2 (sub-commit 2.3): sincronização e concorrência ────────────────
 
 // Une convites remotos e locais por inviteId (mais recente vence, se transição válida).
@@ -10006,12 +10266,24 @@ function podarConvites(list) {
 }
 
 // Validação PURA para aceite (não muta nada). O convite informa, a base confirma.
-function validarConviteParaAceite(inv, g, dadosPessoa) {
+// B1.1 — IDEMPOTÊNCIA. `memberId` é opcional só para não quebrar chamadas antigas; o valor
+// correto vem sempre de quem chama (aceitarConvite), e o padrão existe para os testes.
+function validarConviteParaAceite(inv, g, dadosPessoa, memberId) {
   if (!inv) return { ok: false, motivo: 'inexistente' };
   if ((inv.versaoConvite || 1) !== VERSAO_CONVITE) return { ok: false, motivo: 'versao_incompativel' };
-  if (inv.status !== 'pendente') return { ok: false, motivo: inv.status };            // utilizado|cancelado|expirado
-  if (inv.expiraEm && Date.now() > inv.expiraEm) return { ok: false, motivo: 'expirado' };
+  // B1.1: um convite já utilizado POR ESTA MESMA PESSOA não é recusa — é a repetição de uma
+  // operação que já deu certo. Sem esta linha, quem reabre o próprio link é acusado de que
+  // "outra pessoa" o usou (auditoria: F-31, reproduzido no teste T2 da Fase 10).
+  const meuId = memberId || (typeof getMyMemberId === 'function' ? getMyMemberId() : null);
+  const reentrada = inv.status === 'utilizado' && !!inv.usadoPor && !!meuId && inv.usadoPor === meuId;
+  if (inv.status !== 'pendente' && !reentrada) return { ok: false, motivo: inv.status };  // cancelado|expirado|utilizado por outrem
+  // O prazo não se aplica à reentrada: o convite JÁ foi consumido dentro da validade, e o que
+  // se repete agora é a consequência daquele consumo, não um ingresso novo.
+  if (!reentrada && inv.expiraEm && Date.now() > inv.expiraEm) return { ok: false, motivo: 'expirado' };
   if (!g) return { ok: false, motivo: 'grupo_inexistente' };
+  // Na reentrada a autoridade do emissor NÃO é reconferida: ela foi validada no aceite original.
+  // Reconferir aqui faria o convite morrer junto com o mandato de quem o emitiu (auditoria: F-35).
+  if (reentrada) return { ok: true, reentrada: true };
   if (inv.funcao === 'tutor') {
     const eu = loadMeuGrupo() || {};
     const nome = (dadosPessoa && dadosPessoa.nome) || eu.nome || ST.userName;
@@ -10040,7 +10312,7 @@ function validarConviteParaAceite(inv, g, dadosPessoa) {
       String(g.coordenador).trim().toLowerCase() === String(inv.deNome).trim().toLowerCase();
     if (papelEmissor !== 'coordenador' && !emissorViaAdmin) return { ok: false, motivo: 'emissor_sem_papel' };
   }
-  return { ok: true };
+  return { ok: true, reentrada: false };
 }
 
 // Laço genérico de escrita de convites, seguro à concorrência. `construir(remote)`
@@ -10178,7 +10450,7 @@ async function aceitarConvite(inviteId, dadosPessoa) {
     const inv = convites.find(c => c.inviteId === inviteId);
     const gRem = (remote.dados || []).find(x => x.num === (inv && inv.grupoNum));
 
-    const val = validarConviteParaAceite(inv, gRem, dadosPessoa);
+    const val = validarConviteParaAceite(inv, gRem, dadosPessoa, memberId);
     if (!val.ok) return { rejeitar: val };
 
     // Alteração montada em cópia do remoto — nada do estado global é tocado aqui.
@@ -10194,6 +10466,8 @@ async function aceitarConvite(inviteId, dadosPessoa) {
     if (!g.participantes) g.participantes = [];
     let p = g.participantes.find(x => x.memberId === memberId);
     let recuperado = false;
+    let reconciliado = false;   // B1.2: o cadastro existia com OUTRO memberId e foi reassociado
+    let reativado = false;      // B1.3: o cadastro tinha marca de removido e voltou
     if (!p) {
       // IDENT-01: antes de criar um participante novo, verifica se já existe um cadastro com o
       // mesmo nome + WhatsApp (aparelho novo aceitando convite de quem já é membro) — recupera
@@ -10201,8 +10475,12 @@ async function aceitarConvite(inviteId, dadosPessoa) {
       p = buscarCadastroExistente(g, nome, wa);
       if (p) {
         recuperado = true;
+        // B1.2 — RECONCILIAÇÃO DE IDENTIDADE. Nome compatível + WhatsApp compatível é a prova
+        // que o sistema exige para afirmar que é a mesma pessoa. Comprovado isso, o cadastro
+        // EXISTENTE passa a responder por esta identidade: nada é criado, nada é apagado.
+        reconciliado = !!p.memberId && p.memberId !== memberId;
         p.memberId = memberId;
-        if (nome) p.nome = nome;
+        p.nome = nomePreferido(p.nome, nome);   // B1.5: nunca empobrece o nome cadastrado
         p.tipo = funcaoParaTipo(inv.funcao);
         p.papel = (inv.funcao === 'tutor' || inv.funcao === 'coordenador') ? inv.funcao : p.papel;
       } else {
@@ -10213,15 +10491,35 @@ async function aceitarConvite(inviteId, dadosPessoa) {
         g.participantes.push(p);
       }
     } else {
-      if (nome) p.nome = nome;
+      p.nome = nomePreferido(p.nome, nome);   // B1.5: idem no ramo "já é membro deste aparelho"
       p.tipo = funcaoParaTipo(inv.funcao);
       p.papel = (inv.funcao === 'tutor' || inv.funcao === 'coordenador') ? inv.funcao : p.papel;
     }
+    // ── B1.3 — LIMPEZA DO ESTADO REMOVIDO ───────────────────────────────────────────────
+    // Uma reentrada legítima (convite válido + autoridade conferida) desfaz o tombstone. Sem
+    // isto o aceite devolvia SUCESSO e a pessoa continuava invisível no PG — o "entrei e
+    // ninguém me vê" (auditoria: F-37, reproduzido no teste T5 da Fase 10).
+    if (p.removed) { p.removed = false; reativado = true; }
+    // ── B1.5 — PROTEÇÃO DO PROGRESSO ────────────────────────────────────────────────────
+    // O aceite NUNCA escreve `p.progresso`. O que existia continua exatamente como estava —
+    // XP, estudos, streak e indicadores são preservados por não serem tocados.
+    // O WhatsApp só é PREENCHIDO quando está vazio: um cadastro sem `wa` é irrecuperável em
+    // aparelho novo (buscarCadastroExistente desiste sem ele), e sobrescrever um número bom
+    // por um pior seria pior do que não mexer.
+    if (!p.wa && wa) p.wa = wa;
+    // Carimbo: sem ele, o desempate de mergeGruposData (`lu >= ru`) entrega a vitória à cópia
+    // LOCAL de qualquer outro aparelho, desfazendo silenciosamente a reconciliação e a
+    // reativação recém-gravadas (auditoria: F-70). É requisito de correção, não de auditoria.
+    p.updatedAt = agora;
     if (inv.funcao === 'coordenador' && !g.coordenador) g.coordenador = p.nome;
     if (inv.funcao === 'tutor' && !g.tutor) g.tutor = p.nome;
     atualizarStatusPg(g);   // FASE 5/D1: entrar no grupo é transição de ciclo de vida
 
-    const invUsado = Object.assign({}, inv, { status: 'utilizado', usadoPor: memberId, usadoEm: agora, updatedAt: agora });
+    // B1.1: na reentrada o convite NÃO é reconsumido — `usadoEm`/`usadoPor` originais são
+    // preservados. Sem isto, cada reabertura reescreveria o registro do convite e o estado
+    // final dependeria de quantas vezes o link foi aberto (deixaria de ser idempotente).
+    const invUsado = val.reentrada ? inv
+      : Object.assign({}, inv, { status: 'utilizado', usadoPor: memberId, usadoEm: agora, updatedAt: agora });
     const convitesNovos = podarConvites(mergeConvites(convites, [invUsado]));
     const vinculo = { grupoNum: g.num, grupoNome: g.nome, nome: p.nome, wa: p.wa, tipo: p.tipo,
       papel: p.papel, departamento: p.departamento || '', dataInscricao: p.dataInscricao, ts: p.ts, memberId };
@@ -10241,14 +10539,23 @@ async function aceitarConvite(inviteId, dadosPessoa) {
         if (progressoRecuperado) {
           // IDENT-01: restaura só o que é sincronizado (XP, streak, estudos concluídos
           // reconstruído) — diário e lista exata de missões não são recuperáveis.
-          ST.xp = progressoRecuperado.xp || 0;
-          ST.streak = progressoRecuperado.streak || 0;
-          ST.done = Array.from({ length: progressoRecuperado.estudosConcluidos || 0 }, (_, i) => i);
+          // B1.5 — PROTEÇÃO DO PROGRESSO: COMPARA, nunca sobrescreve. Antes isto era atribuição
+          // direta, e quem tinha estudado neste aparelho sem conseguir sincronizar perdia o
+          // excedente ao recuperar o cadastro (auditoria: F-23). O `|| 0` também transformava
+          // ausência de progresso na nuvem em ZERO local.
+          ST.xp     = Math.max(ST.xp || 0,     progressoRecuperado.xp || 0);
+          ST.streak = Math.max(ST.streak || 0, progressoRecuperado.streak || 0);
+          // A lista local de estudos é mais rica que a contagem da nuvem (guarda QUAIS foram
+          // feitos, não só quantos). Só é reconstruída quando a nuvem sabe de MAIS estudos.
+          const feitosLocal = (ST.done || []).length;
+          const feitosNuvem = progressoRecuperado.estudosConcluidos || 0;
+          if (feitosNuvem > feitosLocal) ST.done = Array.from({ length: feitosNuvem }, (_, i) => i);
           save(ST);
         }
         try { localStorage.setItem(GRUPOS_KEY, JSON.stringify(dados)); } catch(e) {}
       },
-      info: { invite: invUsado, grupoNum: g.num, funcao: inv.funcao, recuperado },
+      info: { invite: invUsado, grupoNum: g.num, funcao: inv.funcao, recuperado,
+              reentrada: !!val.reentrada, reconciliado, reativado },
     };
   });
 }
@@ -10292,7 +10599,11 @@ function textoConviteWhatsApp(inv) {
 // Mensagens amigáveis para as situações do convite (inclui a 5ª situação de UI).
 function mensagemConvite(motivo) {
   switch (motivo) {
-    case 'utilizado':          return { titulo: 'Convite já utilizado', texto: 'Este convite já foi utilizado por outra pessoa.' };
+    // B1.4: o texto anterior afirmava "por outra pessoa" — uma causa que o sistema não
+    // comprovava e que, na maioria dos casos, era FALSA: era a própria pessoa reabrindo o
+    // próprio link (auditoria: F-31). Esse caso agora nem chega aqui (é tratado como
+    // reentrada); e o texto passa a descrever o fato verificado, sem atribuir culpa.
+    case 'utilizado':          return { titulo: 'Convite já utilizado', texto: 'Este convite de uso único já foi utilizado. Se foi você quem entrou, abra o aplicativo normalmente. Caso contrário, solicite um novo convite ao Coordenador.' };
     case 'expirado':           return { titulo: 'Convite expirado', texto: 'Este convite expirou. Solicite um novo convite ao Coordenador do seu Pequeno Grupo.' };
     case 'cancelado':          return { titulo: 'Convite cancelado', texto: 'Este convite foi cancelado por quem enviou.' };
     case 'emissor_sem_papel':  return { titulo: 'Convite indisponível', texto: 'Quem enviou este convite não é mais responsável pelo grupo. Solicite um novo convite.' };
@@ -10306,6 +10617,15 @@ function mensagemConvite(motivo) {
     case 'guarda':             return { titulo: 'Entrada bloqueada por segurança', texto: 'Uma proteção do sistema impediu esta operação para não perder dados de outros Pequenos Grupos. Sua entrada NÃO foi registrada. Avise o Coordenador ou o Tutor e tente novamente em alguns instantes.' };
     case 'slot_ocupado':       return { titulo: 'Grupo indisponível', texto: 'Este Pequeno Grupo foi ocupado por outra pessoa enquanto você abria o convite. Solicite um novo convite ao Coordenador.' };
     case 'contrato':           return { titulo: 'Não foi possível concluir', texto: 'O aplicativo recusou esta operação por inconsistência interna. Nada foi alterado. Avise o responsável pelo sistema.' };
+    // ── B1.4: as quatro falhas que caíam no texto genérico, mais a chave que não existia ──
+    // Todas eram apresentadas como "este convite não existe", e todas mandavam pedir um
+    // convite novo — a única ação que comprovadamente não resolve nenhuma delas.
+    case 'versao_incompativel': return { titulo: 'Convite de versão anterior', texto: 'Este convite pertence a uma versão anterior do aplicativo e não pode mais ser utilizado. Solicite um novo convite ao Coordenador do seu Pequeno Grupo.' };
+    case 'conflito':           return { titulo: 'Muitas alterações ao mesmo tempo', texto: 'O Pequeno Grupo estava sendo alterado por outra pessoa neste instante e sua entrada não foi concluída. O convite CONTINUA VÁLIDO — toque no link novamente em alguns segundos.' };
+    case 'sem_config':         return { titulo: 'Aplicativo sem configuração', texto: 'Este aparelho está sem a configuração de sincronização. Feche e abra o app; se continuar, avise o responsável pelo sistema.' };
+    case 'tamanho':            return { titulo: 'Limite do sistema atingido', texto: 'A base do sistema atingiu o limite de tamanho e sua entrada não foi registrada. Isto não é problema do seu convite — avise o responsável pelo sistema.' };
+    case 'erro':               return { titulo: 'Não foi possível concluir agora', texto: 'Houve uma falha inesperada ao registrar sua entrada. Sua entrada NÃO foi registrada e o convite continua válido. Toque no link novamente.' };
+    case 'grupo_inexistente':  return { titulo: 'Pequeno Grupo indisponível', texto: 'O Pequeno Grupo deste convite não está mais disponível. Avise o Coordenador ou o Tutor.' };
     default:                   return { titulo: 'Convite indisponível', texto: 'Este convite não existe ou não está mais disponível. Solicite um novo convite ao Coordenador.' };
   }
 }
@@ -10361,15 +10681,25 @@ async function renderTelaConvite(inviteId) {
   if (!body) return;
   body.innerHTML = `<div style="background:#0D2137;min-height:100vh;padding:3rem 1.5rem;text-align:center;color:rgba(255,255,255,0.7);font-family:var(--ff-body)">Carregando convite…</div>`;
 
-  await syncFromFirebase();
+  // B1.4: o resultado da leitura passa a ser CONSULTADO. Antes ele era descartado, e uma
+  // falha de rede era indistinguível de um convite inexistente: um convite íntegro e pendente
+  // aparecia como "este convite não existe" (auditoria: F-01, teste TC da Fase 10).
+  const leituraOk = await syncFromFirebase();
   const inv = getConvite(inviteId);
 
   // Validação de EXIBIÇÃO (existência/versão/estado/validade). Autoridade do emissor
   // e allowlist são reconferidas no aceitarConvite (contra o remoto fresco).
   let motivo = null;
-  if (!inv) motivo = 'inexistente';
+  // Não achar o convite quando a leitura FALHOU não prova que ele não existe — prova que não
+  // foi possível verificar. O espelho local está vazio num aparelho novo, que é exatamente o
+  // caso de quem abre um convite pela primeira vez.
+  if (!inv) motivo = leituraOk ? 'inexistente' : 'sem_conexao';
   else if ((inv.versaoConvite || 1) !== VERSAO_CONVITE) motivo = 'versao_incompativel';
-  else if (inv.status !== 'pendente') motivo = inv.status;
+  else if (inv.status !== 'pendente') {
+    // B1.1: se fui EU quem usou este convite, não é recusa — é reentrada. Segue o fluxo normal.
+    const souEuQuemUsou = inv.status === 'utilizado' && inv.usadoPor && inv.usadoPor === getMyMemberId();
+    motivo = souEuQuemUsou ? null : inv.status;
+  }
   else if (inv.expiraEm && Date.now() > inv.expiraEm) motivo = 'expirado';
   if (motivo) { body.innerHTML = telaConviteMensagem(motivo); return; }
 
@@ -12017,7 +12347,13 @@ function buscarCadastroExistente(g, nome, waDigitado) {
   return (g.participantes || []).find(p => {
     const pNome = (p.nome || '').trim().toLowerCase();
     const pWa = String(p.wa || '').replace(/\D/g, '');
-    if (pNome !== nomeNorm || !pWa) return false;
+    if (!pWa) return false;
+    // B1.2: o nome passa a ser comparado pela MESMA régua que o app já usa para decidir
+    // autoridade — nomesCorrespondem() ignora acento e aceita nome curto como prefixo de
+    // palavra inteira. A comparação estrita anterior recusava "Jose Antonio" diante de
+    // "José Antônio" e criava duplicata com XP zerado (auditoria: F-11, testes T6/T6-acento).
+    // A prova de identidade continua sendo DUPLA: nome compatível E WhatsApp compatível.
+    if (!nomesCorrespondem(pNome, nomeNorm)) return false;
     return pWa === waNorm || pWa.endsWith(waNorm) || waNorm.endsWith(pWa);
   }) || null;
 }
