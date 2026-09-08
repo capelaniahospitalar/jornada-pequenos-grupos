@@ -1393,6 +1393,33 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 }
 .mutirao-body{padding:.85rem 1rem}
 
+/* Cabeçalho da tela do Mutirão — mesma forma do .comm-hdr, só a cor muda. */
+.mut-hdr{
+  display:flex;align-items:center;gap:10px;padding:.9rem 1rem;
+  background:linear-gradient(135deg,var(--orange),var(--orange-mid))
+}
+.mut-sec-tit{
+  font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);
+  font-weight:700;font-family:var(--ff-body);margin-bottom:.5rem
+}
+.mut-inp{
+  width:100%;background:var(--bg);border:0.5px solid var(--border);
+  border-radius:var(--radius-sm);padding:.75rem;font-size:22px;color:var(--text);
+  font-family:var(--ff-body);box-sizing:border-box;text-align:center;font-weight:600
+}
+.mut-btn{
+  background:var(--orange);color:#fff;border:none;border-radius:var(--radius-sm);
+  padding:.85rem;font-size:18px;font-weight:600;cursor:pointer;width:100%;
+  font-family:var(--ff-body);letter-spacing:.5px;text-transform:uppercase
+}
+.mut-btn:hover{background:var(--orange-mid)}
+.mut-btn:disabled{background:var(--border);color:var(--text3);cursor:default}
+.mut-linha{
+  display:flex;justify-content:space-between;align-items:baseline;
+  padding:.5rem 0;border-bottom:0.5px solid var(--border);font-family:var(--ff-body)
+}
+.mut-linha:last-child{border-bottom:none}
+
 .pg-goal-row{margin-bottom:.65rem}
 .pg-goal-row:last-child{margin-bottom:0}
 .pg-goal-lbl{
@@ -2011,6 +2038,19 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
     </div>
   </div>
   <div class="comm-body" id="comunidade-body"></div>
+</div>
+
+<!-- MUTIRÃO DE NATAL — tela do participante (FASE 4) -->
+<div id="screen-mutirao" class="screen">
+  <div class="mut-hdr">
+    <button class="back-btn" onclick="goHome()" aria-label="Voltar">&#8592;</button>
+    <div class="comm-hdr-info">
+      <div class="comm-hdr-tag">Jornada Discipular · Pequenos Grupos</div>
+      <div class="comm-hdr-title">🎁 Mutirão de Natal 2026</div>
+      <div class="comm-hdr-sub2">Doações arrecadadas pelos colaboradores</div>
+    </div>
+  </div>
+  <div class="comm-body" id="mutirao-body"></div>
 </div>
 
 </div><!-- #app -->
@@ -12914,43 +12954,128 @@ function renderMutiraoBtnHome() {
   const t = (typeof calcularTotalKgNatalDoPG === 'function')
     ? calcularTotalKgNatalDoPG(mg.grupoNum)
     : { participantes: 0, externos: 0, total: 0, entregas: 0 };
-  const fmt = (n) => String(n).replace('.', ',');
-
   const div = document.createElement('div');
   div.id = 'mutirao-card';
   div.className = 'mutirao-card';
+  // FASE 4: deixou de ser um card que expande e passou a ABRIR a tela do Mutirão, onde o
+  // participante registra a própria entrega e vê o histórico.
   div.innerHTML = `
-    <button class="mutirao-hdr" onclick="toggleSection(this)">
+    <button class="mutirao-hdr" onclick="openMutirao()">
       <span class="mutirao-ico">🎁</span>
       <div class="mutirao-title">
         <div class="mutirao-name">Mutirão de Natal</div>
-        <div class="mutirao-sub">Toque para ver as doações do seu PG</div>
+        <div class="mutirao-sub">Registre a sua entrega</div>
       </div>
-      <div class="mutirao-total">${fmt(t.total)} kg</div>
-      <span class="toggle-arrow" style="color:#fff;font-size:14px;display:inline-block;transition:transform .2s;flex-shrink:0">▸</span>
-    </button>
-    <div class="toggle-content" style="display:none">
-      <div class="mutirao-body">
-        <div style="display:flex;gap:.75rem">
-          <div style="flex:1;background:var(--orange-light);border-radius:var(--radius-sm);padding:.6rem .7rem">
-            <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);font-weight:700;font-family:var(--ff-body)">Participantes</div>
-            <div style="font-size:19px;font-weight:700;color:var(--orange);font-family:var(--ff-body)">${fmt(t.participantes)} kg</div>
-          </div>
-          <div style="flex:1;background:var(--orange-light);border-radius:var(--radius-sm);padding:.6rem .7rem">
-            <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);font-weight:700;font-family:var(--ff-body)">Externos</div>
-            <div style="font-size:19px;font-weight:700;color:var(--orange);font-family:var(--ff-body)">${fmt(t.externos)} kg</div>
-          </div>
-        </div>
-        <div style="font-size:12.5px;color:var(--text3);font-family:var(--ff-body);margin-top:.7rem">
-          ${t.entregas} ${t.entregas === 1 ? 'entrega registrada' : 'entregas registradas'} neste Pequeno Grupo.
-        </div>
-      </div>
-    </div>`;
+      <div class="mutirao-total">${mutiraoFmt(t.total)} kg</div>
+      <span style="color:#fff;font-size:18px;flex-shrink:0">›</span>
+    </button>`;
 
   // Depois do Progresso quando ele existir, logo após a âncora quando estiver oculto —
   // assim a ordem da Home fica previsível nos dois estados.
   const ref = document.getElementById('pg-progress-card') || anchor;
   ref.after(div);
+}
+
+// ── Tela do Mutirão de Natal — participante (FASE 4) ─────────────────────────
+// REGRA CENTRAL: não existe campo para escolher QUEM entregou. O único dado que o
+// participante informa é a quantidade; a autoria vem de registrarMinhaEntregaNatal(), que
+// deriva a pessoa do próprio aparelho. É o que reduz fraude e engano — e é estrutural,
+// não uma validação que se possa contornar.
+function openMutirao() {
+  if (typeof loadGrupos === 'function') loadGrupos();
+  renderMutirao();
+  showScreen('mutirao');
+}
+
+function renderMutirao(msg) {
+  const body = document.getElementById('mutirao-body');
+  if (!body) return;
+
+  const mg = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
+  if (!mg) {
+    body.innerHTML = `
+      <div class="content-card">
+        <div class="phase-tag" style="color:var(--orange)">Mutirão de Natal</div>
+        <p class="body-text">Você ainda não faz parte de um Pequeno Grupo como participante — por isso não há entregas para registrar aqui.</p>
+      </div>
+      <button class="nav-btn" style="margin-top:.85rem" onclick="goHome()">Voltar ao início</button>`;
+    return;
+  }
+
+  const minhas   = listarMinhasEntregasNatal(mg.grupoNum);
+  const meuTotal = Number(minhas.reduce((a, e) => a + (e.quantidadeKg || 0), 0).toFixed(MUTIRAO_NATAL.casas));
+  const doPg     = calcularTotalKgNatalDoPG(mg.grupoNum);
+  const dataBr   = (iso) => { const p = String(iso || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] : String(iso || ''); };
+
+  const historico = minhas.length
+    ? minhas.slice().reverse().map(e => `
+        <div class="mut-linha">
+          <span style="font-size:14.5px;color:var(--text2)">${dataBr(e.data)}</span>
+          <span style="font-size:15px;font-weight:700;color:var(--orange)">${mutiraoFmt(e.quantidadeKg)} kg</span>
+        </div>`).join('')
+    : `<div style="font-size:14.5px;color:var(--text3);font-family:var(--ff-body)">Você ainda não registrou nenhuma entrega.</div>`;
+
+  body.innerHTML = `
+    ${msg ? `<div style="background:var(--orange-light);border:0.5px solid var(--orange);border-radius:var(--radius-sm);padding:.7rem .85rem;margin-bottom:.85rem;font-size:15px;color:var(--text2);font-family:var(--ff-body)">${msg}</div>` : ''}
+
+    <div class="content-card">
+      <div class="mut-sec-tit">Minha entrega</div>
+      <p style="font-size:17px;line-height:1.5;color:var(--text);font-family:var(--ff-body);margin-bottom:.8rem">
+        Quantos quilos você conseguiu para o Mutirão?
+      </p>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:.35rem">
+        <input id="mut-kg" class="mut-inp" type="text" inputmode="decimal" autocomplete="off"
+               maxlength="6" placeholder="0" onkeydown="if(event.key==='Enter')registrarEntregaMutiraoUI()">
+        <span style="font-size:19px;font-weight:600;color:var(--text3);font-family:var(--ff-body)">kg</span>
+      </div>
+      <div id="mut-aviso" style="font-size:13.5px;color:var(--coral);font-family:var(--ff-body);min-height:19px;margin-bottom:.5rem"></div>
+      <button id="mut-btn" class="mut-btn" onclick="registrarEntregaMutiraoUI()">Registrar entrega</button>
+      <div style="font-size:12.5px;color:var(--text3);font-family:var(--ff-body);margin-top:.6rem;text-align:center">
+        A entrega será registrada em seu nome: <strong>${sanitize(mg.nome || '')}</strong>
+      </div>
+    </div>
+
+    <div class="content-card" style="margin-top:.85rem">
+      <div class="mut-sec-tit">Minha participação</div>
+      <div style="font-size:30px;font-weight:700;color:var(--orange);font-family:var(--ff-body);line-height:1.1">${mutiraoFmt(meuTotal)} kg</div>
+      <div style="font-size:13px;color:var(--text3);font-family:var(--ff-body);margin-bottom:.7rem">no total que você já entregou</div>
+      ${historico}
+    </div>
+
+    <div class="content-card" style="margin-top:.85rem">
+      <div class="mut-sec-tit">Meu PG — ${sanitize(mg.grupoNome || ('Grupo ' + mg.grupoNum))}</div>
+      <div style="font-size:30px;font-weight:700;color:var(--orange);font-family:var(--ff-body);line-height:1.1">${mutiraoFmt(doPg.total)} kg</div>
+      <div style="font-size:13px;color:var(--text3);font-family:var(--ff-body)">arrecadados pelo Pequeno Grupo</div>
+    </div>
+
+    <button class="nav-btn" style="margin-top:.85rem" onclick="goHome()">Voltar ao início</button>`;
+}
+
+function registrarEntregaMutiraoUI() {
+  const inp = document.getElementById('mut-kg');
+  const aviso = document.getElementById('mut-aviso');
+  const btn = document.getElementById('mut-btn');
+  if (!inp || !btn) return;
+
+  const kg = mutiraoNormalizarKg(inp.value);
+  if (kg === null) {
+    if (aviso) aviso.textContent = 'Informe um valor entre ' + mutiraoFmt(MUTIRAO_NATAL.kgMin) +
+      ' e ' + mutiraoFmt(MUTIRAO_NATAL.kgMax) + ' kg.';
+    inp.focus();
+    return;
+  }
+
+  btn.disabled = true;
+  const r = registrarMinhaEntregaNatal({ quantidadeKg: kg });
+  btn.disabled = false;
+
+  if (!r.ok) {
+    if (aviso) aviso.textContent = (r.motivo === 'sem_grupo')
+      ? 'Não foi possível identificar o seu Pequeno Grupo.'
+      : 'Não foi possível registrar (' + (r.detalhe || r.motivo) + ').';
+    return;
+  }
+  renderMutirao('✅ Entrega de ' + mutiraoFmt(kg) + ' kg registrada. Obrigado!');
 }
 
 
@@ -14894,6 +15019,22 @@ function listarEntregasNatalDoPG(pgNum, opts) {
     .filter(e => incluirAnuladas || e.removed !== true)
     .sort((a, b) => (a.ts || 0) - (b.ts || 0));
 }
+
+// Minhas entregas. Casa por memberId OU por nome — a mesma regra de getMinhaFuncaoNoGrupo().
+// Só o memberId não basta: quem reentra por um convite pode receber identidade nova, e o
+// histórico da própria pessoa não pode sumir da tela por causa disso.
+function listarMinhasEntregasNatal(pgNum) {
+  const meuId = (typeof getMyMemberId === 'function') ? getMyMemberId() : null;
+  const meuNome = String(((typeof loadMeuGrupo === 'function' && loadMeuGrupo()) || {}).nome
+    || (typeof ST !== 'undefined' && ST.userName) || '').trim().toLowerCase();
+  return listarEntregasNatalDoPG(pgNum).filter(e =>
+    e.tipoOrigem === MUTIRAO_ORIGEM.PARTICIPANTE && e.participante &&
+    ((meuId && e.participante.memberId === meuId) ||
+     (!!meuNome && String(e.participante.nome || '').trim().toLowerCase() === meuNome)));
+}
+
+// Vírgula decimal: 7.5 vira "7,5". Fonte única para a Home e para a tela.
+function mutiraoFmt(n) { return String(n).replace('.', ','); }
 
 // Os dois tipos são somados SEPARADAMENTE e nunca se misturam (critério de aceite da FASE 1).
 function calcularTotalKgNatalDoPG(pgNum) {
