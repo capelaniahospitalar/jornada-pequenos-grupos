@@ -4085,7 +4085,7 @@ function renderMutiraoPainel(grupoNum, nome, msg) {
   const voltar   = String(nome).replace(/'/g, "\\'");
   const r        = resumoMutiraoDoPG(grupoNum);
   const entregas = listarEntregasParticipantesDoPG(grupoNum);
-  const dataBr   = (iso) => { const p = String(iso || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] : String(iso || ''); };
+  const dataBr   = mutiraoDataBr;   // FASE 6: fonte única
   const linha    = (rot, val) => `<div class="mut-linha"><span style="font-size:14.5px;color:var(--text2)">${rot}</span><strong style="font-size:15px;color:var(--text)">${val}</strong></div>`;
 
   // (B) só aparece para o Coordenador DESTE PG, e só quando este PG é o dele:
@@ -4103,6 +4103,25 @@ function renderMutiraoPainel(grupoNum, nome, msg) {
           <span style="font-size:15px;font-weight:700;color:var(--orange);flex-shrink:0">${mutiraoFmt(e.quantidadeKg)} kg</span>
         </div>`).join('')
     : `<div style="font-size:14.5px;color:var(--text3);font-family:var(--ff-body)">Nenhum participante registrou entrega ainda.</div>`;
+
+  // FASE 6 — histórico dos externos já lançados, IMEDIATAMENTE acima do formulário: é vendo
+  // "João · 08/12 · 20 kg" que o Coordenador percebe que aquela entrega já foi lançada.
+  const externos = listarEntregasExternasDoPG(grupoNum);
+  const externosHtml = externos.length
+    ? externos.slice().reverse().map(e => `
+        <div class="mut-linha">
+          <span style="font-size:14.5px;color:var(--text2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${sanitize((e.externo && e.externo.nome) || '—')}</span>
+          <span style="font-size:13px;color:var(--text3);margin:0 8px;flex-shrink:0">${dataBr(e.data)}</span>
+          <span style="font-size:15px;font-weight:700;color:var(--orange);flex-shrink:0">${mutiraoFmt(e.quantidadeKg)} kg</span>
+        </div>`).join('')
+    : `<div style="font-size:14.5px;color:var(--text3);font-family:var(--ff-body)">Nenhum colaborador externo registrado ainda.</div>`;
+
+  const blocoExternos = `
+    <div class="panel-section">
+      <div class="panel-title">Colaboradores externos já registrados (${externos.length})</div>
+      ${externosHtml}
+      ${externos.length ? `<div style="font-size:12.5px;color:var(--text3);font-family:var(--ff-body);margin-top:.7rem">Confira esta lista antes de lançar — evita registrar a mesma entrega duas vezes.</div>` : ''}
+    </div>`;
 
   const estiloCampo = 'width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box;margin-bottom:.6rem';
   const estiloRotulo = 'display:block;font-size:14px;color:var(--text3);margin-bottom:4px';
@@ -4135,6 +4154,8 @@ function renderMutiraoPainel(grupoNum, nome, msg) {
       <div class="panel-title">Entregas dos participantes (${entregas.length})</div>
       ${listaHtml}
     </div>
+
+    ${blocoExternos}
 
     ${blocoB}
 
@@ -4174,7 +4195,25 @@ function registrarExternoMutiraoUI(grupoNum, nome) {
     elKg.focus(); return;
   }
 
-  const r = registrarEntregaExternaNatal({ nome: nomeExt, quantidadeKg: kg, data: elData.value || mutiraoHojeISO() });
+  const data = elData.value || mutiraoHojeISO();
+  let r = registrarEntregaExternaNatal({ nome: nomeExt, quantidadeKg: kg, data: data });
+
+  // FASE 6 — mesma regra do participante: avisa e deixa a decisão com o Coordenador.
+  if (!r.ok && r.motivo === 'duplicata_possivel') {
+    const e = r.existente;
+    const seguir = confirm(
+      'Já existe uma entrega de ' + ((e.externo && e.externo.nome) || '') + ' — ' +
+      mutiraoFmt(e.quantidadeKg) + ' kg — ' + mutiraoDataBr(e.data) + '.\n\n' +
+      'Esta é uma entrega NOVA, além daquela?\n\n' +
+      'OK — sim, registrar mais ' + mutiraoFmt(kg) + ' kg\n' +
+      'Cancelar — não registrar nada');
+    if (!seguir) {
+      if (aviso) aviso.textContent = 'Nada foi registrado. A entrega anterior continua na lista acima.';
+      return;
+    }
+    r = registrarEntregaExternaNatal({ nome: nomeExt, quantidadeKg: kg, data: data, confirmarDuplicata: true });
+  }
+
   if (!r.ok) {
     if (aviso) aviso.textContent = (r.motivo === 'sem_autoridade')
       ? 'Só o Coordenador deste Pequeno Grupo pode registrar entregas externas.'
@@ -13119,7 +13158,7 @@ function renderMutirao(msg) {
   const minhas   = listarMinhasEntregasNatal(mg.grupoNum);
   const meuTotal = Number(minhas.reduce((a, e) => a + (e.quantidadeKg || 0), 0).toFixed(MUTIRAO_NATAL.casas));
   const doPg     = calcularTotalKgNatalDoPG(mg.grupoNum);
-  const dataBr   = (iso) => { const p = String(iso || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] : String(iso || ''); };
+  const dataBr   = mutiraoDataBr;   // FASE 6: fonte única
 
   const historico = minhas.length
     ? minhas.slice().reverse().map(e => `
@@ -13180,7 +13219,26 @@ function registrarEntregaMutiraoUI() {
   }
 
   btn.disabled = true;
-  const r = registrarMinhaEntregaNatal({ quantidadeKg: kg });
+  let r = registrarMinhaEntregaNatal({ quantidadeKg: kg });
+
+  // FASE 6 — repetição acidental. A camada não decide sozinha: ela avisa que já existe uma
+  // entrega igual (mesmo valor, mesmo dia) e a PESSOA diz se é uma entrega nova. Bloquear
+  // calado perderia quem realmente entregou 10 kg duas vezes no mesmo dia.
+  if (!r.ok && r.motivo === 'duplicata_possivel') {
+    const e = r.existente;
+    const seguir = confirm(
+      'Você já registrou ' + mutiraoFmt(e.quantidadeKg) + ' kg em ' + mutiraoDataBr(e.data) + '.\n\n' +
+      'Esta é uma entrega NOVA, além daquela?\n\n' +
+      'OK — sim, registrar mais ' + mutiraoFmt(kg) + ' kg\n' +
+      'Cancelar — não registrar nada');
+    if (!seguir) {
+      btn.disabled = false;
+      if (aviso) aviso.textContent = 'Nada foi registrado. A entrega anterior continua no seu histórico.';
+      inp.value = '';
+      return;
+    }
+    r = registrarMinhaEntregaNatal({ quantidadeKg: kg, confirmarDuplicata: true });
+  }
   btn.disabled = false;
 
   if (!r.ok) {
@@ -13189,7 +13247,7 @@ function registrarEntregaMutiraoUI() {
       : 'Não foi possível registrar (' + (r.detalhe || r.motivo) + ').';
     return;
   }
-  renderMutirao('✅ Entrega de ' + mutiraoFmt(kg) + ' kg registrada. Obrigado!');
+  renderMutirao('✅ ' + mutiraoFmt(kg) + ' kg registrados. Veja abaixo, no seu histórico.');
 }
 
 
@@ -15049,9 +15107,34 @@ function mutiraoSouCoordenadorDoPG(pgNum) {
   return typeof souCoordenadorAdminDoGrupo === 'function' && souCoordenadorAdminDoGrupo(g);
 }
 
-function mutiraoPersistir(reg) {
+// ── FASE 6: prevenção de duplicidade ─────────────────────────────────────────
+// Assinatura de uma entrega: mesmo PG, mesma edição, mesmo doador, mesma quantidade, mesma
+// data. Duas entregas com a mesma assinatura NÃO são prova de engano — uma pessoa pode
+// mesmo entregar 10 kg duas vezes no mesmo dia. É só o sinal de que vale PERGUNTAR antes
+// de gravar. Por isso a camada devolve `duplicata_possivel` em vez de recusar: quem decide
+// é a pessoa, não o sistema. Bloquear calado perderia entrega legítima.
+function mutiraoAssinatura(reg) {
+  const quem = (reg.tipoOrigem === MUTIRAO_ORIGEM.EXTERNO)
+    ? 'E:' + String((reg.externo && reg.externo.nome) || '').trim().toLowerCase()
+    : 'P:' + ((reg.participante && (reg.participante.memberId ||
+        String(reg.participante.nome || '').trim().toLowerCase())) || '');
+  return [reg.pgNum, reg.mutiraoNatal, quem, reg.quantidadeKg, reg.data].join('|');
+}
+
+// Devolve a entrega já existente com a mesma assinatura, ou null. Só olha entregas VIVAS —
+// uma entrega anulada não deve impedir o registro de outra igual.
+function mutiraoEntregaDuplicada(candidato) {
+  const alvo = mutiraoAssinatura(candidato);
+  return listarEntregasNatalDoPG(candidato.pgNum).find(e => mutiraoAssinatura(e) === alvo) || null;
+}
+
+function mutiraoPersistir(reg, confirmarDuplicata) {
   const erro = validarEntregaNatal(reg);
   if (erro) { console.error('Mutirão: registro RECUSADO —', erro); return { ok: false, motivo: 'invalido', detalhe: erro }; }
+  if (!confirmarDuplicata) {
+    const existente = mutiraoEntregaDuplicada(reg);
+    if (existente) return { ok: false, motivo: 'duplicata_possivel', existente: existente };
+  }
   const lista = mutiraoLoadEntregas();
   lista.push(reg);
   if (!mutiraoSaveEntregas(lista)) return { ok: false, motivo: 'falha_gravacao' };
@@ -15061,7 +15144,7 @@ function mutiraoPersistir(reg) {
 // TIPO 1 — o participante registra a PRÓPRIA entrega.
 // NÃO recebe parâmetro de identidade: a pessoa é derivada do próprio aparelho. Por construção
 // não existe caminho para registrar pela outra pessoa nem para produzir um EXTERNO aqui.
-function registrarMinhaEntregaNatal({ quantidadeKg, data } = {}) {
+function registrarMinhaEntregaNatal({ quantidadeKg, data, confirmarDuplicata } = {}) {
   const mg = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
   if (!mg) return { ok: false, motivo: 'sem_grupo' };
 
@@ -15087,14 +15170,14 @@ function registrarMinhaEntregaNatal({ quantidadeKg, data } = {}) {
     participante: { memberId: meuId, nome: nome },
     externo: null,
     removed: false,
-  });
+  }, confirmarDuplicata);
 }
 
 // TIPO 2 — o Coordenador registra a entrega de um colaborador de FORA do PG.
 // O registro nasce EXTERNO com participante:null por construção; não existe caminho que
 // transforme um externo em participante do PG. `setor` é texto livre e NÃO é normalizado
 // (mesma regra já adotada para os Embaixadores externos).
-function registrarEntregaExternaNatal({ nome, setor, quantidadeKg, data } = {}) {
+function registrarEntregaExternaNatal({ nome, setor, quantidadeKg, data, confirmarDuplicata } = {}) {
   const mg = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
   if (!mg) return { ok: false, motivo: 'sem_grupo' };
   if (!mutiraoSouCoordenadorDoPG(mg.grupoNum)) return { ok: false, motivo: 'sem_autoridade' };
@@ -15121,7 +15204,7 @@ function registrarEntregaExternaNatal({ nome, setor, quantidadeKg, data } = {}) 
     participante: null,
     externo: { nome: nomeExt, setor: String(setor || '').trim() || null },
     removed: false,
-  });
+  }, confirmarDuplicata);
 }
 
 // Só entregas VIVAS por padrão: o tombstone é sempre filtrado. Contar sem filtrar `removed`
@@ -15175,6 +15258,18 @@ function resumoMutiraoDoPG(pgNum) {
 // Entregas dos participantes do PG (não inclui externos) — alimenta o bloco A do Painel.
 function listarEntregasParticipantesDoPG(pgNum) {
   return listarEntregasNatalDoPG(pgNum).filter(e => e.tipoOrigem === MUTIRAO_ORIGEM.PARTICIPANTE);
+}
+
+// Entregas de colaboradores externos — FASE 6: o Coordenador precisa VER o que já lançou
+// antes de lançar de novo. Sem esta lista, a duplicidade só seria percebida pelo total.
+function listarEntregasExternasDoPG(pgNum) {
+  return listarEntregasNatalDoPG(pgNum).filter(e => e.tipoOrigem === MUTIRAO_ORIGEM.EXTERNO);
+}
+
+// "2026-12-05" → "05/12". Fonte única para as três telas.
+function mutiraoDataBr(iso) {
+  const p = String(iso || '').split('-');
+  return p.length === 3 ? p[2] + '/' + p[1] : String(iso || '');
 }
 
 // Os dois tipos são somados SEPARADAMENTE e nunca se misturam (critério de aceite da FASE 1).
@@ -15315,6 +15410,40 @@ async function autoTesteMutirao() {
        listarEntregasNatalDoPG(SLOT, { incluirAnuladas: true }).some(x => x.entregaId === e3.entrega.entregaId));
     const totDepois = calcularTotalKgNatalDoPG(SLOT);
     ok('M-30 total desconta a anulada', totDepois.externos === 0 && totDepois.total === 13, JSON.stringify(totDepois));
+
+    // ── 8. FASE 6 — prevenção de duplicidade ─────────────────────────────────
+    mutiraoSaveEntregas([]);
+    vestir('QA-MARIA', 'Maria da Silva', 'colaborador');
+    const d1 = registrarMinhaEntregaNatal({ quantidadeKg: 10, data: '2026-12-10' });
+    const d2 = registrarMinhaEntregaNatal({ quantidadeKg: 10, data: '2026-12-10' });
+    ok('M-31 repetição idêntica NÃO grava', d2.ok === false && d2.motivo === 'duplicata_possivel', d2.motivo || '');
+    ok('M-32 devolve a entrega já existente', !!d2.existente && d2.existente.entregaId === d1.entrega.entregaId);
+    ok('M-33 continua com uma entrega só', listarEntregasNatalDoPG(SLOT).length === 1, 'total=' + listarEntregasNatalDoPG(SLOT).length);
+
+    const d3 = registrarMinhaEntregaNatal({ quantidadeKg: 10, data: '2026-12-10', confirmarDuplicata: true });
+    ok('M-34 confirmada pela pessoa, a segunda é gravada',
+       d3.ok === true && listarEntregasNatalDoPG(SLOT).length === 2, 'total=' + listarEntregasNatalDoPG(SLOT).length);
+
+    ok('M-35 quantidade diferente não é duplicata', registrarMinhaEntregaNatal({ quantidadeKg: 4, data: '2026-12-10' }).ok === true);
+    ok('M-36 data diferente não é duplicata',       registrarMinhaEntregaNatal({ quantidadeKg: 10, data: '2026-12-11' }).ok === true);
+
+    vestir('QA-CARLA', 'Carla Souza', 'colaborador');
+    ok('M-37 outra pessoa, mesmo valor e dia, não é duplicata',
+       registrarMinhaEntregaNatal({ quantidadeKg: 10, data: '2026-12-10' }).ok === true);
+
+    vestir('QA-ANA', 'Ana Beatriz', 'coordenador');
+    const x1 = registrarEntregaExternaNatal({ nome: 'Joao Pereira', quantidadeKg: 20, data: '2026-12-08' });
+    const x2 = registrarEntregaExternaNatal({ nome: 'joao pereira', quantidadeKg: 20, data: '2026-12-08' });
+    ok('M-38 externo repetido é detectado (ignora maiúsculas)',
+       x1.ok === true && x2.ok === false && x2.motivo === 'duplicata_possivel', x2.motivo || '');
+    ok('M-39 outro externo, mesmo valor e dia, não é duplicata',
+       registrarEntregaExternaNatal({ nome: 'Rita Alves', quantidadeKg: 20, data: '2026-12-08' }).ok === true);
+
+    anularEntregaNatal(x1.entrega.entregaId);
+    ok('M-40 entrega anulada não bloqueia um registro igual',
+       registrarEntregaExternaNatal({ nome: 'Joao Pereira', quantidadeKg: 20, data: '2026-12-08' }).ok === true);
+    ok('M-41 histórico de externos mostra só os vivos',
+       listarEntregasExternasDoPG(SLOT).length === 2, 'vivos=' + listarEntregasExternasDoPG(SLOT).length);
 
   } finally {
     window.loadMeuGrupo = origLMG;
