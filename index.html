@@ -4048,6 +4048,7 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
     ${souCoordenadorDesteGrupo ? `<button onclick="iniciarConvidarParticipanteDoPainel(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:#FF6B4A;border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">🔗 Convidar Participante</button>` : ''}
     <button onclick="iniciarEditarNomeGrupo(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">✎ Editar nome do grupo</button>
     <button onclick="iniciarEditarReuniaoPainel(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">🗓️ Editar dia e horário</button>
+    <button onclick="renderMutiraoPainel(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--orange);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">🎁 Mutirão de Natal</button>
     ${renderPainelIndicadoresPorSetor(g, grupoNum, nome)}
     <div class="panel-section">
       <div class="panel-title">Progresso semanal do grupo</div>
@@ -4069,6 +4070,119 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
 `;
 
   resetScroll();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  MUTIRÃO DE NATAL — Painel do Tutor/Coordenador (FASE 5)
+// ══════════════════════════════════════════════════════════════════════════
+// Três blocos: (A) entregas dos participantes, (B) registro de colaborador externo — só
+// para o Coordenador do próprio PG — e (C) resumo do PG.
+function renderMutiraoPainel(grupoNum, nome, msg) {
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  const body = document.getElementById('tutorpanel-body');
+  if (!g || !body) return;
+
+  const voltar   = String(nome).replace(/'/g, "\\'");
+  const r        = resumoMutiraoDoPG(grupoNum);
+  const entregas = listarEntregasParticipantesDoPG(grupoNum);
+  const dataBr   = (iso) => { const p = String(iso || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] : String(iso || ''); };
+  const linha    = (rot, val) => `<div class="mut-linha"><span style="font-size:14.5px;color:var(--text2)">${rot}</span><strong style="font-size:15px;color:var(--text)">${val}</strong></div>`;
+
+  // (B) só aparece para o Coordenador DESTE PG, e só quando este PG é o dele:
+  // registrarEntregaExternaNatal() vincula a entrega ao PG do próprio aparelho, então
+  // oferecer o formulário noutro contexto seria oferecer um botão que gravaria no lugar errado.
+  const mgAtual = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
+  const podeExterno = !!mgAtual && mgAtual.grupoNum === grupoNum && mutiraoSouCoordenadorDoPG(grupoNum);
+  const hoje = mutiraoHojeISO();
+
+  const listaHtml = entregas.length
+    ? entregas.slice().reverse().map(e => `
+        <div class="mut-linha">
+          <span style="font-size:14.5px;color:var(--text2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${sanitize((e.participante && e.participante.nome) || '—')}</span>
+          <span style="font-size:13px;color:var(--text3);margin:0 8px;flex-shrink:0">${dataBr(e.data)}</span>
+          <span style="font-size:15px;font-weight:700;color:var(--orange);flex-shrink:0">${mutiraoFmt(e.quantidadeKg)} kg</span>
+        </div>`).join('')
+    : `<div style="font-size:14.5px;color:var(--text3);font-family:var(--ff-body)">Nenhum participante registrou entrega ainda.</div>`;
+
+  const estiloCampo = 'width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text);font-family:var(--ff-body);box-sizing:border-box;margin-bottom:.6rem';
+  const estiloRotulo = 'display:block;font-size:14px;color:var(--text3);margin-bottom:4px';
+
+  const blocoB = podeExterno ? `
+    <div class="panel-section">
+      <div class="panel-title">Registrar participação externa</div>
+      <label style="${estiloRotulo}">Nome do colaborador externo</label>
+      <input id="mut-ext-nome" type="text" maxlength="60" autocomplete="off" style="${estiloCampo}" placeholder="Nome de quem doou">
+      <label style="${estiloRotulo}">Quantidade entregue</label>
+      <input id="mut-ext-kg" type="text" inputmode="decimal" maxlength="6" autocomplete="off" style="${estiloCampo}" placeholder="kg">
+      <label style="${estiloRotulo}">Data</label>
+      <input id="mut-ext-data" type="date" value="${hoje}" max="${hoje}" style="${estiloCampo}">
+      <div id="mut-ext-aviso" style="font-size:13.5px;color:var(--coral);font-family:var(--ff-body);min-height:19px;margin-bottom:.5rem"></div>
+      <button class="mut-btn" onclick="registrarExternoMutiraoUI(${grupoNum}, '${voltar}')">Registrar entrega</button>
+    </div>` : `
+    <div class="panel-section">
+      <div class="panel-title">Registrar participação externa</div>
+      <div style="font-size:14.5px;color:var(--text3);font-family:var(--ff-body)">Só o Coordenador deste Pequeno Grupo registra entregas de colaboradores externos.</div>
+    </div>`;
+
+  body.innerHTML = `
+    <div class="content-card">
+      <div class="phase-tag" style="color:var(--orange);margin-bottom:4px">🎁 Mutirão de Natal ${MUTIRAO_NATAL.edicao}</div>
+      <p class="body-text" style="margin:0">${sanitize(g.nome || 'Grupo ' + grupoNum)}</p>
+    </div>
+    ${msg ? `<div class="panel-section" style="background:var(--orange-light);border-color:var(--orange)"><div style="font-size:15px;color:var(--text2);font-family:var(--ff-body)">${msg}</div></div>` : ''}
+
+    <div class="panel-section">
+      <div class="panel-title">Entregas dos participantes (${entregas.length})</div>
+      ${listaHtml}
+    </div>
+
+    ${blocoB}
+
+    <div class="panel-section">
+      <div class="panel-title">Resumo do PG</div>
+      <div style="font-size:32px;font-weight:700;color:var(--orange);font-family:var(--ff-body);line-height:1.1">${mutiraoFmt(r.total)} kg</div>
+      <div style="font-size:13px;color:var(--text3);font-family:var(--ff-body);margin-bottom:.8rem">total arrecadado pelo Pequeno Grupo</div>
+      ${linha('Participantes do PG', mutiraoFmt(r.participantes) + ' kg')}
+      ${linha('Colaboradores externos', mutiraoFmt(r.externos) + ' kg')}
+      ${linha('<strong>Total</strong>', '<strong>' + mutiraoFmt(r.total) + ' kg</strong>')}
+      <div style="height:.8rem"></div>
+      ${linha('Participantes do PG que entregaram', r.pessoasParticipantes)}
+      ${linha('Colaboradores externos mobilizados', r.pessoasExternas)}
+    </div>
+
+    <button onclick="renderTutorGrupoDetalhe(${grupoNum}, '${voltar}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Voltar ao Pequeno Grupo</button>`;
+
+  resetScroll();
+}
+
+function registrarExternoMutiraoUI(grupoNum, nome) {
+  const elNome = document.getElementById('mut-ext-nome');
+  const elKg   = document.getElementById('mut-ext-kg');
+  const elData = document.getElementById('mut-ext-data');
+  const aviso  = document.getElementById('mut-ext-aviso');
+  if (!elNome || !elKg || !elData) return;
+
+  const nomeExt = elNome.value.trim();
+  if (!nomeExt) {
+    if (aviso) aviso.textContent = 'Informe o nome do colaborador externo.';
+    elNome.focus(); return;
+  }
+  const kg = mutiraoNormalizarKg(elKg.value);
+  if (kg === null) {
+    if (aviso) aviso.textContent = 'Informe um valor entre ' + mutiraoFmt(MUTIRAO_NATAL.kgMin) +
+      ' e ' + mutiraoFmt(MUTIRAO_NATAL.kgMax) + ' kg.';
+    elKg.focus(); return;
+  }
+
+  const r = registrarEntregaExternaNatal({ nome: nomeExt, quantidadeKg: kg, data: elData.value || mutiraoHojeISO() });
+  if (!r.ok) {
+    if (aviso) aviso.textContent = (r.motivo === 'sem_autoridade')
+      ? 'Só o Coordenador deste Pequeno Grupo pode registrar entregas externas.'
+      : 'Não foi possível registrar (' + (r.detalhe || r.motivo) + ').';
+    return;
+  }
+  renderMutiraoPainel(grupoNum, nome,
+    '✅ Entrega de ' + mutiraoFmt(kg) + ' kg registrada para ' + sanitize(nomeExt) + '.');
 }
 
 // ── Editar nome do Pequeno Grupo (Tutor/Coordenador, achado de campo: nome
@@ -15035,6 +15149,33 @@ function listarMinhasEntregasNatal(pgNum) {
 
 // Vírgula decimal: 7.5 vira "7,5". Fonte única para a Home e para a tela.
 function mutiraoFmt(n) { return String(n).replace('.', ','); }
+
+// Resumo do PG para o Painel: os quilos de calcularTotalKgNatalDoPG mais quantas PESSOAS de
+// cada lado. Pessoa ≠ entrega: quem entregou duas vezes conta UMA vez.
+// Chave do participante: memberId quando existe, senão o nome — mesma tolerância de
+// listarMinhasEntregasNatal, pelo mesmo motivo (identidade nova após reentrada).
+// Chave do externo: nome + setor. Sem setor informado, dois homônimos contam como uma
+// pessoa só — limite conhecido, registrado no relatório da FASE 5.
+function resumoMutiraoDoPG(pgNum) {
+  const lista = listarEntregasNatalDoPG(pgNum);
+  const pessoas = new Set(), externos = new Set();
+  lista.forEach(e => {
+    if (e.tipoOrigem === MUTIRAO_ORIGEM.PARTICIPANTE && e.participante) {
+      const k = e.participante.memberId || String(e.participante.nome || '').trim().toLowerCase();
+      if (k) pessoas.add(k);
+    } else if (e.tipoOrigem === MUTIRAO_ORIGEM.EXTERNO && e.externo) {
+      const k = String(e.externo.nome || '').trim().toLowerCase() + '|' + String(e.externo.setor || '').trim().toLowerCase();
+      if (k !== '|') externos.add(k);
+    }
+  });
+  return Object.assign({}, calcularTotalKgNatalDoPG(pgNum),
+    { pessoasParticipantes: pessoas.size, pessoasExternas: externos.size });
+}
+
+// Entregas dos participantes do PG (não inclui externos) — alimenta o bloco A do Painel.
+function listarEntregasParticipantesDoPG(pgNum) {
+  return listarEntregasNatalDoPG(pgNum).filter(e => e.tipoOrigem === MUTIRAO_ORIGEM.PARTICIPANTE);
+}
 
 // Os dois tipos são somados SEPARADAMENTE e nunca se misturam (critério de aceite da FASE 1).
 function calcularTotalKgNatalDoPG(pgNum) {
