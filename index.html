@@ -1420,6 +1420,23 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 }
 .mut-linha:last-child{border-bottom:none}
 
+/* Dashboard do PG (FASE 7) */
+.mut-kpi-lbl{
+  font-size:11px;letter-spacing:1.3px;text-transform:uppercase;color:var(--text3);
+  font-weight:700;font-family:var(--ff-body)
+}
+.mut-kpi-sub{font-size:12.5px;color:var(--text3);font-family:var(--ff-body);margin-top:2px}
+.mut-kpi{flex:1;min-width:0;background:var(--orange-light);border-radius:var(--radius-sm);padding:.7rem .8rem}
+.mut-kpi-num{font-size:28px;font-weight:700;color:var(--orange);font-family:var(--ff-body);line-height:1.15}
+.mut-tab{width:100%;border-collapse:collapse;font-family:var(--ff-body);margin-top:.35rem}
+.mut-tab th{
+  font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text3);
+  font-weight:700;text-align:left;padding:.35rem 0;border-bottom:0.5px solid var(--border)
+}
+.mut-tab td{font-size:15px;color:var(--text2);padding:.5rem 0;border-bottom:0.5px solid var(--border)}
+.mut-tab th:last-child,.mut-tab td:last-child{text-align:right}
+.mut-tab tr:last-child td{border-bottom:none;font-weight:700;color:var(--text)}
+
 .pg-goal-row{margin-bottom:.65rem}
 .pg-goal-row:last-child{margin-bottom:0}
 .pg-goal-lbl{
@@ -4072,6 +4089,47 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
   resetScroll();
 }
 
+// ── Dashboard do PG (FASE 7) ─────────────────────────────────────────────────
+// SÓ APRESENTAÇÃO. Todos os números vêm de resumoMutiraoDoPG() — nenhum cálculo acontece
+// aqui, e nada é derivado por um segundo caminho. É o que mantém o indicador auditável:
+// os dois números da tabela somam exatamente o total exibido em cima, e as duas contagens
+// de pessoas são as mesmas que alimentam o resumo. Sem componente oculto.
+function htmlMutiraoDashboard(pgNum) {
+  const r = resumoMutiraoDoPG(pgNum);
+  const plural = (n, um, varios) => (n === 1 ? um : varios);
+  return `
+    <div class="panel-section">
+      <div class="panel-title">Dashboard do PG</div>
+
+      <div class="mut-kpi-lbl">Arrecadação</div>
+      <div style="font-size:36px;font-weight:700;color:var(--orange);font-family:var(--ff-body);line-height:1.1">${mutiraoFmt(r.total)} kg</div>
+      <div class="mut-kpi-sub" style="margin-bottom:.9rem">total arrecadado pelo Pequeno Grupo</div>
+
+      <div style="display:flex;gap:.7rem;margin-bottom:1rem">
+        <div class="mut-kpi">
+          <div class="mut-kpi-lbl">Participação do PG</div>
+          <div class="mut-kpi-num">${r.pessoasParticipantes}</div>
+          <div class="mut-kpi-sub">${plural(r.pessoasParticipantes, 'participante entregou', 'participantes entregaram')}</div>
+        </div>
+        <div class="mut-kpi">
+          <div class="mut-kpi-lbl">Mobilização externa</div>
+          <div class="mut-kpi-num">${r.pessoasExternas}</div>
+          <div class="mut-kpi-sub">${plural(r.pessoasExternas, 'colaborador externo entregou', 'colaboradores externos entregaram')}</div>
+        </div>
+      </div>
+
+      <div class="mut-kpi-lbl">Origem dos kg</div>
+      <table class="mut-tab">
+        <thead><tr><th>Origem</th><th>Kg</th></tr></thead>
+        <tbody>
+          <tr><td>Participantes do PG</td><td>${mutiraoFmt(r.participantes)}</td></tr>
+          <tr><td>Colaboradores externos</td><td>${mutiraoFmt(r.externos)}</td></tr>
+          <tr><td>Total</td><td>${mutiraoFmt(r.total)}</td></tr>
+        </tbody>
+      </table>
+    </div>`;
+}
+
 // ══════════════════════════════════════════════════════════════════════════
 //  MUTIRÃO DE NATAL — Painel do Tutor/Coordenador (FASE 5)
 // ══════════════════════════════════════════════════════════════════════════
@@ -4083,10 +4141,8 @@ function renderMutiraoPainel(grupoNum, nome, msg) {
   if (!g || !body) return;
 
   const voltar   = String(nome).replace(/'/g, "\\'");
-  const r        = resumoMutiraoDoPG(grupoNum);
   const entregas = listarEntregasParticipantesDoPG(grupoNum);
   const dataBr   = mutiraoDataBr;   // FASE 6: fonte única
-  const linha    = (rot, val) => `<div class="mut-linha"><span style="font-size:14.5px;color:var(--text2)">${rot}</span><strong style="font-size:15px;color:var(--text)">${val}</strong></div>`;
 
   // (B) só aparece para o Coordenador DESTE PG, e só quando este PG é o dele:
   // registrarEntregaExternaNatal() vincula a entrega ao PG do próprio aparelho, então
@@ -4159,17 +4215,7 @@ function renderMutiraoPainel(grupoNum, nome, msg) {
 
     ${blocoB}
 
-    <div class="panel-section">
-      <div class="panel-title">Resumo do PG</div>
-      <div style="font-size:32px;font-weight:700;color:var(--orange);font-family:var(--ff-body);line-height:1.1">${mutiraoFmt(r.total)} kg</div>
-      <div style="font-size:13px;color:var(--text3);font-family:var(--ff-body);margin-bottom:.8rem">total arrecadado pelo Pequeno Grupo</div>
-      ${linha('Participantes do PG', mutiraoFmt(r.participantes) + ' kg')}
-      ${linha('Colaboradores externos', mutiraoFmt(r.externos) + ' kg')}
-      ${linha('<strong>Total</strong>', '<strong>' + mutiraoFmt(r.total) + ' kg</strong>')}
-      <div style="height:.8rem"></div>
-      ${linha('Participantes do PG que entregaram', r.pessoasParticipantes)}
-      ${linha('Colaboradores externos mobilizados', r.pessoasExternas)}
-    </div>
+    ${htmlMutiraoDashboard(grupoNum)}
 
     <button onclick="renderTutorGrupoDetalhe(${grupoNum}, '${voltar}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Voltar ao Pequeno Grupo</button>`;
 
