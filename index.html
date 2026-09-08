@@ -34,6 +34,11 @@
   --purple-light: #EDE7F6;
   --coral: #C0392B;
   --coral-light: #FDECEA;
+  /* Mutirão de Natal — laranja escuro. #B5541A dá 4,95:1 de contraste com texto branco
+     (acima do mínimo de 4,5:1), diferente o bastante do --coral para não ser lido como erro. */
+  --orange: #B5541A;
+  --orange-mid: #C9691B;
+  --orange-light: #FBEADF;
   --text: #0D0D1A;
   --text2: #20293A;
   --text3: #4A5868;
@@ -1364,6 +1369,29 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 }
 
 .pg-progress-body{padding:.85rem 1rem}
+
+/* ── Mutirão de Natal ─────────────────────────────────────────────────────
+   Mesma forma dos demais cards da Home (margem, raio, borda, cabeçalho em
+   gradiente) — só a cor muda, para destacar sem destoar. */
+.mutirao-card{
+  margin:.75rem 1rem 0;background:var(--card);
+  border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden
+}
+.mutirao-hdr{
+  background:linear-gradient(135deg,var(--orange),var(--orange-mid));
+  padding:.7rem 1rem;display:flex;align-items:center;gap:8px;
+  border:none;cursor:pointer;width:100%;text-align:left;font:inherit
+}
+.mutirao-ico{font-size:20px;flex-shrink:0}
+.mutirao-title{flex:1;min-width:0}
+.mutirao-name{font-size:15px;font-weight:700;color:#fff;font-family:var(--ff-body)}
+.mutirao-sub{font-size:11.5px;color:rgba(255,255,255,.72);font-family:var(--ff-body);margin-top:1px}
+.mutirao-total{
+  display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.18);
+  border-radius:20px;padding:3px 9px;font-size:12px;color:#fff;
+  font-family:var(--ff-body);font-weight:600;flex-shrink:0
+}
+.mutirao-body{padding:.85rem 1rem}
 
 .pg-goal-row{margin-bottom:.65rem}
 .pg-goal-row:last-child{margin-bottom:0}
@@ -6939,6 +6967,7 @@ function renderHome() {
   setTimeout(() => {
     if (typeof renderGruposBtnHome === 'function') renderGruposBtnHome();
     if (typeof renderPgProgressHome === 'function') renderPgProgressHome();
+    if (typeof renderMutiraoBtnHome === 'function') renderMutiraoBtnHome();
     if (typeof renderComunidadeBtnHome === 'function') renderComunidadeBtnHome();
     if (typeof renderDiretoriaTemasHome === 'function') renderDiretoriaTemasHome();
     // O botão de recomeço fica sempre por último na Home
@@ -12854,10 +12883,74 @@ function renderGruposBtnHome() {
   // O card do grupo (flâmula + nome + dados) foi consolidado dentro do conteúdo expansível do
   // botão único "Progresso — <PG>" (ver renderPgProgressHome) — este div vira só o ponto de
   // ancoragem onde aquele botão é inserido logo em seguida (anchor.after em renderPgProgressHome).
-  div.innerHTML = '';
+  //
+  // FASE 3 (Mutirão): com o Progresso oculto, aquele card deixaria de existir na Home e o
+  // participante perderia o acesso à própria inscrição. Então ele volta a ser um botão
+  // próprio aqui, como era antes da consolidação. Quando MOSTRAR_PROGRESSO_PG_HOME voltar a
+  // true, este div volta a ser só a âncora e o card volta para dentro do Progresso — nunca
+  // aparecendo duas vezes.
+  const mgHome = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
+  div.innerHTML = (!MOSTRAR_PROGRESSO_PG_HOME && mgHome) ? htmlCardDoGrupo(mgHome, true) : '';
 
   // UX-01: o card "Mural de Gratidão" foi removido daqui — consolidado no único card
   // "Painel da Comunidade" (renderComunidadeBtnHome). O chip do grupo acima é preservado.
+}
+
+// ── Card do Mutirão de Natal na Home (FASE 3) ────────────────────────────────
+// Ocupa o espaço deixado pelo Progresso do PG. Mesma forma dos outros cards da Home
+// (margem, raio, cabeçalho em gradiente, conteúdo expansível por toggleSection) — só a cor
+// muda, para destacar sem destoar. Os números vêm da camada de serviços da FASE 2.
+// A tela de registro de entregas é a FASE 4.
+function renderMutiraoBtnHome() {
+  const existing = document.getElementById('mutirao-card');
+  if (existing) existing.remove();
+
+  const mg = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
+  if (!mg) return;   // mesma regra do Progresso: só aparece para quem já está num PG
+
+  const anchor = document.getElementById('grupos-home-btn');
+  if (!anchor) return;
+
+  const t = (typeof calcularTotalKgNatalDoPG === 'function')
+    ? calcularTotalKgNatalDoPG(mg.grupoNum)
+    : { participantes: 0, externos: 0, total: 0, entregas: 0 };
+  const fmt = (n) => String(n).replace('.', ',');
+
+  const div = document.createElement('div');
+  div.id = 'mutirao-card';
+  div.className = 'mutirao-card';
+  div.innerHTML = `
+    <button class="mutirao-hdr" onclick="toggleSection(this)">
+      <span class="mutirao-ico">🎁</span>
+      <div class="mutirao-title">
+        <div class="mutirao-name">Mutirão de Natal</div>
+        <div class="mutirao-sub">Toque para ver as doações do seu PG</div>
+      </div>
+      <div class="mutirao-total">${fmt(t.total)} kg</div>
+      <span class="toggle-arrow" style="color:#fff;font-size:14px;display:inline-block;transition:transform .2s;flex-shrink:0">▸</span>
+    </button>
+    <div class="toggle-content" style="display:none">
+      <div class="mutirao-body">
+        <div style="display:flex;gap:.75rem">
+          <div style="flex:1;background:var(--orange-light);border-radius:var(--radius-sm);padding:.6rem .7rem">
+            <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);font-weight:700;font-family:var(--ff-body)">Participantes</div>
+            <div style="font-size:19px;font-weight:700;color:var(--orange);font-family:var(--ff-body)">${fmt(t.participantes)} kg</div>
+          </div>
+          <div style="flex:1;background:var(--orange-light);border-radius:var(--radius-sm);padding:.6rem .7rem">
+            <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);font-weight:700;font-family:var(--ff-body)">Externos</div>
+            <div style="font-size:19px;font-weight:700;color:var(--orange);font-family:var(--ff-body)">${fmt(t.externos)} kg</div>
+          </div>
+        </div>
+        <div style="font-size:12.5px;color:var(--text3);font-family:var(--ff-body);margin-top:.7rem">
+          ${t.entregas} ${t.entregas === 1 ? 'entrega registrada' : 'entregas registradas'} neste Pequeno Grupo.
+        </div>
+      </div>
+    </div>`;
+
+  // Depois do Progresso quando ele existir, logo após a âncora quando estiver oculto —
+  // assim a ordem da Home fica previsível nos dois estados.
+  const ref = document.getElementById('pg-progress-card') || anchor;
+  ref.after(div);
 }
 
 
@@ -14444,10 +14537,49 @@ function desfazerVisita(grupoNum, campId, tutorNome) {
   renderTutorGrupoDetalhe(grupoNum, tutorNome);
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+//  CHAVE DE RESTAURAÇÃO DO PROGRESSO DO PG NA HOME
+// ══════════════════════════════════════════════════════════════════════════
+// FASE 3 do Mutirão de Natal: a seção "Progresso — <PG>" sai da Home para dar lugar ao
+// card do Mutirão. A remoção é SÓ VISUAL e reversível numa linha.
+//
+// NADA foi apagado: renderPgProgressHome() continua inteira logo abaixo, o CSS
+// .pg-progress-* continua no arquivo, e TODAS as funções de cálculo (getPgWeekMetas,
+// getPgGroupWeek, getPgEngajamentoSemana, getPgGrupoLevel, bumpPgProgress...) continuam
+// ativas e sendo chamadas — elas alimentam o Painel do Tutor e o Ranking IMD, que NÃO
+// foram afetados. Os dados continuam sendo coletados e gravados normalmente.
+//
+// PARA RESTAURAR: troque false por true. É só isso.
+const MOSTRAR_PROGRESSO_PG_HOME = false;
+
+// Card do grupo (flâmula + nome + dados + acesso à inscrição). Vive em DOIS lugares,
+// conforme a chave acima: dentro do card de Progresso (quando ele aparece) ou solto na Home
+// (quando o Progresso está oculto). Fonte única para os dois — duplicar o markup faria uma
+// correção num lugar não chegar no outro.
+function htmlCardDoGrupo(mg, solto) {
+  const pennant = generatePennantSvg(mg.grupoNum, mg.grupoNome, {width:52, height:72});
+  const tipo = mg.tipo === 'colaborador' ? '🏥 ' + mg.departamento
+             : mg.tipo === 'amigo' ? '🤝 Amigo dos Adventistas'
+             : mg.tipo === 'membro' ? '⛪ Membro IASD' : '🌿 Participante';
+  const moldura = solto
+    ? 'background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius)'
+    : 'background:var(--card);border:none;border-bottom:0.5px solid var(--border)';
+  return `
+    <button onclick="openInscricao(${mg.grupoNum})" style="display:flex;align-items:center;gap:10px;width:100%;${moldura};padding:.65rem 1rem;cursor:pointer;font-family:var(--ff-body)">
+      <div style="width:36px;height:50px;flex-shrink:0">${pennant}</div>
+      <div style="flex:1;text-align:left">
+        <div style="font-weight:600;font-size:15px;color:var(--teal)">Grupo ${mg.grupoNum} — ${mg.grupoNome}</div>
+        <div style="font-size:13px;color:var(--text3)">${tipo} · ${mg.dataInscricao || ''}</div>
+      </div>
+      <span style="color:var(--text3);font-size:18px">›</span>
+    </button>`;
+}
+
 // ── Render da barra de progresso do PG na Home ──────────────────────
 function renderPgProgressHome() {
   const existing = document.getElementById('pg-progress-card');
   if (existing) existing.remove();
+  if (!MOSTRAR_PROGRESSO_PG_HOME) return;   // FASE 3 — oculto, não removido
 
   const meuGrupo = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
   if (!meuGrupo) return; // só mostra se o usuário já está inscrito num grupo
@@ -14560,16 +14692,9 @@ function renderPgProgressHome() {
 
   // Card do grupo (flâmula + nome + dados) — antes era um botão separado na Home
   // (#grupos-home-btn), agora vive dentro do conteúdo expansível deste botão único.
-  const pennant = generatePennantSvg(meuGrupo.grupoNum, meuGrupo.grupoNome, {width:52, height:72});
-  const grupoInfoHtml = `
-    <button onclick="openInscricao(${meuGrupo.grupoNum})" style="display:flex;align-items:center;gap:10px;width:100%;background:var(--card);border:none;border-bottom:0.5px solid var(--border);padding:.65rem 1rem;cursor:pointer;font-family:var(--ff-body)">
-      <div style="width:36px;height:50px;flex-shrink:0">${pennant}</div>
-      <div style="flex:1;text-align:left">
-        <div style="font-weight:600;font-size:15px;color:var(--teal)">Grupo ${meuGrupo.grupoNum} — ${meuGrupo.grupoNome}</div>
-        <div style="font-size:13px;color:var(--text3)">${meuGrupo.tipo === 'colaborador' ? '🏥 ' + meuGrupo.departamento : meuGrupo.tipo === 'amigo' ? '🤝 Amigo dos Adventistas' : meuGrupo.tipo === 'membro' ? '⛪ Membro IASD' : '🌿 Participante'} · ${meuGrupo.dataInscricao || ''}</div>
-      </div>
-      <span style="color:var(--text3);font-size:18px">›</span>
-    </button>`;
+  // Markup extraído para htmlCardDoGrupo() na FASE 3, porque passou a ser usado também
+  // solto na Home quando o Progresso está oculto.
+  const grupoInfoHtml = htmlCardDoGrupo(meuGrupo, false);
 
   const div = document.createElement('div');
   div.id = 'pg-progress-card';
