@@ -4065,7 +4065,7 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
     ${souCoordenadorDesteGrupo ? `<button onclick="iniciarConvidarParticipanteDoPainel(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:#FF6B4A;border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">🔗 Convidar Participante</button>` : ''}
     <button onclick="iniciarEditarNomeGrupo(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">✎ Editar nome do grupo</button>
     <button onclick="iniciarEditarReuniaoPainel(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">🗓️ Editar dia e horário</button>
-    <button onclick="renderMutiraoPainel(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--orange);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">🎁 Mutirão de Natal</button>
+    <button onclick="abrirMutiraoPainel(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--orange);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">🎁 Mutirão de Natal</button>
     ${renderPainelIndicadoresPorSetor(g, grupoNum, nome)}
     <div class="panel-section">
       <div class="panel-title">Progresso semanal do grupo</div>
@@ -4268,6 +4268,13 @@ function registrarExternoMutiraoUI(grupoNum, nome) {
   }
   renderMutiraoPainel(grupoNum, nome,
     '✅ Entrega de ' + mutiraoFmt(kg) + ' kg registrada para ' + sanitize(nomeExt) + '.');
+  mutiraoSincronizarEDepois(() => renderMutiraoPainel(grupoNum, nome));
+}
+
+// Abre a área do Mutirão no Painel já puxando o que os outros aparelhos registraram.
+function abrirMutiraoPainel(grupoNum, nome) {
+  renderMutiraoPainel(grupoNum, nome);
+  mutiraoSincronizarEDepois(() => renderMutiraoPainel(grupoNum, nome));
 }
 
 // ── Editar nome do Pequeno Grupo (Tutor/Coordenador, achado de campo: nome
@@ -13184,6 +13191,9 @@ function openMutirao() {
   if (typeof loadGrupos === 'function') loadGrupos();
   renderMutirao();
   showScreen('mutirao');
+  // Puxa o que os outros aparelhos do PG registraram. A tela já apareceu com o dado local:
+  // a rede não segura a interface, só a atualiza quando chega.
+  mutiraoSincronizarEDepois(() => renderMutirao());
 }
 
 function renderMutirao(msg) {
@@ -13294,6 +13304,9 @@ function registrarEntregaMutiraoUI() {
     return;
   }
   renderMutirao('✅ ' + mutiraoFmt(kg) + ' kg registrados. Veja abaixo, no seu histórico.');
+  // A entrega já está salva no aparelho. O envio para a nuvem acontece em seguida e não
+  // pode fazer a pessoa esperar — se falhar, a entrega continua aqui e sobe no próximo sync.
+  mutiraoSincronizarEDepois(() => renderMutirao());
 }
 
 
@@ -15370,6 +15383,184 @@ function anularEntregaNatal(entregaId) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+//  SINCRONIZAÇÃO DO MUTIRÃO — documento próprio `jdpg/mutirao` (Opção 2)
+// ══════════════════════════════════════════════════════════════════════════
+// Decisão do usuário (2026-09-08): documento SEPARADO de `jdpg/grupos`.
+//   · isolamento — não disputa gravação com a sincronização dos PGs
+//   · tamanho    — orçamento próprio de 1 MiB, não consome os ~435 KB de `jdpg/grupos`
+//   · versão antiga — o app publicado não conhece este documento e nunca o toca
+//   · auditoria  — a campanha inteira num lugar só
+//
+// ⚠️ NADA AQUI ALTERA `jdpg/grupos`, o contrato de gravação dos grupos, os convites ou a
+// reentrada. Este é um caminho de rede paralelo e independente: `fbReadDoc`, `fbWriteGrupos`,
+// `commitConviteChange` e `trySaveGrupos` continuam exatamente como estavam.
+const MUT_COLL      = 'jdpg';
+const MUT_DOC       = 'mutirao';
+const MUT_SCHEMA    = 1;
+const MUT_MAX_BYTES = 480000;   // mesma folga que `dados` usa contra o teto de 500 KB da regra
+
+function mutiraoDocUrl(cfg) {
+  return `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/${MUT_COLL}/${MUT_DOC}?key=${cfg.apiKey}`;
+}
+
+// ── A REGRA DE MESCLAGEM ─────────────────────────────────────────────────────
+// É ELA, mais do que a trava, que cumpre o requisito "nenhum registro pode ser perdido".
+//
+// O conjunto de entregas só CRESCE. Cada entrega tem `entregaId` único, e a união por esse
+// id é COMUTATIVA (tanto faz quem grava primeiro) e IDEMPOTENTE (repetir não muda nada).
+// O único campo que muda depois de criado é `removed`, e ele só anda de false para true.
+//
+// Consequência: duas gravações simultâneas NÃO conseguem apagar uma entrega, nem "desanular"
+// uma que alguém anulou. Mesmo que a trava de concorrência falhasse, o pior caso desta
+// mesclagem é gravar duas vezes o mesmo conjunto — nunca perder um registro.
+function mutiraoMesclar(a, b) {
+  const porId = new Map();
+  const juntar = (lista) => (lista || []).forEach(e => {
+    if (!e || !e.entregaId) return;
+    const atual = porId.get(e.entregaId);
+    if (!atual) { porId.set(e.entregaId, e); return; }
+    // tombstone é monotônico: quem estiver anulado vence
+    if (e.removed === true && atual.removed !== true) porId.set(e.entregaId, e);
+  });
+  juntar(a);
+  juntar(b);
+  return Array.from(porId.values()).sort((x, y) => (x.ts || 0) - (y.ts || 0));
+}
+
+// Retrato do conjunto: quais entregas existem e quais estão anuladas. Serve para saber se
+// há algo novo a enviar — sem isso, todo sync gravaria mesmo sem mudança nenhuma.
+function mutiraoRetratoConjunto(lista) {
+  return (lista || []).map(e => e.entregaId + (e.removed === true ? '!' : '')).sort().join(',');
+}
+
+// Lê `jdpg/mutirao`. Devolve { entregas, updateTime } · { entregas: [], updateTime: null } se
+// o documento ainda não existe · { erro: true, … } em falha de rede · null no modo de teste.
+async function mutiraoFbRead(cfg) {
+  // BARREIRA DO MODO DE TESTE — gêmea da de fbReadDoc. Isolado é isolado dos dois lados.
+  if (MODO_TESTE) {
+    registrarEscritaBloqueada('mutiraoFbRead (leitura)', { destinoQueSeriaUsado: cfg ? cfg.projectId : null });
+    return null;
+  }
+  const r = await fetchComTimeout(mutiraoDocUrl(cfg), undefined, 15000);
+  if (r.status === 404) return { entregas: [], updateTime: null };   // documento ainda não existe
+  if (!r.ok) {
+    const t = await r.text();
+    const cl = classificarRespostaHttp(r.status);
+    return { erro: true, http: r.status, motivoHttp: cl.motivo, transitorio: cl.classe === 'transitorio', detalhe: t.slice(0, 120) };
+  }
+  const doc = await r.json();
+  let entregas = [];
+  try { entregas = JSON.parse((doc.fields && doc.fields.entregas && doc.fields.entregas.stringValue) || '[]'); }
+  catch (_) { entregas = []; }
+  if (!Array.isArray(entregas)) entregas = [];
+  return { entregas: entregas, updateTime: doc.updateTime || null };
+}
+
+// Grava `jdpg/mutirao` com TRAVA DE CONCORRÊNCIA obrigatória.
+//   · documento já existe → `currentDocument.updateTime` (só grava se ninguém mexeu desde a leitura)
+//   · documento não existe → `currentDocument.exists=false` (só cria se ninguém criou antes)
+// Sem um dos dois, duas pessoas gravando ao mesmo tempo perderiam uma entrega. Recusa do
+// servidor vira `preconditionFailed`, e quem chama RELÊ e remescla antes de tentar de novo.
+async function mutiraoFbWrite(cfg, entregas, baseUpdateTime) {
+  const payload = JSON.stringify(entregas || []);
+
+  // BARREIRA DO MODO DE TESTE — primeira instrução depois de montar o payload, como em
+  // fbWriteGrupos. Devolve a MESMA forma de um sucesso real, para o laço se comportar igual.
+  if (MODO_TESTE) {
+    registrarEscritaBloqueada('mutiraoFbWrite', {
+      operacao: 'mutirao-sync', bytes: payload.length, entregas: (entregas || []).length,
+      destinoQueSeriaUsado: cfg ? cfg.projectId : null,
+    });
+    return { ok: true, updateTime: new Date().toISOString() };
+  }
+
+  if (payload.length > MUT_MAX_BYTES) {
+    console.error('Mutirão: payload grande demais (' + payload.length + ' bytes) — gravação cancelada.');
+    return { ok: false, motivo: 'tamanho_excedido', bytes: payload.length };
+  }
+
+  const fields = {
+    entregas:      { stringValue: payload },
+    ts:            { integerValue: String(Date.now()) },
+    schemaVersion: { integerValue: String(MUT_SCHEMA) },
+  };
+  let url = mutiraoDocUrl(cfg) + '&updateMask.fieldPaths=entregas&updateMask.fieldPaths=ts&updateMask.fieldPaths=schemaVersion';
+  url += baseUpdateTime
+    ? '&currentDocument.updateTime=' + encodeURIComponent(baseUpdateTime)
+    : '&currentDocument.exists=false';
+
+  const r = await fetchComTimeout(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields: fields }),
+  }, 15000);
+
+  if (r.status === 400) {
+    const t = await r.text();
+    if (t.indexOf('FAILED_PRECONDITION') >= 0) return { ok: false, preconditionFailed: true };
+    return { ok: false, http: 400, motivoHttp: 'requisicao_invalida', detalhe: t.slice(0, 120) };
+  }
+  if (!r.ok) {
+    const t = await r.text();
+    const cl = classificarRespostaHttp(r.status);
+    return { ok: false, http: r.status, motivoHttp: cl.motivo, transitorio: cl.classe === 'transitorio', detalhe: t.slice(0, 120) };
+  }
+  const saved = await r.json();
+  return { ok: true, updateTime: saved.updateTime || null };
+}
+
+// ── O laço de sincronização ──────────────────────────────────────────────────
+// A cada tentativa ele RELÊ a nuvem e REMESCLA. Montar o payload uma vez e repetir a mesma
+// gravação seria o modo mais provável de esta implementação dar errado: a retentativa
+// gravaria por cima do que o outro aparelho acabou de escrever.
+async function sincronizarMutirao(opts) {
+  const tentativasMax = (opts && opts.tentativas) || 3;
+  const cfg = loadFbConfig();
+  if (!cfg || !cfg.projectId || !cfg.apiKey) return { ok: false, motivo: 'sem_config' };
+
+  for (let tentativa = 1; tentativa <= tentativasMax; tentativa++) {
+    const remoto = await mutiraoFbRead(cfg);
+    if (remoto === null) return { ok: false, motivo: 'modo_teste' };
+    if (remoto.erro) return { ok: false, motivo: remoto.motivoHttp, transitorio: !!remoto.transitorio, http: remoto.http };
+
+    const local    = mutiraoLoadEntregas();
+    const mesclado = mutiraoMesclar(remoto.entregas, local);
+
+    // A nuvem volta para o aparelho SEMPRE — inclusive as entregas registradas por outras
+    // pessoas do PG. É isto que faz o "total do PG" deixar de ser o total daquele celular.
+    mutiraoSaveEntregas(mesclado);
+
+    // Nada a enviar? então não grava — evita disputa e escrita inútil.
+    if (mutiraoRetratoConjunto(mesclado) === mutiraoRetratoConjunto(remoto.entregas)) {
+      return { ok: true, semMudanca: true, entregas: mesclado.length, recebidas: remoto.entregas.length };
+    }
+
+    const w = await mutiraoFbWrite(cfg, mesclado, remoto.updateTime);
+    if (w.ok) {
+      return { ok: true, entregas: mesclado.length, enviadas: mesclado.length - remoto.entregas.length, tentativa: tentativa };
+    }
+    if (w.preconditionFailed) {
+      // Outro aparelho gravou no meio do caminho. Espera um pouco e recomeça DO ZERO.
+      await new Promise(res => setTimeout(res, 80 * tentativa));
+      continue;
+    }
+    return { ok: false, motivo: w.motivo || w.motivoHttp || 'falha_gravacao', transitorio: !!w.transitorio, http: w.http };
+  }
+  return { ok: false, motivo: 'conflito_persistente' };
+}
+
+// Atalho para as telas: sincroniza sem travar a interface e redesenha se algo mudou.
+function mutiraoSincronizarEDepois(redesenhar) {
+  const antes = mutiraoRetratoConjunto(mutiraoLoadEntregas());
+  sincronizarMutirao()
+    .then(res => {
+      if (!res || !res.ok) return;
+      if (typeof redesenhar === 'function' && mutiraoRetratoConjunto(mutiraoLoadEntregas()) !== antes) redesenhar();
+    })
+    .catch(e => console.warn('sincronizarMutirao:', e));
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 //  BATERIA DO MUTIRÃO — testa a camada de serviços SEM interface
 // ══════════════════════════════════════════════════════════════════════════
 // Exige MODO_TESTE: fora dele, MUTIRAO_KEY é a chave REAL e a bateria apagaria o dado do
@@ -15805,9 +15996,10 @@ async function autoTesteMutiraoMatriz() {
 
     // ── T9 ────────────────────────────────────────────────────────────────
     bloqueado('T9 dois aparelhos — sincronização',
-      'NÃO EXECUTÁVEL: as entregas são gravadas apenas no localStorage do aparelho e não existe ' +
-      'caminho de sincronização implementado (decisão Opção 1 × Opção 2 em aberto). Não é defeito ' +
-      'de código — é ausência de funcionalidade. IMPEDE A PUBLICAÇÃO da campanha.');
+      'A sincronização EXISTE desde a FASE 12 (documento jdpg/mutirao, com trava de concorrência ' +
+      'provada em autoTesteMutiraoSync). O que falta agora é EXECUÇÃO EM CAMPO: dois aparelhos ' +
+      'físicos e a regra do Firestore para jdpg/mutirao publicada no Console. Sem a regra ' +
+      'publicada, toda gravação volta 403 e aparece ao usuário como "sem conexão".');
 
     // ── T10 ───────────────────────────────────────────────────────────────
     ok('T10a Progresso está OCULTO na Home', MOSTRAR_PROGRESSO_PG_HOME === false, 'chave=' + MOSTRAR_PROGRESSO_PG_HOME);
@@ -15836,6 +16028,146 @@ async function autoTesteMutiraoMatriz() {
     window.getMyMemberId = origMID;
     window.getMinhaFuncaoNoGrupo = origFUN;
     window.souCoordenadorAdminDoGrupo = origCAD;
+    try {
+      if (guarda === null) localStorage.removeItem(MUTIRAO_KEY);
+      else localStorage.setItem(MUTIRAO_KEY, guarda);
+    } catch (_) {}
+  }
+  return r;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  BATERIA DE SINCRONIZAÇÃO E CONCORRÊNCIA (FASE 12)
+// ══════════════════════════════════════════════════════════════════════════
+// Requisito do usuário: "nenhum registro de entrega poderá ser perdido quando dois usuários
+// gravarem simultaneamente". Esta bateria é a prova disso.
+//
+// Substitui mutiraoFbRead/mutiraoFbWrite por um Firestore FALSO em memória que HONRA a
+// pré-condição de verdade — recusa a gravação cujo `baseUpdateTime` não bate com a versão
+// atual do documento. É assim que o cenário de lost update é reproduzido de propósito.
+// Nenhuma rede é tocada. As duas funções originais são restauradas no finally.
+async function autoTesteMutiraoSync() {
+  if (!MODO_TESTE) {
+    console.error('autoTesteMutiraoSync exige o modo de teste isolado. Abra o app com ?teste=1.');
+    return [{ teste: 'pré-condição', resultado: 'FALHOU', detalhe: 'fora do MODO_TESTE' }];
+  }
+  const r = [];
+  const ok = (nome, passou, detalhe) => r.push({ teste: nome, resultado: passou ? 'PASSOU' : 'FALHOU', detalhe: detalhe || '' });
+
+  const PG = PEQUENOS_GRUPOS[PEQUENOS_GRUPOS.length - 1].num;
+  const origRead = window.mutiraoFbRead, origWrite = window.mutiraoFbWrite;
+  const guarda = localStorage.getItem(MUTIRAO_KEY);
+
+  const ent = (id, kg, removed) => ({
+    entregaId: id, mutiraoNatal: '2026', pgNum: PG, pgId: null,
+    tipoOrigem: 'PARTICIPANTE_PG', quantidadeKg: kg, data: '2026-12-10', ts: 1000 + kg,
+    registradoPor: { memberId: 'qa', nome: 'QA', papel: 'colaborador' },
+    participante: { memberId: 'qa', nome: 'QA' }, externo: null, removed: !!removed,
+  });
+  const ids = (lista) => (lista || []).map(e => e.entregaId).sort().join(',');
+
+  // ── Firestore falso, com pré-condição de verdade ──────────────────────────
+  const srv = { doc: null, versao: 0, leituras: 0, gravacoes: 0, recusas: 0, falharCom: null, staleUmaVez: null };
+  const clonar = (x) => JSON.parse(JSON.stringify(x));
+  window.mutiraoFbRead = async () => {
+    srv.leituras++;
+    if (srv.falharCom) return srv.falharCom;
+    if (srv.staleUmaVez) { const s = srv.staleUmaVez; srv.staleUmaVez = null; return s; }
+    return srv.doc ? { entregas: clonar(srv.doc.entregas), updateTime: srv.doc.updateTime }
+                   : { entregas: [], updateTime: null };
+  };
+  window.mutiraoFbWrite = async (cfg, entregas, base) => {
+    srv.gravacoes++;
+    const atual = srv.doc ? srv.doc.updateTime : null;
+    if (base !== atual) { srv.recusas++; return { ok: false, preconditionFailed: true }; }
+    srv.versao++;
+    srv.doc = { entregas: clonar(entregas), updateTime: 'v' + srv.versao };
+    return { ok: true, updateTime: srv.doc.updateTime };
+  };
+
+  try {
+    // ═══ 1. A regra de mesclagem ═══════════════════════════════════════════
+    const A = ent('A', 1), B = ent('B', 2), C = ent('C', 3);
+    ok('N-01 mesclagem une por entregaId', ids(mutiraoMesclar([A, B], [B, C])) === 'A,B,C',
+       ids(mutiraoMesclar([A, B], [B, C])));
+    ok('N-02 mesclar duas vezes dá o mesmo resultado (idempotente)',
+       ids(mutiraoMesclar(mutiraoMesclar([A, B], [C]), [C])) === 'A,B,C');
+    ok('N-03 a ordem não importa (comutativa)',
+       ids(mutiraoMesclar([A], [B, C])) === ids(mutiraoMesclar([B, C], [A])));
+    const anulada = ent('A', 1, true);
+    ok('N-04 anulada vence a viva, venha de que lado vier',
+       mutiraoMesclar([A], [anulada])[0].removed === true &&
+       mutiraoMesclar([anulada], [A])[0].removed === true);
+    ok('N-05 uma entrega anulada nunca "revive"',
+       mutiraoMesclar(mutiraoMesclar([anulada], [A]), [A])[0].removed === true);
+
+    // ═══ 2. O laço de sincronização ════════════════════════════════════════
+    srv.doc = null; srv.versao = 0; srv.gravacoes = 0; srv.recusas = 0;
+    mutiraoSaveEntregas([A]);
+    const s1 = await sincronizarMutirao();
+    ok('N-06 primeira sincronização CRIA o documento e envia o local',
+       s1.ok === true && ids(srv.doc.entregas) === 'A', JSON.stringify(s1));
+
+    const gravAntes = srv.gravacoes;
+    const s2 = await sincronizarMutirao();
+    ok('N-07 sem mudança, não grava de novo',
+       s2.ok === true && s2.semMudanca === true && srv.gravacoes === gravAntes, JSON.stringify(s2));
+
+    // outra pessoa registrou algo na nuvem
+    srv.doc = { entregas: [clonar(A), clonar(B)], updateTime: 'v99' };
+    const s3 = await sincronizarMutirao();
+    ok('N-08 a nuvem traz de volta a entrega de outra pessoa',
+       s3.ok === true && ids(mutiraoLoadEntregas()) === 'A,B', ids(mutiraoLoadEntregas()));
+
+    // ═══ 3. ⭐ LOST UPDATE — o teste que o requisito exige ═════════════════
+    // Aparelho A e aparelho B leem o MESMO estado e gravam quase ao mesmo tempo.
+    srv.doc = { entregas: [clonar(A)], updateTime: 'v1' };
+    srv.versao = 1; srv.gravacoes = 0; srv.recusas = 0;
+
+    // Aparelho A: tem A + A1 e sincroniza primeiro, sem disputa.
+    const A1 = ent('A1', 10);
+    mutiraoSaveEntregas([clonar(A), A1]);
+    const sA = await sincronizarMutirao();
+
+    // Aparelho B: tem A + B1 e JÁ TINHA LIDO a versão v1, antes de A gravar.
+    const B1 = ent('B1', 20);
+    mutiraoSaveEntregas([clonar(A), B1]);
+    srv.staleUmaVez = { entregas: [clonar(A)], updateTime: 'v1' };   // leitura velha, de propósito
+    const sB = await sincronizarMutirao();
+
+    ok('N-09 aparelho A gravou', sA.ok === true, JSON.stringify(sA));
+    ok('N-10 aparelho B teve a gravação RECUSADA pela trava e tentou de novo',
+       srv.recusas === 1 && sB.ok === true, 'recusas=' + srv.recusas + ' · ' + JSON.stringify(sB));
+    ok('N-11 ⭐ NENHUMA ENTREGA SE PERDEU — as duas sobreviveram',
+       ids(srv.doc.entregas) === 'A,A1,B1', 'nuvem = ' + ids(srv.doc.entregas));
+    ok('N-12 o aparelho B terminou enxergando as duas', ids(mutiraoLoadEntregas()) === 'A,A1,B1',
+       ids(mutiraoLoadEntregas()));
+
+    // ═══ 4. Falhas ═════════════════════════════════════════════════════════
+    // Conflito que não passa: devolve erro e NÃO apaga nada do aparelho.
+    srv.doc = { entregas: [clonar(A)], updateTime: 'vX' };
+    mutiraoSaveEntregas([clonar(A), ent('Z', 5)]);
+    const origW = window.mutiraoFbWrite;
+    window.mutiraoFbWrite = async () => ({ ok: false, preconditionFailed: true });
+    const sConf = await sincronizarMutirao({ tentativas: 2 });
+    window.mutiraoFbWrite = origW;
+    ok('N-13 conflito persistente devolve erro, sem perder nada no aparelho',
+       sConf.ok === false && sConf.motivo === 'conflito_persistente' && ids(mutiraoLoadEntregas()).indexOf('Z') >= 0,
+       sConf.motivo + ' · local=' + ids(mutiraoLoadEntregas()));
+
+    // Erro permanente (403 = regra do Firestore recusando) não vira laço infinito.
+    srv.falharCom = { erro: true, http: 403, motivoHttp: 'sem_permissao', transitorio: false };
+    const s403 = await sincronizarMutirao();
+    srv.falharCom = null;
+    ok('N-14 erro permanente (403) é reportado, não retentado',
+       s403.ok === false && s403.motivo === 'sem_permissao' && s403.transitorio === false, JSON.stringify(s403));
+
+    // ═══ 5. Isolamento ════════════════════════════════════════════════════
+    ok('N-15 a chave real nunca foi tocada', localStorage.getItem('jdpg_mutirao_natal_v1') === null);
+
+  } finally {
+    window.mutiraoFbRead = origRead;
+    window.mutiraoFbWrite = origWrite;
     try {
       if (guarda === null) localStorage.removeItem(MUTIRAO_KEY);
       else localStorage.setItem(MUTIRAO_KEY, guarda);

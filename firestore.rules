@@ -15,6 +15,11 @@
 //
 // Última sincronização com o Console: 2026-08-19 (versão publicada às 09:20).
 //
+// ⚠️ DIVERGÊNCIA CONHECIDA (2026-09-08): o bloco `/jdpg/mutirao` abaixo foi ACRESCENTADO
+// aqui mas AINDA NÃO FOI PUBLICADO no Console. Enquanto não for, toda gravação do Mutirão
+// volta 403 e o app mostra "sem conexão" — a armadilha já conhecida deste projeto. Os
+// outros dois blocos não mudaram uma vírgula.
+//
 // O que essa versão mudou em relação à anterior (2026-07-08):
 //   1) Bloco novo `/embaixadoresExternos/{registro}` — liberou o app dos
 //      colaboradores sem PG (`embaixadores-agosto.html`), que até então recebia
@@ -47,6 +52,22 @@ service cloud.firestore {
         && (!('setoresMestre' in request.resource.data) || request.resource.data.setoresMestre is string)
         && (!('setoresEfetivo' in request.resource.data) || request.resource.data.setoresEfetivo is string)
         && (!('embaixadoresExternos' in request.resource.data) || request.resource.data.embaixadoresExternos is string);
+    }
+
+    // ── Mutirão de Natal (FASE 12, 2026-09-08) ───────────────────────────────
+    // Documento PRÓPRIO, separado de `jdpg/grupos` por decisão do usuário (Opção 2):
+    // isolamento, orçamento de tamanho próprio, invisível para o app publicado e mais
+    // fácil de auditar. Este bloco é ADITIVO — não altera nada dos outros dois.
+    //
+    // A trava de concorrência (`currentDocument.updateTime` / `currentDocument.exists`)
+    // é enviada pelo app; a regra só valida a FORMA do que chega.
+    match /jdpg/mutirao {
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasOnly(['entregas','ts','schemaVersion'])
+        && request.resource.data.entregas is string
+        && request.resource.data.entregas.size() < 500000
+        && (!('ts' in request.resource.data) || request.resource.data.ts is int)
+        && (!('schemaVersion' in request.resource.data) || request.resource.data.schemaVersion is int);
     }
 
     match /embaixadoresExternos/{registro} {
