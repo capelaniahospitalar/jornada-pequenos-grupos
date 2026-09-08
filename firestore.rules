@@ -63,11 +63,18 @@ service cloud.firestore {
     // é enviada pelo app; a regra só valida a FORMA do que chega.
     match /jdpg/mutirao {
       allow read: if true;
-      allow write: if request.resource.data.keys().hasOnly(['entregas','ts','schemaVersion'])
+      // `create, update` em vez de `write`: assim a exclusão do documento fica negada de
+      // forma EXPLÍCITA, e não por efeito colateral de `request.resource` ser nulo no delete.
+      allow create, update: if request.resource.data.keys().hasOnly(['entregas','ts','schemaVersion'])
         && request.resource.data.entregas is string
-        && request.resource.data.entregas.size() < 500000
-        && (!('ts' in request.resource.data) || request.resource.data.ts is int)
-        && (!('schemaVersion' in request.resource.data) || request.resource.data.schemaVersion is int);
+        && request.resource.data.entregas.size() < 500000;
+      allow delete: if false;
+      // NÃO valida o TIPO de `ts` e `schemaVersion` de propósito. `hasOnly` já barra campo
+      // desconhecido, e uma condição a mais aqui é uma chance a mais de recusar TODA gravação
+      // — foi exatamente esse o defeito da regra M2 (ver proposta não publicada mais abaixo),
+      // que bloquearia todas as gravações a partir da segunda. Regra de campanha não é lugar
+      // para sofisticação: o `jdpg/grupos`, que roda em produção desde agosto, também não
+      // valida o tipo de `ts`.
     }
 
     match /embaixadoresExternos/{registro} {

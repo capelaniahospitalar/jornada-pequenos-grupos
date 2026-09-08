@@ -15399,6 +15399,10 @@ const MUT_DOC       = 'mutirao';
 const MUT_SCHEMA    = 1;
 const MUT_MAX_BYTES = 480000;   // mesma folga que `dados` usa contra o teto de 500 KB da regra
 
+// Contador de vezes que a trava de concorrência recusou uma gravação nesta sessão. Existe
+// só para o R2: é o número que prova, em campo, que a trava atuou de verdade.
+let mutiraoConflitos = 0;
+
 function mutiraoDocUrl(cfg) {
   return `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/${MUT_COLL}/${MUT_DOC}?key=${cfg.apiKey}`;
 }
@@ -15513,7 +15517,16 @@ async function mutiraoFbWrite(cfg, entregas, baseUpdateTime) {
 // A cada tentativa ele RELÊ a nuvem e REMESCLA. Montar o payload uma vez e repetir a mesma
 // gravação seria o modo mais provável de esta implementação dar errado: a retentativa
 // gravaria por cima do que o outro aparelho acabou de escrever.
+// Envelope fino sobre o laço, só para deixar o resultado OBSERVÁVEL em campo. Sem isto, no
+// R2 seria impossível distinguir "não houve conflito" de "houve conflito e a trava resolveu"
+// — e é exatamente essa a prova que o teste de simultaneidade precisa produzir.
 async function sincronizarMutirao(opts) {
+  const res = await mutiraoSyncInterno(opts);
+  try { window.__mutiraoUltimoSync = Object.assign({ quando: new Date().toISOString() }, res); } catch (_) {}
+  return res;
+}
+
+async function mutiraoSyncInterno(opts) {
   const tentativasMax = (opts && opts.tentativas) || 3;
   const cfg = loadFbConfig();
   if (!cfg || !cfg.projectId || !cfg.apiKey) return { ok: false, motivo: 'sem_config' };
@@ -15541,6 +15554,10 @@ async function sincronizarMutirao(opts) {
     }
     if (w.preconditionFailed) {
       // Outro aparelho gravou no meio do caminho. Espera um pouco e recomeça DO ZERO.
+      // Este log é a EVIDÊNCIA do R2: é ele que mostra a trava disparando de verdade.
+      console.info('Mutirão: trava de concorrência disparou na tentativa ' + tentativa +
+                   ' — outro aparelho gravou primeiro. Relendo e remesclando.');
+      mutiraoConflitos++;
       await new Promise(res => setTimeout(res, 80 * tentativa));
       continue;
     }
