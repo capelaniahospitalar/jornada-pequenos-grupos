@@ -15707,6 +15707,143 @@ async function autoTesteMutiraoPermissoes() {
   return r;
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+//  MATRIZ DE TESTES DE PUBLICAÇÃO — MUTIRÃO (FASE 10)
+// ══════════════════════════════════════════════════════════════════════════
+// T1–T10, exatamente como especificados. É a matriz que decide se a campanha pode ir ao ar.
+//
+// ⚠️ O T9 (dois aparelhos) NÃO PODE PASSAR nesta versão, e por isso ele devolve o status
+// BLOQUEADO em vez de PASSOU/FALHOU: não é defeito de código, é ausência de funcionalidade.
+// Preferi que a própria matriz carregue essa verdade a deixá-la só num relatório — assim
+// quem rodar a bateria antes de publicar vê o impedimento na cara, não numa nota de rodapé.
+async function autoTesteMutiraoMatriz() {
+  if (!MODO_TESTE) {
+    console.error('autoTesteMutiraoMatriz exige o modo de teste isolado. Abra o app com ?teste=1.');
+    return [{ teste: 'pré-condição', resultado: 'FALHOU', detalhe: 'fora do MODO_TESTE' }];
+  }
+  const r = [];
+  const ok = (nome, passou, detalhe) => r.push({ teste: nome, resultado: passou ? 'PASSOU' : 'FALHOU', detalhe: detalhe || '' });
+  const bloqueado = (nome, detalhe) => r.push({ teste: nome, resultado: 'BLOQUEADO', detalhe: detalhe || '' });
+
+  const PG    = PEQUENOS_GRUPOS[PEQUENOS_GRUPOS.length - 1].num;
+  const OUTRO = PEQUENOS_GRUPOS[PEQUENOS_GRUPOS.length - 2].num;
+  const origLMG = loadMeuGrupo, origMID = getMyMemberId, origFUN = getMinhaFuncaoNoGrupo, origCAD = souCoordenadorAdminDoGrupo;
+  const guarda = localStorage.getItem(MUTIRAO_KEY);
+
+  const vestir = (id, nome, papel, pg) => {
+    window.loadMeuGrupo = () => ({ grupoNum: pg || PG, grupoNome: 'PG MATRIZ QA', nome: nome });
+    window.getMyMemberId = () => id;
+    window.getMinhaFuncaoNoGrupo = (n) => (n === PG ? papel : 'colaborador');
+    window.souCoordenadorAdminDoGrupo = () => false;
+  };
+  const kgDoPg = () => dadosMutiraoDoPG(PG).totalKg;
+
+  try {
+    mutiraoSaveEntregas([]);
+
+    // ── T1 ────────────────────────────────────────────────────────────────
+    vestir('T-ANA', 'Ana Lima', 'colaborador');
+    const a1 = kgDoPg();
+    registrarMinhaEntregaNatal({ quantidadeKg: 1, data: '2026-12-01' });
+    ok('T1 participante registra 1 kg → +1 kg no PG', kgDoPg() === a1 + 1, a1 + ' → ' + kgDoPg() + ' kg');
+
+    // ── T2 ────────────────────────────────────────────────────────────────
+    const a2 = kgDoPg();
+    registrarMinhaEntregaNatal({ quantidadeKg: 20, data: '2026-12-02' });
+    ok('T2 participante registra 20 kg → +20 kg no PG', kgDoPg() === a2 + 20, a2 + ' → ' + kgDoPg() + ' kg');
+
+    // ── T3 ────────────────────────────────────────────────────────────────
+    vestir('T-BRUNO', 'Bruno Reis', 'colaborador');
+    registrarMinhaEntregaNatal({ quantidadeKg: 4.5, data: '2026-12-02' });
+    const d3 = dadosMutiraoDoPG(PG);
+    ok('T3 dois participantes → soma correta',
+       d3.kgParticipantes === 25.5 && d3.participantesQueEntregaram === 2 && d3.totalEntregasParticipantes === 3,
+       d3.kgParticipantes + ' kg · ' + d3.participantesQueEntregaram + ' pessoas · ' + d3.totalEntregasParticipantes + ' entregas');
+
+    // ── T4 ────────────────────────────────────────────────────────────────
+    vestir('T-COORD', 'Ana Beatriz', 'coordenador');
+    const a4 = kgDoPg();
+    const e4 = registrarEntregaExternaNatal({ nome: 'Joao Pereira', quantidadeKg: 10, data: '2026-12-03' });
+    const d4 = dadosMutiraoDoPG(PG);
+    ok('T4 coordenador registra externo → kg entram no PG e 1 externo é contabilizado',
+       e4.ok === true && d4.totalKg === a4 + 10 && d4.colaboradoresExternosMobilizados === 1,
+       d4.totalKg + ' kg · ' + d4.colaboradoresExternosMobilizados + ' externo');
+
+    // ── T5 ────────────────────────────────────────────────────────────────
+    registrarEntregaExternaNatal({ nome: 'Rita Alves',  quantidadeKg: 3, data: '2026-12-03' });
+    registrarEntregaExternaNatal({ nome: 'Carlos Dias', quantidadeKg: 2, data: '2026-12-03' });
+    registrarEntregaExternaNatal({ nome: 'Joao Pereira', quantidadeKg: 5, data: '2026-12-04' });  // o mesmo, 2ª entrega
+    const lista5 = listarEntregasExternasDoPG(PG);
+    const d5 = dadosMutiraoDoPG(PG);
+    ok('T5 vários externos → cada um aparece individualmente',
+       lista5.length === 4 && d5.colaboradoresExternosMobilizados === 3 && d5.totalEntregasExternas === 4,
+       lista5.map(e => e.externo.nome + ' ' + e.quantidadeKg + 'kg').join(' · '));
+
+    // ── T6 ────────────────────────────────────────────────────────────────
+    vestir('T-ANA', 'Ana Lima', 'colaborador');
+    const t6 = registrarEntregaExternaNatal({ nome: 'Fantasma', quantidadeKg: 9 });
+    ok('T6 participante NÃO consegue registrar externo', t6.ok === false && t6.motivo === 'sem_autoridade', t6.motivo || '');
+
+    // ── T7 ────────────────────────────────────────────────────────────────
+    vestir('T-COORD', 'Ana Beatriz', 'coordenador', OUTRO);
+    const t7 = registrarEntregaExternaNatal({ nome: 'Alguem', quantidadeKg: 7 });
+    ok('T7 coordenador NÃO consegue registrar em outro PG', t7.ok === false && t7.motivo === 'sem_autoridade', t7.motivo || '');
+
+    // ── T8 ────────────────────────────────────────────────────────────────
+    // (a) mutiraoLoadEntregas() relê o localStorage a cada chamada — é literalmente o que
+    //     acontece quando o app é fechado e reaberto.
+    const persistidas = mutiraoLoadEntregas();
+    ok('T8a registros sobrevivem a fechar e reabrir o app',
+       persistidas.length === 7 && dadosMutiraoDoPG(PG).totalKg === 45.5,
+       persistidas.length + ' entregas · ' + dadosMutiraoDoPG(PG).totalKg + ' kg');
+    // (b) reentrada por convite pode gerar memberId NOVO — o histórico da pessoa não pode sumir.
+    vestir('T-ANA-ID-NOVO', 'Ana Lima', 'colaborador');
+    const minhas = listarMinhasEntregasNatal(PG);
+    ok('T8b após reentrada com identidade nova, o histórico continua visível',
+       minhas.length === 2 && minhas.reduce((s, e) => s + e.quantidadeKg, 0) === 21,
+       minhas.length + ' entregas · ' + minhas.reduce((s, e) => s + e.quantidadeKg, 0) + ' kg');
+
+    // ── T9 ────────────────────────────────────────────────────────────────
+    bloqueado('T9 dois aparelhos — sincronização',
+      'NÃO EXECUTÁVEL: as entregas são gravadas apenas no localStorage do aparelho e não existe ' +
+      'caminho de sincronização implementado (decisão Opção 1 × Opção 2 em aberto). Não é defeito ' +
+      'de código — é ausência de funcionalidade. IMPEDE A PUBLICAÇÃO da campanha.');
+
+    // ── T10 ───────────────────────────────────────────────────────────────
+    ok('T10a Progresso está OCULTO na Home', MOSTRAR_PROGRESSO_PG_HOME === false, 'chave=' + MOSTRAR_PROGRESSO_PG_HOME);
+    ok('T10b a função de render continua existindo', typeof renderPgProgressHome === 'function');
+    renderPgProgressHome();
+    ok('T10c chamá-la não desenha nada enquanto está oculta', !document.getElementById('pg-progress-card'));
+    const fnsProgresso = ['getPgWeekMetas', 'getPgGroupWeek', 'getPgEngajamentoSemana', 'getPgGrupoLevel',
+                          'getOrInitPgProgress', 'loadPgProgress', 'savePgProgress', 'bumpPgProgress',
+                          'registrarSemanaAtiva', 'htmlCardDoGrupo'];
+    const sumidas = fnsProgresso.filter(f => typeof window[f] !== 'function');
+    ok('T10d nenhuma função de cálculo do Progresso foi removida', sumidas.length === 0, sumidas.join(', ') || 'as 10 presentes');
+    ok('T10e as metas semanais continuam íntegras (5 indicadores)', Object.keys(getPgWeekMetas()).length === 5);
+    ok('T10f os cálculos continuam respondendo',
+       !!getPgGroupWeek(PG) && !!getPgGrupoLevel(PG) && !!getPgEngajamentoSemana(PG));
+    let temCss = false;
+    try {
+      temCss = [...document.styleSheets].some(ss => {
+        try { return [...ss.cssRules].some(rule => (rule.selectorText || '').indexOf('.pg-progress-card') !== -1); }
+        catch (_) { return false; }
+      });
+    } catch (_) {}
+    ok('T10g o CSS do Progresso continua no arquivo', temCss === true);
+
+  } finally {
+    window.loadMeuGrupo = origLMG;
+    window.getMyMemberId = origMID;
+    window.getMinhaFuncaoNoGrupo = origFUN;
+    window.souCoordenadorAdminDoGrupo = origCAD;
+    try {
+      if (guarda === null) localStorage.removeItem(MUTIRAO_KEY);
+      else localStorage.setItem(MUTIRAO_KEY, guarda);
+    } catch (_) {}
+  }
+  return r;
+}
+
 
 
 // ══════════════════════════════════════
