@@ -14606,6 +14606,325 @@ function renderPgProgressHome() {
 
 
 // ══════════════════════════════════════
+//  MUTIRÃO DE NATAL — CAMADA DE SERVIÇOS
+// ══════════════════════════════════════
+// FASE 2 do plano do Mutirão. Camada SEM interface: nada aqui desenha tela, e nenhuma tela
+// existente chama estas funções ainda. Contrato de dados: MUTIRAO-01-FASE1-CONTRATO-DE-DADOS.md
+//
+// ⚠️ PERSISTÊNCIA: por enquanto SÓ localStorage (mesmo padrão de GRAT_KEY, prefixado por
+// chaveTeste para o modo de teste não encostar no dado real). A sincronização com o Firestore
+// é decisão em aberto na FASE 1 §2 (campo de topo `mutirao` × documento próprio `jdpg/mutirao`)
+// e NÃO está implementada aqui — de propósito: nenhuma função desta camada toca a rede,
+// portanto nada aqui pode escrever em produção.
+
+const MUTIRAO_KEY = chaveTeste('jdpg_mutirao_natal_v1');
+
+const MUTIRAO_ORIGEM = Object.freeze({ PARTICIPANTE: 'PARTICIPANTE_PG', EXTERNO: 'EXTERNO' });
+
+// kgMax existe para barrar erro de digitação (1000 no lugar de 10). Os três valores são
+// PROVISÓRIOS — pendentes de confirmação do usuário (FASE 1 §7.1, perguntas 2 e 3).
+const MUTIRAO_NATAL = Object.freeze({ edicao: '2026', kgMin: 0.1, kgMax: 200, casas: 2 });
+
+function mutiraoLoadEntregas() {
+  try { const v = JSON.parse(localStorage.getItem(MUTIRAO_KEY) || '[]'); return Array.isArray(v) ? v : []; }
+  catch { return []; }
+}
+function mutiraoSaveEntregas(lista) {
+  try { localStorage.setItem(MUTIRAO_KEY, JSON.stringify(lista)); return true; }
+  catch (e) { console.warn('mutiraoSaveEntregas:', e); return false; }
+}
+
+function mutiraoHojeISO(d) {
+  const x = d ? new Date(d) : new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return x.getFullYear() + '-' + p(x.getMonth() + 1) + '-' + p(x.getDate());
+}
+
+// Aceita "2,5" e 2.5. Devolve número arredondado ou null se não for quantidade aceitável.
+function mutiraoNormalizarKg(v) {
+  const n = Number(String(v == null ? '' : v).replace(',', '.').trim());
+  if (!isFinite(n) || n <= 0) return null;
+  const r = Number(n.toFixed(MUTIRAO_NATAL.casas));
+  return (r < MUTIRAO_NATAL.kgMin || r > MUTIRAO_NATAL.kgMax) ? null : r;
+}
+
+// INVARIANTE DA FASE 1 §4.1 — todo registro tem EXATAMENTE uma identidade de doador.
+// Recusa ALTO e devolve o motivo, no mesmo espírito de validarIntencao(): melhor falhar
+// visível do que gravar um registro ambíguo em silêncio.
+function validarEntregaNatal(reg) {
+  if (!reg || typeof reg !== 'object') return 'registro ausente';
+  if (!reg.entregaId) return 'entregaId ausente';
+  if (reg.mutiraoNatal !== MUTIRAO_NATAL.edicao) return 'edicao invalida';
+  if (!Number.isInteger(reg.pgNum) || reg.pgNum < 1) return 'pgNum invalido';
+  if (mutiraoNormalizarKg(reg.quantidadeKg) !== reg.quantidadeKg) return 'quantidadeKg invalida';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(reg.data || ''))) return 'data invalida';
+  if (!reg.registradoPor || !reg.registradoPor.nome) return 'registradoPor ausente';
+
+  const ehPart = reg.tipoOrigem === MUTIRAO_ORIGEM.PARTICIPANTE;
+  const ehExt  = reg.tipoOrigem === MUTIRAO_ORIGEM.EXTERNO;
+  if (!ehPart && !ehExt) return 'tipoOrigem invalido';
+
+  const temPart = !!reg.participante, temExt = !!reg.externo;
+  if (temPart && temExt)   return 'participante e externo preenchidos ao mesmo tempo';
+  if (!temPart && !temExt) return 'entrega sem doador';
+  if (ehPart && !temPart)  return 'PARTICIPANTE_PG sem participante';
+  if (ehExt && !temExt)    return 'EXTERNO sem externo';
+  if (ehPart && !reg.participante.nome) return 'participante sem nome';
+  if (ehExt && !reg.externo.nome)       return 'externo sem nome';
+  return null;
+}
+
+// Coordenador é reconhecido pelos DOIS caminhos que o app já usa: o registro de participante
+// (getMinhaFuncaoNoGrupo) e a autenticação do Painel (souCoordenadorAdminDoGrupo). Um
+// coordenador legítimo cujo registro nunca recebeu papel='coordenador' continua autorizado —
+// foi exatamente o defeito encontrado nos PG1/PG2/PG10 em 2026-08-14.
+function mutiraoSouCoordenadorDoPG(pgNum) {
+  const g = (typeof PEQUENOS_GRUPOS !== 'undefined') ? PEQUENOS_GRUPOS.find(x => x.num === pgNum) : null;
+  if (!g) return false;
+  if (typeof getMinhaFuncaoNoGrupo === 'function' && getMinhaFuncaoNoGrupo(pgNum) === 'coordenador') return true;
+  return typeof souCoordenadorAdminDoGrupo === 'function' && souCoordenadorAdminDoGrupo(g);
+}
+
+function mutiraoPersistir(reg) {
+  const erro = validarEntregaNatal(reg);
+  if (erro) { console.error('Mutirão: registro RECUSADO —', erro); return { ok: false, motivo: 'invalido', detalhe: erro }; }
+  const lista = mutiraoLoadEntregas();
+  lista.push(reg);
+  if (!mutiraoSaveEntregas(lista)) return { ok: false, motivo: 'falha_gravacao' };
+  return { ok: true, entrega: reg };
+}
+
+// TIPO 1 — o participante registra a PRÓPRIA entrega.
+// NÃO recebe parâmetro de identidade: a pessoa é derivada do próprio aparelho. Por construção
+// não existe caminho para registrar pela outra pessoa nem para produzir um EXTERNO aqui.
+function registrarMinhaEntregaNatal({ quantidadeKg, data } = {}) {
+  const mg = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
+  if (!mg) return { ok: false, motivo: 'sem_grupo' };
+
+  const kg = mutiraoNormalizarKg(quantidadeKg);
+  if (kg === null) return { ok: false, motivo: 'quantidade_invalida' };
+
+  const nome = mg.nome || (typeof ST !== 'undefined' && ST.userName) || '';
+  if (!nome) return { ok: false, motivo: 'sem_identidade' };
+  const meuId = (typeof getMyMemberId === 'function') ? getMyMemberId() : null;
+  const g = (typeof PEQUENOS_GRUPOS !== 'undefined') ? PEQUENOS_GRUPOS.find(x => x.num === mg.grupoNum) : null;
+
+  return mutiraoPersistir({
+    entregaId: uuid(),
+    mutiraoNatal: MUTIRAO_NATAL.edicao,
+    pgNum: mg.grupoNum,
+    pgId: (g && g.pgId) || null,
+    tipoOrigem: MUTIRAO_ORIGEM.PARTICIPANTE,
+    quantidadeKg: kg,
+    data: data || mutiraoHojeISO(),
+    ts: Date.now(),
+    registradoPor: { memberId: meuId, nome: nome,
+      papel: (typeof getMinhaFuncaoNoGrupo === 'function' && getMinhaFuncaoNoGrupo(mg.grupoNum)) || 'colaborador' },
+    participante: { memberId: meuId, nome: nome },
+    externo: null,
+    removed: false,
+  });
+}
+
+// TIPO 2 — o Coordenador registra a entrega de um colaborador de FORA do PG.
+// O registro nasce EXTERNO com participante:null por construção; não existe caminho que
+// transforme um externo em participante do PG. `setor` é texto livre e NÃO é normalizado
+// (mesma regra já adotada para os Embaixadores externos).
+function registrarEntregaExternaNatal({ nome, setor, quantidadeKg, data } = {}) {
+  const mg = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
+  if (!mg) return { ok: false, motivo: 'sem_grupo' };
+  if (!mutiraoSouCoordenadorDoPG(mg.grupoNum)) return { ok: false, motivo: 'sem_autoridade' };
+
+  const nomeExt = String(nome || '').trim();
+  if (!nomeExt) return { ok: false, motivo: 'externo_sem_nome' };
+
+  const kg = mutiraoNormalizarKg(quantidadeKg);
+  if (kg === null) return { ok: false, motivo: 'quantidade_invalida' };
+
+  const g = (typeof PEQUENOS_GRUPOS !== 'undefined') ? PEQUENOS_GRUPOS.find(x => x.num === mg.grupoNum) : null;
+
+  return mutiraoPersistir({
+    entregaId: uuid(),
+    mutiraoNatal: MUTIRAO_NATAL.edicao,
+    pgNum: mg.grupoNum,
+    pgId: (g && g.pgId) || null,
+    tipoOrigem: MUTIRAO_ORIGEM.EXTERNO,
+    quantidadeKg: kg,
+    data: data || mutiraoHojeISO(),
+    ts: Date.now(),
+    registradoPor: { memberId: (typeof getMyMemberId === 'function') ? getMyMemberId() : null,
+      nome: mg.nome || (typeof ST !== 'undefined' && ST.userName) || '', papel: 'coordenador' },
+    participante: null,
+    externo: { nome: nomeExt, setor: String(setor || '').trim() || null },
+    removed: false,
+  });
+}
+
+// Só entregas VIVAS por padrão: o tombstone é sempre filtrado. Contar sem filtrar `removed`
+// infla o total — lição de 2026-08-21 com os participantes.
+function listarEntregasNatalDoPG(pgNum, opts) {
+  const incluirAnuladas = !!(opts && opts.incluirAnuladas);
+  return mutiraoLoadEntregas()
+    .filter(e => e.pgNum === pgNum && e.mutiraoNatal === MUTIRAO_NATAL.edicao)
+    .filter(e => incluirAnuladas || e.removed !== true)
+    .sort((a, b) => (a.ts || 0) - (b.ts || 0));
+}
+
+// Os dois tipos são somados SEPARADAMENTE e nunca se misturam (critério de aceite da FASE 1).
+function calcularTotalKgNatalDoPG(pgNum) {
+  const lista = listarEntregasNatalDoPG(pgNum);
+  const soma = (t) => lista.filter(e => e.tipoOrigem === t).reduce((acc, e) => acc + (e.quantidadeKg || 0), 0);
+  const participantes = Number(soma(MUTIRAO_ORIGEM.PARTICIPANTE).toFixed(MUTIRAO_NATAL.casas));
+  const externos      = Number(soma(MUTIRAO_ORIGEM.EXTERNO).toFixed(MUTIRAO_NATAL.casas));
+  return { participantes, externos,
+    total: Number((participantes + externos).toFixed(MUTIRAO_NATAL.casas)), entregas: lista.length };
+}
+
+// Correção de erro: NUNCA apaga — marca o tombstone e deixa a trilha, mesma convenção dos
+// participantes. Quem pode anular: o Coordenador do PG, ou quem registrou.
+function anularEntregaNatal(entregaId) {
+  const lista = mutiraoLoadEntregas();
+  const e = lista.find(x => x.entregaId === entregaId);
+  if (!e) return { ok: false, motivo: 'nao_encontrada' };
+  if (e.removed === true) return { ok: true, entrega: e };
+  const meuId = (typeof getMyMemberId === 'function') ? getMyMemberId() : null;
+  const souDono = !!(e.registradoPor && meuId && e.registradoPor.memberId === meuId);
+  if (!souDono && !mutiraoSouCoordenadorDoPG(e.pgNum)) return { ok: false, motivo: 'sem_autoridade' };
+  e.removed = true;
+  e.removedAt = Date.now();
+  e.removedBy = { memberId: meuId, nome: ((typeof loadMeuGrupo === 'function' && loadMeuGrupo()) || {}).nome || '' };
+  if (!mutiraoSaveEntregas(lista)) return { ok: false, motivo: 'falha_gravacao' };
+  return { ok: true, entrega: e };
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  BATERIA DO MUTIRÃO — testa a camada de serviços SEM interface
+// ══════════════════════════════════════════════════════════════════════════
+// Exige MODO_TESTE: fora dele, MUTIRAO_KEY é a chave REAL e a bateria apagaria o dado do
+// usuário. Não toca a rede — a camada inteira é local. Substitui as funções de identidade
+// por versões forjadas e restaura tudo no finally.
+async function autoTesteMutirao() {
+  if (!MODO_TESTE) {
+    console.error('autoTesteMutirao exige o modo de teste isolado. Abra o app com ?teste=1.');
+    return [{ teste: 'pré-condição', resultado: 'FALHOU', detalhe: 'fora do MODO_TESTE' }];
+  }
+  const r = [];
+  const ok = (nome, passou, detalhe) => r.push({ teste: nome, resultado: passou ? 'PASSOU' : 'FALHOU', detalhe: detalhe || '' });
+
+  const SLOT = PEQUENOS_GRUPOS[PEQUENOS_GRUPOS.length - 1].num;
+  const origLMG = loadMeuGrupo, origMID = getMyMemberId, origFUN = getMinhaFuncaoNoGrupo, origCAD = souCoordenadorAdminDoGrupo;
+  const guardaEntregas = localStorage.getItem(MUTIRAO_KEY);
+
+  const vestir = (memberId, nome, papel) => {
+    window.loadMeuGrupo = () => ({ grupoNum: SLOT, grupoNome: 'PG MUTIRAO QA', nome: nome });
+    window.getMyMemberId = () => memberId;
+    window.getMinhaFuncaoNoGrupo = () => papel;
+    window.souCoordenadorAdminDoGrupo = () => false;
+  };
+
+  try {
+    mutiraoSaveEntregas([]);
+
+    // ── 1. Normalização da quantidade ────────────────────────────────────────
+    ok('M-01 aceita decimal com vírgula', mutiraoNormalizarKg('2,5') === 2.5, String(mutiraoNormalizarKg('2,5')));
+    ok('M-02 recusa zero e negativo', mutiraoNormalizarKg(0) === null && mutiraoNormalizarKg(-5) === null);
+    ok('M-03 recusa texto', mutiraoNormalizarKg('dez') === null);
+    ok('M-04 recusa acima do teto (erro de digitação)', mutiraoNormalizarKg(1000) === null, 'teto=' + MUTIRAO_NATAL.kgMax);
+
+    // ── 2. O invariante do §4.1 — exclusividade mútua ────────────────────────
+    const base = { entregaId: 'QA-1', mutiraoNatal: '2026', pgNum: SLOT, quantidadeKg: 10,
+      data: '2026-12-05', ts: 1, registradoPor: { memberId: 'QA', nome: 'Quem Registrou' } };
+    const comAmbos = Object.assign({}, base, { tipoOrigem: 'PARTICIPANTE_PG',
+      participante: { memberId: 'A', nome: 'A' }, externo: { nome: 'B' } });
+    const semNenhum = Object.assign({}, base, { tipoOrigem: 'PARTICIPANTE_PG', participante: null, externo: null });
+    const cruzado = Object.assign({}, base, { tipoOrigem: 'EXTERNO',
+      participante: { memberId: 'A', nome: 'A' }, externo: null });
+    const tipoErrado = Object.assign({}, base, { tipoOrigem: 'OUTRO', participante: { memberId: 'A', nome: 'A' }, externo: null });
+
+    ok('M-05 recusa participante E externo juntos', !!validarEntregaNatal(comAmbos), validarEntregaNatal(comAmbos) || '');
+    ok('M-06 recusa entrega sem doador', !!validarEntregaNatal(semNenhum), validarEntregaNatal(semNenhum) || '');
+    ok('M-07 recusa tipo cruzado com a identidade', !!validarEntregaNatal(cruzado), validarEntregaNatal(cruzado) || '');
+    ok('M-08 recusa tipoOrigem fora do contrato', !!validarEntregaNatal(tipoErrado), validarEntregaNatal(tipoErrado) || '');
+
+    // ── 3. Participante registra a PRÓPRIA entrega ───────────────────────────
+    vestir('QA-MARIA', 'Maria da Silva', 'colaborador');
+    const e1 = registrarMinhaEntregaNatal({ quantidadeKg: 10, data: '2026-12-05' });
+    ok('M-09 participante registra a própria entrega', e1.ok === true, e1.motivo || '');
+    ok('M-10 nasce como PARTICIPANTE_PG', !!e1.entrega && e1.entrega.tipoOrigem === 'PARTICIPANTE_PG');
+    ok('M-11 identidade é a do próprio aparelho', !!e1.entrega && e1.entrega.participante.memberId === 'QA-MARIA');
+    ok('M-12 externo fica null', !!e1.entrega && e1.entrega.externo === null);
+
+    // Não escolhe outro participante: a função não aceita identidade. Mesmo passando os
+    // campos, o registro sai com a identidade do aparelho.
+    const e2 = registrarMinhaEntregaNatal({ quantidadeKg: 3,
+      participante: { memberId: 'QA-OUTRO', nome: 'Outra Pessoa' }, tipoOrigem: 'EXTERNO', externo: { nome: 'X' } });
+    ok('M-13 ignora tentativa de registrar por outro',
+       e2.ok === true && e2.entrega.participante.memberId === 'QA-MARIA' && e2.entrega.participante.nome === 'Maria da Silva');
+    ok('M-14 participante não consegue produzir EXTERNO',
+       e2.entrega.tipoOrigem === 'PARTICIPANTE_PG' && e2.entrega.externo === null);
+
+    // ── 4. Autoridade para registrar externo ─────────────────────────────────
+    const eNeg = registrarEntregaExternaNatal({ nome: 'João Pereira', quantidadeKg: 10 });
+    ok('M-15 participante comum NÃO registra externo', eNeg.ok === false && eNeg.motivo === 'sem_autoridade', eNeg.motivo || '');
+
+    vestir('QA-ANA', 'Ana Beatriz', 'coordenador');
+    const e3 = registrarEntregaExternaNatal({ nome: 'João Pereira', setor: 'Farmácia', quantidadeKg: 10, data: '2026-12-05' });
+    ok('M-16 coordenador registra externo', e3.ok === true, e3.motivo || '');
+    ok('M-17 externo nasce EXTERNO com participante null',
+       !!e3.entrega && e3.entrega.tipoOrigem === 'EXTERNO' && e3.entrega.participante === null);
+    ok('M-18 externo fica vinculado ao PG do coordenador', !!e3.entrega && e3.entrega.pgNum === SLOT);
+    ok('M-19 setor não é normalizado', !!e3.entrega && e3.entrega.externo.setor === 'Farmácia');
+    const eSemNome = registrarEntregaExternaNatal({ nome: '   ', quantidadeKg: 5 });
+    ok('M-20 externo sem nome é recusado', eSemNome.ok === false && eSemNome.motivo === 'externo_sem_nome');
+
+    // ── 5. CRITÉRIO DE ACEITE DA FASE 1 ──────────────────────────────────────
+    // 10 kg de participante × 10 kg de externo, mesmo PG, mesmo dia: distinguíveis.
+    const dez = listarEntregasNatalDoPG(SLOT).filter(x => x.quantidadeKg === 10 && x.data === '2026-12-05');
+    const dezP = dez.find(x => x.tipoOrigem === 'PARTICIPANTE_PG');
+    const dezE = dez.find(x => x.tipoOrigem === 'EXTERNO');
+    ok('M-21 as duas entregas de 10 kg coexistem', !!dezP && !!dezE, dez.length + ' registros de 10 kg');
+    ok('M-22 são distinguíveis por 4 marcas independentes',
+       !!dezP && !!dezE &&
+       dezP.tipoOrigem !== dezE.tipoOrigem &&
+       (dezP.participante !== null) !== (dezE.participante !== null) &&
+       (dezP.externo !== null) !== (dezE.externo !== null) &&
+       dezP.registradoPor.papel !== dezE.registradoPor.papel,
+       'tipoOrigem · participante · externo · papel');
+    ok('M-23 identificador único por entrega', dezP.entregaId !== dezE.entregaId);
+
+    // ── 6. Listagem e soma ───────────────────────────────────────────────────
+    const tot = calcularTotalKgNatalDoPG(SLOT);
+    ok('M-24 soma separa participantes de externos',
+       tot.participantes === 13 && tot.externos === 10, JSON.stringify(tot));
+    ok('M-25 total é a soma das duas colunas', tot.total === 23, String(tot.total));
+    ok('M-26 outro PG não vê estas entregas', calcularTotalKgNatalDoPG(SLOT - 1).entregas === 0);
+
+    // ── 7. Tombstone ─────────────────────────────────────────────────────────
+    const anul = anularEntregaNatal(e3.entrega.entregaId);
+    ok('M-27 coordenador anula a entrega', anul.ok === true, anul.motivo || '');
+    ok('M-28 anulada some da listagem viva',
+       !listarEntregasNatalDoPG(SLOT).some(x => x.entregaId === e3.entrega.entregaId));
+    ok('M-29 anulada NÃO é apagada do banco',
+       listarEntregasNatalDoPG(SLOT, { incluirAnuladas: true }).some(x => x.entregaId === e3.entrega.entregaId));
+    const totDepois = calcularTotalKgNatalDoPG(SLOT);
+    ok('M-30 total desconta a anulada', totDepois.externos === 0 && totDepois.total === 13, JSON.stringify(totDepois));
+
+  } finally {
+    window.loadMeuGrupo = origLMG;
+    window.getMyMemberId = origMID;
+    window.getMinhaFuncaoNoGrupo = origFUN;
+    window.souCoordenadorAdminDoGrupo = origCAD;
+    try {
+      if (guardaEntregas === null) localStorage.removeItem(MUTIRAO_KEY);
+      else localStorage.setItem(MUTIRAO_KEY, guardaEntregas);
+    } catch (_) {}
+  }
+  return r;
+}
+
+
+
+// ══════════════════════════════════════
 //  COMUNIDADE — MURAL DE GRATIDÃO
 // ══════════════════════════════════════
 
