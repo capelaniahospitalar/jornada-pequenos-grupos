@@ -15574,6 +15574,139 @@ async function autoTesteMutirao() {
   return r;
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+//  BATERIA DE PERMISSÕES DO MUTIRÃO (FASE 9)
+// ══════════════════════════════════════════════════════════════════════════
+// Prova, uma a uma, as duas matrizes de permissão — o que cada papel PODE e NÃO PODE.
+// Cada teste ataca a regra pelo caminho da função de serviço, não pela tela: esconder um
+// botão não é permissão, é cortesia. O que vale é o que a função recusa.
+//
+// ⚠️ LIMITE HONESTO: estas regras vivem no aparelho. Elas impedem o engano e o atalho, não
+// um adversário — a regra do Firestore deste projeto é permissiva e o app não tem Firebase
+// Auth (AUD-002 da RC5.0). Quem abrir o console do navegador contorna qualquer uma delas.
+// Isto é uma bateria de PERMISSÕES DE USO, não uma prova de segurança contra invasor.
+async function autoTesteMutiraoPermissoes() {
+  if (!MODO_TESTE) {
+    console.error('autoTesteMutiraoPermissoes exige o modo de teste isolado. Abra o app com ?teste=1.');
+    return [{ teste: 'pré-condição', resultado: 'FALHOU', detalhe: 'fora do MODO_TESTE' }];
+  }
+  const r = [];
+  const ok = (nome, passou, detalhe) => r.push({ teste: nome, resultado: passou ? 'PASSOU' : 'FALHOU', detalhe: detalhe || '' });
+
+  const MEU    = PEQUENOS_GRUPOS[PEQUENOS_GRUPOS.length - 1].num;   // o PG da pessoa
+  const OUTRO  = PEQUENOS_GRUPOS[PEQUENOS_GRUPOS.length - 2].num;   // um PG alheio
+  const origLMG = loadMeuGrupo, origMID = getMyMemberId, origFUN = getMinhaFuncaoNoGrupo, origCAD = souCoordenadorAdminDoGrupo;
+  const guarda = localStorage.getItem(MUTIRAO_KEY);
+
+  // O papel é POR PG: coordenador do MEU não é coordenador do OUTRO.
+  const vestir = (memberId, nome, papel, pg) => {
+    window.loadMeuGrupo = () => ({ grupoNum: pg || MEU, grupoNome: 'PG PERM QA', nome: nome });
+    window.getMyMemberId = () => memberId;
+    window.getMinhaFuncaoNoGrupo = (n) => (n === MEU ? papel : 'colaborador');
+    window.souCoordenadorAdminDoGrupo = () => false;
+  };
+
+  try {
+    mutiraoSaveEntregas([]);
+
+    // ═══ PARTICIPANTE — PODE ══════════════════════════════════════════════
+    vestir('QA-P1', 'Marta Lima', 'colaborador');
+    const p1 = registrarMinhaEntregaNatal({ quantidadeKg: 8, data: '2026-12-10' });
+    ok('S-01 participante registra a PRÓPRIA entrega', p1.ok === true, p1.motivo || '');
+
+    // um colega registra também, para provar o isolamento da visão
+    vestir('QA-P2', 'Bruno Reis', 'colaborador');
+    const p2 = registrarMinhaEntregaNatal({ quantidadeKg: 5, data: '2026-12-10' });
+
+    vestir('QA-P1', 'Marta Lima', 'colaborador');
+    const meus = listarMinhasEntregasNatal(MEU);
+    ok('S-02 participante vê os PRÓPRIOS registros, e só eles',
+       meus.length === 1 && meus[0].participante.memberId === 'QA-P1', 'vejo ' + meus.length);
+    ok('S-03 participante vê o total do seu PG (resumo permitido)',
+       calcularTotalKgNatalDoPG(MEU).total === 13, String(calcularTotalKgNatalDoPG(MEU).total));
+
+    // ═══ PARTICIPANTE — NÃO PODE ══════════════════════════════════════════
+    const forjado = registrarMinhaEntregaNatal({
+      quantidadeKg: 3, data: '2026-12-10',
+      participante: { memberId: 'QA-P2', nome: 'Bruno Reis' },     // tenta registrar por outro
+      tipoOrigem: MUTIRAO_ORIGEM.EXTERNO,                          // tenta virar externo
+      externo: { nome: 'Fantasma' },
+      pgNum: OUTRO,                                                // tenta outro PG
+    });
+    ok('S-04 NÃO registra por outro participante',
+       forjado.ok === true && forjado.entrega.participante.memberId === 'QA-P1',
+       'saiu como ' + forjado.entrega.participante.memberId);
+    ok('S-05 NÃO consegue produzir um EXTERNO',
+       forjado.entrega.tipoOrigem === MUTIRAO_ORIGEM.PARTICIPANTE && forjado.entrega.externo === null);
+    ok('S-06 NÃO registra em outro PG',
+       forjado.entrega.pgNum === MEU, 'gravou no PG ' + forjado.entrega.pgNum);
+
+    const ext = registrarEntregaExternaNatal({ nome: 'Colaborador X', quantidadeKg: 9 });
+    ok('S-07 NÃO registra colaborador externo', ext.ok === false && ext.motivo === 'sem_autoridade', ext.motivo || '');
+
+    const alheia = anularEntregaNatal(p2.entrega.entregaId);
+    ok('S-08 NÃO altera registro de terceiro', alheia.ok === false && alheia.motivo === 'sem_autoridade', alheia.motivo || '');
+    ok('S-09 o registro do terceiro continua vivo e intacto',
+       listarEntregasNatalDoPG(MEU).some(e => e.entregaId === p2.entrega.entregaId && e.removed !== true));
+
+    const propria = anularEntregaNatal(forjado.entrega.entregaId);
+    ok('S-10 mas PODE corrigir a própria entrega', propria.ok === true, propria.motivo || '');
+
+    // ═══ COORDENADOR — PODE ═══════════════════════════════════════════════
+    vestir('QA-COORD', 'Ana Beatriz', 'coordenador');
+    const x1 = registrarEntregaExternaNatal({ nome: 'Joao Pereira', quantidadeKg: 20, data: '2026-12-08' });
+    ok('S-11 coordenador registra externo', x1.ok === true, x1.motivo || '');
+    ok('S-12 o externo nasce vinculado ao PG DELE', x1.ok && x1.entrega.pgNum === MEU, 'PG ' + (x1.entrega || {}).pgNum);
+    ok('S-13 coordenador vê os registros do PG',
+       listarEntregasParticipantesDoPG(MEU).length === 2 && listarEntregasExternasDoPG(MEU).length === 1,
+       listarEntregasParticipantesDoPG(MEU).length + ' part / ' + listarEntregasExternasDoPG(MEU).length + ' ext');
+    const d = dadosMutiraoDoPG(MEU);
+    ok('S-14 coordenador acompanha os totais', d.totalKg === 33 && d.totalPessoasMobilizadas === 3, JSON.stringify(d));
+
+    // ═══ COORDENADOR — NÃO PODE ═══════════════════════════════════════════
+    ok('S-15 NÃO transforma externo em participante',
+       x1.entrega.tipoOrigem === MUTIRAO_ORIGEM.EXTERNO && x1.entrega.participante === null);
+
+    // mesmo coordenador, mas atuando num PG onde não é coordenador
+    vestir('QA-COORD', 'Ana Beatriz', 'coordenador', OUTRO);
+    const foraDoPg = registrarEntregaExternaNatal({ nome: 'Alguem', quantidadeKg: 7 });
+    ok('S-16 NÃO registra externo em outro PG', foraDoPg.ok === false && foraDoPg.motivo === 'sem_autoridade', foraDoPg.motivo || '');
+
+    // Uma entrega que pertence ao OUTRO PG, feita por outra pessoa. A autoridade de anular
+    // é avaliada pelo PG DA ENTREGA — não por qual PG o aparelho está mostrando.
+    vestir('QA-P3', 'Clara Nunes', 'colaborador', OUTRO);
+    const noOutroPg = registrarMinhaEntregaNatal({ quantidadeKg: 6, data: '2026-12-10' });
+    vestir('QA-COORD', 'Ana Beatriz', 'coordenador');
+    const anularAlheio = anularEntregaNatal(noOutroPg.entrega.entregaId);
+    ok('S-17 NÃO anula registro de PG onde não é coordenador',
+       anularAlheio.ok === false && anularAlheio.motivo === 'sem_autoridade', anularAlheio.motivo || '');
+
+    // o mecanismo autorizado é o tombstone — e ele NÃO apaga
+    vestir('QA-COORD', 'Ana Beatriz', 'coordenador');
+    const antes = mutiraoLoadEntregas().length;
+    const anulou = anularEntregaNatal(p2.entrega.entregaId);
+    ok('S-18 coordenador PODE anular pelo mecanismo autorizado', anulou.ok === true, anulou.motivo || '');
+    ok('S-19 anular NÃO apaga — o registro continua no banco',
+       mutiraoLoadEntregas().length === antes &&
+       mutiraoLoadEntregas().some(e => e.entregaId === p2.entrega.entregaId && e.removed === true),
+       'antes=' + antes + ' depois=' + mutiraoLoadEntregas().length);
+    ok('S-20 e some das listagens e dos totais',
+       !listarEntregasNatalDoPG(MEU).some(e => e.entregaId === p2.entrega.entregaId) &&
+       dadosMutiraoDoPG(MEU).totalKg === 28, String(dadosMutiraoDoPG(MEU).totalKg));
+
+  } finally {
+    window.loadMeuGrupo = origLMG;
+    window.getMyMemberId = origMID;
+    window.getMinhaFuncaoNoGrupo = origFUN;
+    window.souCoordenadorAdminDoGrupo = origCAD;
+    try {
+      if (guarda === null) localStorage.removeItem(MUTIRAO_KEY);
+      else localStorage.setItem(MUTIRAO_KEY, guarda);
+    } catch (_) {}
+  }
+  return r;
+}
+
 
 
 // ══════════════════════════════════════
