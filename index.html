@@ -4090,31 +4090,31 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
 }
 
 // ── Dashboard do PG (FASE 7) ─────────────────────────────────────────────────
-// SÓ APRESENTAÇÃO. Todos os números vêm de resumoMutiraoDoPG() — nenhum cálculo acontece
+// SÓ APRESENTAÇÃO. Todos os números vêm de dadosMutiraoDoPG() — nenhum cálculo acontece
 // aqui, e nada é derivado por um segundo caminho. É o que mantém o indicador auditável:
 // os dois números da tabela somam exatamente o total exibido em cima, e as duas contagens
-// de pessoas são as mesmas que alimentam o resumo. Sem componente oculto.
+// de pessoas são as mesmas que alimentam o registro bruto. Sem componente oculto.
 function htmlMutiraoDashboard(pgNum) {
-  const r = resumoMutiraoDoPG(pgNum);
+  const r = dadosMutiraoDoPG(pgNum);
   const plural = (n, um, varios) => (n === 1 ? um : varios);
   return `
     <div class="panel-section">
       <div class="panel-title">Dashboard do PG</div>
 
       <div class="mut-kpi-lbl">Arrecadação</div>
-      <div style="font-size:36px;font-weight:700;color:var(--orange);font-family:var(--ff-body);line-height:1.1">${mutiraoFmt(r.total)} kg</div>
+      <div style="font-size:36px;font-weight:700;color:var(--orange);font-family:var(--ff-body);line-height:1.1">${mutiraoFmt(r.totalKg)} kg</div>
       <div class="mut-kpi-sub" style="margin-bottom:.9rem">total arrecadado pelo Pequeno Grupo</div>
 
       <div style="display:flex;gap:.7rem;margin-bottom:1rem">
         <div class="mut-kpi">
           <div class="mut-kpi-lbl">Participação do PG</div>
-          <div class="mut-kpi-num">${r.pessoasParticipantes}</div>
-          <div class="mut-kpi-sub">${plural(r.pessoasParticipantes, 'participante entregou', 'participantes entregaram')}</div>
+          <div class="mut-kpi-num">${r.participantesQueEntregaram}</div>
+          <div class="mut-kpi-sub">${plural(r.participantesQueEntregaram, 'participante entregou', 'participantes entregaram')}</div>
         </div>
         <div class="mut-kpi">
           <div class="mut-kpi-lbl">Mobilização externa</div>
-          <div class="mut-kpi-num">${r.pessoasExternas}</div>
-          <div class="mut-kpi-sub">${plural(r.pessoasExternas, 'colaborador externo entregou', 'colaboradores externos entregaram')}</div>
+          <div class="mut-kpi-num">${r.colaboradoresExternosMobilizados}</div>
+          <div class="mut-kpi-sub">${plural(r.colaboradoresExternosMobilizados, 'colaborador externo entregou', 'colaboradores externos entregaram')}</div>
         </div>
       </div>
 
@@ -4122,9 +4122,9 @@ function htmlMutiraoDashboard(pgNum) {
       <table class="mut-tab">
         <thead><tr><th>Origem</th><th>Kg</th></tr></thead>
         <tbody>
-          <tr><td>Participantes do PG</td><td>${mutiraoFmt(r.participantes)}</td></tr>
-          <tr><td>Colaboradores externos</td><td>${mutiraoFmt(r.externos)}</td></tr>
-          <tr><td>Total</td><td>${mutiraoFmt(r.total)}</td></tr>
+          <tr><td>Participantes do PG</td><td>${mutiraoFmt(r.kgParticipantes)}</td></tr>
+          <tr><td>Colaboradores externos</td><td>${mutiraoFmt(r.kgExternos)}</td></tr>
+          <tr><td>Total</td><td>${mutiraoFmt(r.totalKg)}</td></tr>
         </tbody>
       </table>
     </div>`;
@@ -15279,26 +15279,50 @@ function listarMinhasEntregasNatal(pgNum) {
 // Vírgula decimal: 7.5 vira "7,5". Fonte única para a Home e para a tela.
 function mutiraoFmt(n) { return String(n).replace('.', ','); }
 
-// Resumo do PG para o Painel: os quilos de calcularTotalKgNatalDoPG mais quantas PESSOAS de
-// cada lado. Pessoa ≠ entrega: quem entregou duas vezes conta UMA vez.
+// ── FASE 8 — DADOS BRUTOS DO PG (preparação para o ranking) ──────────────────
+// Este é O registro de dados brutos do Mutirão por PG. Os nomes são exatamente os
+// especificados na FASE 8, mais os dois quilos por origem que o Dashboard (FASE 7) já usa.
+//
+// ⚠️ NENHUMA FÓRMULA AQUI. Nada é ponderado, normalizado ou combinado num índice — de
+// propósito. A regra matemática do ranking ainda NÃO foi homologada, e guardar apenas o
+// número bruto é o que permite trocar a fórmula depois sem ter perdido informação. Se um dia
+// alguém quiser somar, pesar ou dividir estes números, que faça em outra função: esta não.
+//
+// Pessoa ≠ entrega: quem entregou duas vezes conta UMA vez em "…QueEntregaram" /
+// "…Mobilizados", e DUAS em "totalEntregas…". São perguntas diferentes e ficam separadas.
+//
 // Chave do participante: memberId quando existe, senão o nome — mesma tolerância de
 // listarMinhasEntregasNatal, pelo mesmo motivo (identidade nova após reentrada).
 // Chave do externo: nome + setor. Sem setor informado, dois homônimos contam como uma
 // pessoa só — limite conhecido, registrado no relatório da FASE 5.
-function resumoMutiraoDoPG(pgNum) {
+function dadosMutiraoDoPG(pgNum) {
   const lista = listarEntregasNatalDoPG(pgNum);
   const pessoas = new Set(), externos = new Set();
+  let entregasParticipantes = 0, entregasExternas = 0;
   lista.forEach(e => {
     if (e.tipoOrigem === MUTIRAO_ORIGEM.PARTICIPANTE && e.participante) {
+      entregasParticipantes++;
       const k = e.participante.memberId || String(e.participante.nome || '').trim().toLowerCase();
       if (k) pessoas.add(k);
     } else if (e.tipoOrigem === MUTIRAO_ORIGEM.EXTERNO && e.externo) {
+      entregasExternas++;
       const k = String(e.externo.nome || '').trim().toLowerCase() + '|' + String(e.externo.setor || '').trim().toLowerCase();
       if (k !== '|') externos.add(k);
     }
   });
-  return Object.assign({}, calcularTotalKgNatalDoPG(pgNum),
-    { pessoasParticipantes: pessoas.size, pessoasExternas: externos.size });
+  const kg = calcularTotalKgNatalDoPG(pgNum);
+  return {
+    pgNum: pgNum,
+    edicao: MUTIRAO_NATAL.edicao,
+    totalKg: kg.total,
+    kgParticipantes: kg.participantes,
+    kgExternos: kg.externos,
+    participantesQueEntregaram: pessoas.size,
+    colaboradoresExternosMobilizados: externos.size,
+    totalPessoasMobilizadas: pessoas.size + externos.size,
+    totalEntregasParticipantes: entregasParticipantes,
+    totalEntregasExternas: entregasExternas,
+  };
 }
 
 // Entregas dos participantes do PG (não inclui externos) — alimenta o bloco A do Painel.
@@ -15490,6 +15514,52 @@ async function autoTesteMutirao() {
        registrarEntregaExternaNatal({ nome: 'Joao Pereira', quantidadeKg: 20, data: '2026-12-08' }).ok === true);
     ok('M-41 histórico de externos mostra só os vivos',
        listarEntregasExternasDoPG(SLOT).length === 2, 'vivos=' + listarEntregasExternasDoPG(SLOT).length);
+
+    // ── 9. FASE 8 — dados brutos para o ranking ──────────────────────────────
+    // Cenário montado para que pessoa e entrega NÃO coincidam em nenhum dos dois lados:
+    // Maria 6+4, Carla 5  → 2 pessoas, 3 entregas, 15 kg
+    // João 3+2, Rita 1    → 2 pessoas, 3 entregas,  6 kg
+    mutiraoSaveEntregas([]);
+    vestir('QA-MARIA', 'Maria da Silva', 'colaborador');
+    registrarMinhaEntregaNatal({ quantidadeKg: 6, data: '2026-12-10' });
+    registrarMinhaEntregaNatal({ quantidadeKg: 4, data: '2026-12-10' });
+    vestir('QA-CARLA', 'Carla Souza', 'colaborador');
+    registrarMinhaEntregaNatal({ quantidadeKg: 5, data: '2026-12-10' });
+    vestir('QA-ANA', 'Ana Beatriz', 'coordenador');
+    registrarEntregaExternaNatal({ nome: 'Joao Pereira', quantidadeKg: 3, data: '2026-12-10' });
+    registrarEntregaExternaNatal({ nome: 'Joao Pereira', quantidadeKg: 2, data: '2026-12-10' });
+    registrarEntregaExternaNatal({ nome: 'Rita Alves',   quantidadeKg: 1, data: '2026-12-10' });
+
+    const d = dadosMutiraoDoPG(SLOT);
+    const contrato = ['totalKg', 'participantesQueEntregaram', 'colaboradoresExternosMobilizados',
+                      'totalPessoasMobilizadas', 'totalEntregasParticipantes', 'totalEntregasExternas'];
+    const faltando = contrato.filter(c => typeof d[c] !== 'number');
+    ok('M-42 o registro traz todos os campos do contrato', faltando.length === 0, faltando.join(', ') || 'todos presentes');
+
+    ok('M-43 totalKg correto', d.totalKg === 21, String(d.totalKg));
+    ok('M-44 quilos por origem somam o total',
+       d.kgParticipantes === 15 && d.kgExternos === 6 && d.kgParticipantes + d.kgExternos === d.totalKg,
+       d.kgParticipantes + ' + ' + d.kgExternos);
+
+    ok('M-45 PESSOAS: quem entregou 2x conta 1 vez',
+       d.participantesQueEntregaram === 2 && d.colaboradoresExternosMobilizados === 2,
+       d.participantesQueEntregaram + ' / ' + d.colaboradoresExternosMobilizados);
+    ok('M-46 ENTREGAS: a mesma pessoa conta 2 vezes',
+       d.totalEntregasParticipantes === 3 && d.totalEntregasExternas === 3,
+       d.totalEntregasParticipantes + ' / ' + d.totalEntregasExternas);
+    ok('M-47 totalPessoasMobilizadas soma os dois lados',
+       d.totalPessoasMobilizadas === 4, String(d.totalPessoasMobilizadas));
+
+    // Nada de fórmula: o registro só pode conter os campos declarados — nenhum índice,
+    // nota, peso ou score entrou de contrabando.
+    const permitidos = ['pgNum', 'edicao', 'kgParticipantes', 'kgExternos'].concat(contrato);
+    const intrusos = Object.keys(d).filter(k => permitidos.indexOf(k) === -1);
+    ok('M-48 nenhum campo calculado além do contrato', intrusos.length === 0, intrusos.join(', ') || 'nenhum');
+
+    const vazio = dadosMutiraoDoPG(SLOT - 1);
+    ok('M-49 PG sem entregas devolve zeros, não vazio',
+       vazio.totalKg === 0 && vazio.totalPessoasMobilizadas === 0 && vazio.totalEntregasExternas === 0,
+       JSON.stringify(vazio));
 
   } finally {
     window.loadMeuGrupo = origLMG;
