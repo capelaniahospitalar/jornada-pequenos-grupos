@@ -82,10 +82,21 @@ service cloud.firestore {
     // A trava de concorrência (`currentDocument.updateTime` / `currentDocument.exists`)
     // é enviada pelo app; a regra só valida a FORMA do que chega.
     //
-    // ESCOLHA A REVER COM O USUÁRIO: `{edicao}` é curinga, então a campanha de 2027 nasce
-    // sem tocar nesta regra. Para travar só em 2026, troque `{edicao}` por `2026` — a regra
-    // fica mais restrita e 2027 exigirá uma linha nova, publicada de propósito.
-    match /jdpg/mutirao/{edicao}/{pgNum} {
+    // ⚠️ A EDIÇÃO É LITERAL `2026`, NÃO CURINGA — decisão do usuário em 2026-09-09, depois de
+    // pesar os dois modos de falha. O endereço é montado no app a partir de
+    // `MUTIRAO_NATAL.edicao`. Se esse valor sair errado um dia (edição acidental do código,
+    // versão antiga em cache, teste apontando para outro lugar), o que acontece depende desta
+    // linha:
+    //   · com curinga → a gravação é ACEITA e cai numa coleção que nenhuma tela lê. Ninguém vê
+    //     erro; a pessoa registra, o app diz "salvo", e o dado não existe para o resto do mundo.
+    //   · travado em 2026 → volta 403, o app avisa a pessoa e o problema aparece no mesmo dia.
+    // Num projeto que já teve gravação indevida em produção, essa segunda barreira — externa ao
+    // JavaScript e que o aparelho não atravessa — vale mais do que a conveniência de 2027.
+    //
+    // CAMPANHA DE 2027: exigirá acrescentar um bloco novo aqui, de propósito. Isso é a
+    // vantagem, não o custo. O teste N-26 avisa se o código mudar de edição sem que a regra mude
+    // junto.
+    match /jdpg/mutirao/2026/{pgNum} {
       allow read: if true;
       // `create, update` em vez de `write`: assim a exclusão do documento fica negada de
       // forma EXPLÍCITA, e não por efeito colateral de `request.resource` ser nulo no delete.

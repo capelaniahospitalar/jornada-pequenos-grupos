@@ -132,12 +132,12 @@ Executados em `http://localhost:8099/index.html?teste=1`, no modo de teste isola
 | `autoTesteMutirao` (**M**) | 49 | 49 | 0 | 0 |
 | `autoTesteMutiraoPermissoes` (**S**) | 20 | 20 | 0 | 0 |
 | `autoTesteMutiraoMatriz` (**T**) | 17 | 16 | 0 | **1** |
-| `autoTesteMutiraoSync` (**N**) | **25** | **25** | 0 | 0 |
-| **TOTAL** | **237** | **236** | **0** | **1** |
+| `autoTesteMutiraoSync` (**N**) | **26** | **26** | 0 | 0 |
+| **TOTAL** | **238** | **237** | **0** | **1** |
 
-Eram 227 antes; as 10 novas são os testes de isolamento. A única não-verde é a **T9**, marcada `BLOQUEADO` de propósito: é o R2 de campo com dois aparelhos, que já estava assim e continua pendente.
+Eram 227 antes; as 11 novas são os 10 testes de isolamento mais o alarme N-26. A única não-verde é a **T9**, marcada `BLOQUEADO` de propósito: é o R2 de campo com dois aparelhos, que já estava assim e continua pendente.
 
-## 4.1 Os 10 testes novos
+## 4.1 Os 11 testes novos
 
 | | |
 |---|---|
@@ -151,6 +151,7 @@ Eram 227 antes; as 10 novas são os testes de isolamento. A única não-verde é
 | **N-23** | o endereço leva a edição e o número do PG, e nunca toca `jdpg/grupos` |
 | **N-24** | sincronizar sem PG válido é recusado e não grava nada |
 | **N-25** | entrega de outra edição não é enviada e continua no aparelho |
+| **N-26** | alarme: a edição do código é a mesma que a regra publicada aceita (2026) |
 
 **N-21 e N-22 chamam a função de gravação REAL**, não o servidor falso — senão o teste provaria apenas que o meu servidor de mentira funciona.
 
@@ -178,7 +179,7 @@ E `mutiraoDocUrl(cfg, null)` lança erro em vez de montar um endereço.
 # 5. A regra do Firestore — **NÃO PUBLICADA**
 
 ```
-match /jdpg/mutirao/{edicao}/{pgNum} {
+match /jdpg/mutirao/2026/{pgNum} {
   allow read: if true;
   allow create, update: if request.resource.data.keys().hasOnly(['entregas','ts','schemaVersion'])
     && request.resource.data.entregas is string
@@ -187,15 +188,24 @@ match /jdpg/mutirao/{edicao}/{pgNum} {
 }
 ```
 
-**Por que não alcança `jdpg/grupos`:** este caminho tem **quatro** segmentos e o de `jdpg/grupos` tem **dois**. Em Security Rules um `match` só casa com caminhos da mesma profundidade, e não há aqui nenhum curinga recursivo (`{x=**}`) — a única construção capaz de atravessar níveis. Não existe caminho por onde esta regra afete os 70 PGs reais.
+**Por que não alcança `jdpg/grupos`:** este caminho tem **quatro** segmentos e o de `jdpg/grupos` tem **dois**. Em Security Rules um `match` só casa com caminhos da mesma profundidade, e não há aqui nenhum curinga recursivo (`{x=**}`) — a única construção capaz de atravessar níveis. O único curinga é `{pgNum}`, no último segmento. Não existe caminho por onde esta regra afete os 70 PGs reais.
 
-Os blocos `jdpg/grupos` e `embaixadoresExternos` continuam **byte a byte idênticos** ao publicado em 19/08.
+**Verificado por comparação automática** (comentários removidos, espaços normalizados): entre a regra publicada em 19/08 e esta, a diferença são **7 linhas acrescentadas**, todas dentro do bloco novo. Nenhuma linha removida, nenhuma alterada. Os blocos `jdpg/grupos` e `embaixadoresExternos` continuam idênticos.
 
-## 5.1 ⚠️ Uma escolha para o usuário decidir
+## 5.1 A edição é literal `2026`, não curinga — decisão de 09/09
 
-`{edicao}` é curinga: a campanha de 2027 nasceria sem tocar nesta regra. Para travar só em 2026, basta trocar `{edicao}` por `2026` — fica mais restrita, e 2027 exigiria uma linha nova, publicada de propósito.
+Eu havia proposto `{edicao}` como curinga, para a campanha de 2027 nascer sem tocar na regra. **Revi a recomendação e o usuário decidiu por `2026` travado.** O argumento é o modo de falha, não a conveniência.
 
-Escolhi o curinga porque atende diretamente ao objetivo declarado ("2027 nasce isolado sem precisar alterar"), mas a versão travada é defensável e a troca é de uma palavra.
+O endereço é montado no app a partir de `MUTIRAO_NATAL.edicao`. Se esse valor sair errado um dia — edição acidental do código, versão antiga em cache, teste apontado para outro lugar:
+
+| | O que acontece |
+|---|---|
+| Com curinga | a gravação é **aceita** e cai numa coleção que nenhuma tela lê. Ninguém vê erro: a pessoa registra, o app diz "salvo", e o dado não existe para o resto do mundo |
+| Travado em `2026` | volta **403**, o app avisa a pessoa e o problema aparece no mesmo dia |
+
+Num projeto que já teve gravação indevida em produção, essa segunda barreira — **externa ao JavaScript, que o aparelho não atravessa** — vale mais do que economizar uma linha em 2027. Exigir alteração deliberada da regra para abrir 2027 é a vantagem, não o custo.
+
+**O preço dessa proteção:** código e regra passam a ter de andar juntos. O alarme para isso é o teste **N-26**, que fica vermelho se alguém mudar a edição no código — lembrando de publicar a regra da edição nova ANTES, sob pena de toda gravação da campanha voltar 403 disfarçado de "sem conexão".
 
 ---
 

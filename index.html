@@ -16332,6 +16332,16 @@ async function autoTesteMutiraoSync() {
        ids(docDe(PG).entregas) === 'N1' && ids(mutiraoLoadEntregas()) === 'N1,V1',
        'nuvem=' + ids(docDe(PG).entregas) + ' · local=' + ids(mutiraoLoadEntregas()));
 
+    // ── ALARME: a regra publicada aceita SÓ a edição 2026 (literal, não curinga) ──────
+    // Decisão do usuário em 09/09: a regra é a segunda barreira contra gravação endereçada à
+    // edição errada. O preço dessa proteção é que código e regra passam a ter de andar juntos.
+    // Este teste é o alarme: mudar a edição aqui sem publicar o bloco correspondente no Console
+    // faria TODA gravação da campanha voltar 403 — e este projeto já conhece esse 403 disfarçado
+    // de "sem conexão". Se esta prova ficar vermelha, publique a regra da edição nova ANTES.
+    ok('N-26 a edição do código é a mesma que a regra publicada aceita (2026)',
+       MUTIRAO_NATAL.edicao === '2026',
+       'código=' + MUTIRAO_NATAL.edicao + ' · regra=2026');
+
   } finally {
     window.mutiraoFbRead = origRead;
     window.mutiraoFbWrite = origWrite;
