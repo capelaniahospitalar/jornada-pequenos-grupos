@@ -1,10 +1,15 @@
 # MUTIRÃO DE NATAL 2026 · FASE 14 — Um documento por PG e por edição
 
 **Data:** 2026-09-09 · **Branch:** `audit/fix-invite-reentry` · **Status:** ✅ implementada e verificada
-**`main` intocada em `1aafe63`.** Nenhuma gravação em produção, nenhum R2 executado.
+**`main` intocada em `1aafe63`.**
 **A regra do Firestore foi publicada em 09/09 às 09:54** e conferida byte a byte (§5) — publicar a
 regra não publica o app: a `main` continua na `1.2.0-rc1` e nenhum aparelho em campo conhece o
 endereço novo.
+**R2-A, R2-B e R2-C executados e aprovados em produção** no mesmo dia — evidência integral em
+`MUTIRAO-15-R2-EXECUCAO.md`. As únicas escritas dirigidas à produção foram as **três autorizadas**
+(uma no R2-A e duas no R2-C, das quais **a segunda foi recusada pela trava, como se pretendia**),
+todas endereçadas ao documento de teste `jdpg/mutirao/2026/999`. **`jdpg/grupos` não foi tocado** —
+provado pelo carimbo, 16 minutos anterior à nossa gravação.
 
 ---
 
@@ -236,7 +241,7 @@ Num projeto que já teve gravação indevida em produção, essa segunda barreir
 | | |
 |---|---|
 | Publicar a regra no Console | ✅ **feito 09/09 às 09:54**, conferido byte a byte (§5) |
-| **R2 do Mutirão** (`MUTIRAO-13`, revisto hoje) | ⛔ não executado |
+| **R2 do Mutirão** (`MUTIRAO-13`) | 🟡 **R2-A, R2-B e R2-C aprovados em produção** (evidência em `MUTIRAO-15`); faltam §5.1, R2-D e R2-E |
 | **R2 do `AUDIT-17`** (reentrada de convite) | ⛔ não executado, independente |
 | Merge para a `main` | ⛔ **exige autorização explícita do usuário** |
 

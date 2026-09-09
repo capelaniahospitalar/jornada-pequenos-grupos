@@ -1,7 +1,14 @@
 # MUTIRÃO DE NATAL 2026 · PROTOCOLO R2 — validação contra o Firestore real
 
 **Data:** 2026-09-08 · **Revisto em 2026-09-09** · **Versão candidata:** `1.3.0-rc1` + Mutirão (FASES 0–14)
-**Status:** 📋 **PROTOCOLO — não executado.** Exige a regra publicada e, na etapa D, dois aparelhos.
+**Status:** 🟡 **PARCIALMENTE EXECUTADO em 2026-09-09.** R2-A, R2-B e R2-C ✅ aprovados em produção
+— a evidência está em `MUTIRAO-15-R2-EXECUCAO.md`, não aqui. Faltam o §5.1, o R2-D (dois aparelhos)
+e o R2-E.
+
+> ⚠️ **O §2 deste protocolo manda abrir o app SEM `?teste=1`. NÃO FAÇA ISSO** — carregar a página
+> em modo normal dispara `syncFromFirebase → migrarSetoresParaMestre → saveGrupos`, que **grava em
+> `jdpg/grupos`** sem nenhum clique. Use o método do `MUTIRAO-15` §0: `?teste=1` mais as chamadas
+> explícitas pelo console.
 
 > ⚠️ **REVISÃO DE 2026-09-09 — leia antes de executar.** O Mutirão deixou de usar um documento
 > institucional único e passou a usar **um documento por PG e por edição**:
