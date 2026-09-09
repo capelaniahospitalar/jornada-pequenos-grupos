@@ -4268,13 +4268,13 @@ function registrarExternoMutiraoUI(grupoNum, nome) {
   }
   renderMutiraoPainel(grupoNum, nome,
     '✅ Entrega de ' + mutiraoFmt(kg) + ' kg registrada para ' + sanitize(nomeExt) + '.');
-  mutiraoSincronizarEDepois(() => renderMutiraoPainel(grupoNum, nome));
+  mutiraoSincronizarEDepois(grupoNum, () => renderMutiraoPainel(grupoNum, nome));
 }
 
 // Abre a área do Mutirão no Painel já puxando o que os outros aparelhos registraram.
 function abrirMutiraoPainel(grupoNum, nome) {
   renderMutiraoPainel(grupoNum, nome);
-  mutiraoSincronizarEDepois(() => renderMutiraoPainel(grupoNum, nome));
+  mutiraoSincronizarEDepois(grupoNum, () => renderMutiraoPainel(grupoNum, nome));
 }
 
 // ── Editar nome do Pequeno Grupo (Tutor/Coordenador, achado de campo: nome
@@ -13193,7 +13193,7 @@ function openMutirao() {
   showScreen('mutirao');
   // Puxa o que os outros aparelhos do PG registraram. A tela já apareceu com o dado local:
   // a rede não segura a interface, só a atualiza quando chega.
-  mutiraoSincronizarEDepois(() => renderMutirao());
+  mutiraoSincronizarEDepois(mutiraoMeuPgNum(), () => renderMutirao());
 }
 
 function renderMutirao(msg) {
@@ -13306,7 +13306,7 @@ function registrarEntregaMutiraoUI() {
   renderMutirao('✅ ' + mutiraoFmt(kg) + ' kg registrados. Veja abaixo, no seu histórico.');
   // A entrega já está salva no aparelho. O envio para a nuvem acontece em seguida e não
   // pode fazer a pessoa esperar — se falhar, a entrega continua aqui e sobe no próximo sync.
-  mutiraoSincronizarEDepois(() => renderMutirao());
+  mutiraoSincronizarEDepois(mutiraoMeuPgNum(), () => renderMutirao());
 }
 
 
@@ -15383,13 +15383,33 @@ function anularEntregaNatal(entregaId) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-//  SINCRONIZAÇÃO DO MUTIRÃO — documento próprio `jdpg/mutirao` (Opção 2)
+//  SINCRONIZAÇÃO DO MUTIRÃO — UM DOCUMENTO POR PG, POR EDIÇÃO
 // ══════════════════════════════════════════════════════════════════════════
 // Decisão do usuário (2026-09-08): documento SEPARADO de `jdpg/grupos`.
-//   · isolamento — não disputa gravação com a sincronização dos PGs
-//   · tamanho    — orçamento próprio de 1 MiB, não consome os ~435 KB de `jdpg/grupos`
-//   · versão antiga — o app publicado não conhece este documento e nunca o toca
-//   · auditoria  — a campanha inteira num lugar só
+// Decisão do usuário (2026-09-09): e SEPARADO por PG e por edição da campanha.
+//
+//     jdpg/mutirao/2026/12   ← as entregas do PG 12 na campanha de 2026
+//     └ coleção `jdpg` · documento `mutirao` · coleção `2026` · documento `12`
+//
+// POR QUE MUDOU: o documento institucional único comportava ~1 012 entregas no total. Com a
+// campanha aberta de setembro ao início de dezembro e cada pessoa registrando VÁRIAS vezes,
+// esse teto seria alcançado no meio da campanha — e alcançar o teto aqui significa gravação
+// recusada, o modo de falha mais caro que este projeto já teve. Não é que o limite deixe de
+// existir: cada documento continua tendo o seu. O limite deixa de ser um gargalo
+// institucional único e passa a ser distribuído entre os PGs.
+//
+// O SEGUNDO GANHO, tão importante quanto: hoje a instituição inteira disputaria a mesma
+// gravação, e todo registro colidiria com todos os outros. Com um documento por PG, só as
+// pessoas do próprio PG podem colidir entre si.
+//
+// A CHAVE É `pgNum`, NÃO `pgId`: no retrato de produção de 04/09, `pgId` está vazio em 66 dos
+// 70 slots (FASE 1 §1.2). Chavear por `pgId` jogaria 66 PGs no mesmo documento "null" —
+// recriando exatamente o gargalo do qual estamos saindo. `pgNum` está em 100% dos slots e é
+// estável: a regra do projeto é nunca mover PG de slot.
+//
+// A EDIÇÃO ESTÁ NO ENDEREÇO para que a campanha de 2027 nasça isolada, sem migrar nem
+// encostar nos dados de 2026. O campo `mutiraoNatal` continua DENTRO de cada registro — o
+// formato do registro não mudou.
 //
 // ⚠️ NADA AQUI ALTERA `jdpg/grupos`, o contrato de gravação dos grupos, os convites ou a
 // reentrada. Este é um caminho de rede paralelo e independente: `fbReadDoc`, `fbWriteGrupos`,
@@ -15397,14 +15417,22 @@ function anularEntregaNatal(entregaId) {
 const MUT_COLL      = 'jdpg';
 const MUT_DOC       = 'mutirao';
 const MUT_SCHEMA    = 1;
-const MUT_MAX_BYTES = 480000;   // mesma folga que `dados` usa contra o teto de 500 KB da regra
+const MUT_MAX_BYTES = 480000;   // agora POR PG — mesma folga contra o teto de 500 KB da regra
 
 // Contador de vezes que a trava de concorrência recusou uma gravação nesta sessão. Existe
 // só para o R2: é o número que prova, em campo, que a trava atuou de verdade.
 let mutiraoConflitos = 0;
 
-function mutiraoDocUrl(cfg) {
-  return `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/${MUT_COLL}/${MUT_DOC}?key=${cfg.apiKey}`;
+// Um endereço errado aqui grava no documento de outro PG. Por isso o número do PG é validado
+// antes de virar URL, e quem chamar sem PG recebe erro em vez de um endereço plausível.
+function mutiraoPgNumValido(pgNum) {
+  return Number.isInteger(pgNum) && pgNum > 0;
+}
+
+function mutiraoDocUrl(cfg, pgNum) {
+  if (!mutiraoPgNumValido(pgNum)) throw new Error('mutiraoDocUrl: pgNum inválido (' + pgNum + ')');
+  const base = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents`;
+  return `${base}/${MUT_COLL}/${MUT_DOC}/${encodeURIComponent(MUTIRAO_NATAL.edicao)}/${pgNum}?key=${cfg.apiKey}`;
 }
 
 // ── A REGRA DE MESCLAGEM ─────────────────────────────────────────────────────
@@ -15437,15 +15465,17 @@ function mutiraoRetratoConjunto(lista) {
   return (lista || []).map(e => e.entregaId + (e.removed === true ? '!' : '')).sort().join(',');
 }
 
-// Lê `jdpg/mutirao`. Devolve { entregas, updateTime } · { entregas: [], updateTime: null } se
-// o documento ainda não existe · { erro: true, … } em falha de rede · null no modo de teste.
-async function mutiraoFbRead(cfg) {
+// Lê o documento do PG na edição corrente. Devolve { entregas, updateTime } ·
+// { entregas: [], updateTime: null } se o documento ainda não existe · { erro: true, … } em
+// falha de rede · null no modo de teste.
+async function mutiraoFbRead(cfg, pgNum) {
   // BARREIRA DO MODO DE TESTE — gêmea da de fbReadDoc. Isolado é isolado dos dois lados.
   if (MODO_TESTE) {
-    registrarEscritaBloqueada('mutiraoFbRead (leitura)', { destinoQueSeriaUsado: cfg ? cfg.projectId : null });
+    registrarEscritaBloqueada('mutiraoFbRead (leitura)', { destinoQueSeriaUsado: cfg ? cfg.projectId : null, pgNum: pgNum });
     return null;
   }
-  const r = await fetchComTimeout(mutiraoDocUrl(cfg), undefined, 15000);
+  if (!mutiraoPgNumValido(pgNum)) return { erro: true, http: 0, motivoHttp: 'pg_invalido', transitorio: false };
+  const r = await fetchComTimeout(mutiraoDocUrl(cfg, pgNum), undefined, 15000);
   if (r.status === 404) return { entregas: [], updateTime: null };   // documento ainda não existe
   if (!r.ok) {
     const t = await r.text();
@@ -15460,26 +15490,39 @@ async function mutiraoFbRead(cfg) {
   return { entregas: entregas, updateTime: doc.updateTime || null };
 }
 
-// Grava `jdpg/mutirao` com TRAVA DE CONCORRÊNCIA obrigatória.
+// Grava o documento do PG com TRAVA DE CONCORRÊNCIA obrigatória.
 //   · documento já existe → `currentDocument.updateTime` (só grava se ninguém mexeu desde a leitura)
 //   · documento não existe → `currentDocument.exists=false` (só cria se ninguém criou antes)
 // Sem um dos dois, duas pessoas gravando ao mesmo tempo perderiam uma entrega. Recusa do
 // servidor vira `preconditionFailed`, e quem chama RELÊ e remescla antes de tentar de novo.
-async function mutiraoFbWrite(cfg, entregas, baseUpdateTime) {
-  const payload = JSON.stringify(entregas || []);
+//
+// GUARDA DE ISOLAMENTO: recusa o conjunto que contenha entrega de OUTRO PG ou de outra
+// edição. É o que torna a contaminação entre documentos impossível por construção, e não
+// apenas improvável — um erro de filtro em quem chama vira erro visível aqui, não um dado
+// gravado no PG errado, que ninguém notaria.
+async function mutiraoFbWrite(cfg, pgNum, entregas, baseUpdateTime) {
+  const lista   = entregas || [];
+  const payload = JSON.stringify(lista);
 
-  // BARREIRA DO MODO DE TESTE — primeira instrução depois de montar o payload, como em
-  // fbWriteGrupos. Devolve a MESMA forma de um sucesso real, para o laço se comportar igual.
+  if (!mutiraoPgNumValido(pgNum)) return { ok: false, motivo: 'pg_invalido' };
+  const intrusa = lista.find(e => !e || e.pgNum !== pgNum || e.mutiraoNatal !== MUTIRAO_NATAL.edicao);
+  if (intrusa) {
+    console.error('Mutirão: gravação CANCELADA — entrega de outro PG/edição no conjunto do PG ' + pgNum + '.', intrusa);
+    return { ok: false, motivo: 'pg_misturado', pgNum: pgNum, intrusa: (intrusa && intrusa.entregaId) || null };
+  }
+
+  // BARREIRA DO MODO DE TESTE — primeira instrução depois das guardas, como em fbWriteGrupos.
+  // Devolve a MESMA forma de um sucesso real, para o laço se comportar igual.
   if (MODO_TESTE) {
     registrarEscritaBloqueada('mutiraoFbWrite', {
-      operacao: 'mutirao-sync', bytes: payload.length, entregas: (entregas || []).length,
-      destinoQueSeriaUsado: cfg ? cfg.projectId : null,
+      operacao: 'mutirao-sync', bytes: payload.length, entregas: lista.length,
+      destinoQueSeriaUsado: cfg ? cfg.projectId : null, pgNum: pgNum,
     });
     return { ok: true, updateTime: new Date().toISOString() };
   }
 
   if (payload.length > MUT_MAX_BYTES) {
-    console.error('Mutirão: payload grande demais (' + payload.length + ' bytes) — gravação cancelada.');
+    console.error('Mutirão: payload do PG ' + pgNum + ' grande demais (' + payload.length + ' bytes) — gravação cancelada.');
     return { ok: false, motivo: 'tamanho_excedido', bytes: payload.length };
   }
 
@@ -15488,7 +15531,7 @@ async function mutiraoFbWrite(cfg, entregas, baseUpdateTime) {
     ts:            { integerValue: String(Date.now()) },
     schemaVersion: { integerValue: String(MUT_SCHEMA) },
   };
-  let url = mutiraoDocUrl(cfg) + '&updateMask.fieldPaths=entregas&updateMask.fieldPaths=ts&updateMask.fieldPaths=schemaVersion';
+  let url = mutiraoDocUrl(cfg, pgNum) + '&updateMask.fieldPaths=entregas&updateMask.fieldPaths=ts&updateMask.fieldPaths=schemaVersion';
   url += baseUpdateTime
     ? '&currentDocument.updateTime=' + encodeURIComponent(baseUpdateTime)
     : '&currentDocument.exists=false';
@@ -15520,42 +15563,56 @@ async function mutiraoFbWrite(cfg, entregas, baseUpdateTime) {
 // Envelope fino sobre o laço, só para deixar o resultado OBSERVÁVEL em campo. Sem isto, no
 // R2 seria impossível distinguir "não houve conflito" de "houve conflito e a trava resolveu"
 // — e é exatamente essa a prova que o teste de simultaneidade precisa produzir.
-async function sincronizarMutirao(opts) {
-  const res = await mutiraoSyncInterno(opts);
-  try { window.__mutiraoUltimoSync = Object.assign({ quando: new Date().toISOString() }, res); } catch (_) {}
+// Sincroniza UM PG. `sincronizarMutirao(pgNum)` ou `sincronizarMutirao(pgNum, { tentativas })`.
+async function sincronizarMutirao(pgNum, opts) {
+  const res = await mutiraoSyncInterno(pgNum, opts);
+  try { window.__mutiraoUltimoSync = Object.assign({ quando: new Date().toISOString(), pgNum: pgNum }, res); } catch (_) {}
   return res;
 }
 
-async function mutiraoSyncInterno(opts) {
+// O aparelho guarda UMA lista local com as entregas de todos os PGs que já viu (a pessoa pode
+// ser tutora de vários). A sincronização recorta dessa lista só a fatia do PG pedido, mescla
+// com a nuvem daquele PG e devolve a fatia ao lugar — as entregas dos OUTROS PGs são
+// preservadas sem serem tocadas nem enviadas.
+function mutiraoFatiaDoPG(lista, pgNum) {
+  return (lista || []).filter(e => e && e.pgNum === pgNum && e.mutiraoNatal === MUTIRAO_NATAL.edicao);
+}
+function mutiraoForaDaFatia(lista, pgNum) {
+  return (lista || []).filter(e => !(e && e.pgNum === pgNum && e.mutiraoNatal === MUTIRAO_NATAL.edicao));
+}
+
+async function mutiraoSyncInterno(pgNum, opts) {
   const tentativasMax = (opts && opts.tentativas) || 3;
+  if (!mutiraoPgNumValido(pgNum)) return { ok: false, motivo: 'pg_invalido' };
   const cfg = loadFbConfig();
   if (!cfg || !cfg.projectId || !cfg.apiKey) return { ok: false, motivo: 'sem_config' };
 
   for (let tentativa = 1; tentativa <= tentativasMax; tentativa++) {
-    const remoto = await mutiraoFbRead(cfg);
+    const remoto = await mutiraoFbRead(cfg, pgNum);
     if (remoto === null) return { ok: false, motivo: 'modo_teste' };
     if (remoto.erro) return { ok: false, motivo: remoto.motivoHttp, transitorio: !!remoto.transitorio, http: remoto.http };
 
     const local    = mutiraoLoadEntregas();
-    const mesclado = mutiraoMesclar(remoto.entregas, local);
+    const mesclado = mutiraoMesclar(remoto.entregas, mutiraoFatiaDoPG(local, pgNum));
 
     // A nuvem volta para o aparelho SEMPRE — inclusive as entregas registradas por outras
     // pessoas do PG. É isto que faz o "total do PG" deixar de ser o total daquele celular.
-    mutiraoSaveEntregas(mesclado);
+    // Só a fatia DESTE PG é substituída; o resto da lista local segue intacto.
+    mutiraoSaveEntregas(mutiraoForaDaFatia(local, pgNum).concat(mesclado));
 
     // Nada a enviar? então não grava — evita disputa e escrita inútil.
     if (mutiraoRetratoConjunto(mesclado) === mutiraoRetratoConjunto(remoto.entregas)) {
-      return { ok: true, semMudanca: true, entregas: mesclado.length, recebidas: remoto.entregas.length };
+      return { ok: true, semMudanca: true, pgNum: pgNum, entregas: mesclado.length, recebidas: remoto.entregas.length };
     }
 
-    const w = await mutiraoFbWrite(cfg, mesclado, remoto.updateTime);
+    const w = await mutiraoFbWrite(cfg, pgNum, mesclado, remoto.updateTime);
     if (w.ok) {
-      return { ok: true, entregas: mesclado.length, enviadas: mesclado.length - remoto.entregas.length, tentativa: tentativa };
+      return { ok: true, pgNum: pgNum, entregas: mesclado.length, enviadas: mesclado.length - remoto.entregas.length, tentativa: tentativa };
     }
     if (w.preconditionFailed) {
       // Outro aparelho gravou no meio do caminho. Espera um pouco e recomeça DO ZERO.
       // Este log é a EVIDÊNCIA do R2: é ele que mostra a trava disparando de verdade.
-      console.info('Mutirão: trava de concorrência disparou na tentativa ' + tentativa +
+      console.info('Mutirão: trava de concorrência disparou no PG ' + pgNum + ', tentativa ' + tentativa +
                    ' — outro aparelho gravou primeiro. Relendo e remesclando.');
       mutiraoConflitos++;
       await new Promise(res => setTimeout(res, 80 * tentativa));
@@ -15566,15 +15623,24 @@ async function mutiraoSyncInterno(opts) {
   return { ok: false, motivo: 'conflito_persistente' };
 }
 
-// Atalho para as telas: sincroniza sem travar a interface e redesenha se algo mudou.
-function mutiraoSincronizarEDepois(redesenhar) {
-  const antes = mutiraoRetratoConjunto(mutiraoLoadEntregas());
-  sincronizarMutirao()
+// Atalho para as telas: sincroniza UM PG sem travar a interface e redesenha se algo mudou.
+// O retrato comparado é o do PG sincronizado — mudança em outro PG não redesenha esta tela.
+function mutiraoSincronizarEDepois(pgNum, redesenhar) {
+  if (!mutiraoPgNumValido(pgNum)) return;
+  const antes = mutiraoRetratoConjunto(mutiraoFatiaDoPG(mutiraoLoadEntregas(), pgNum));
+  sincronizarMutirao(pgNum)
     .then(res => {
       if (!res || !res.ok) return;
-      if (typeof redesenhar === 'function' && mutiraoRetratoConjunto(mutiraoLoadEntregas()) !== antes) redesenhar();
+      const depois = mutiraoRetratoConjunto(mutiraoFatiaDoPG(mutiraoLoadEntregas(), pgNum));
+      if (typeof redesenhar === 'function' && depois !== antes) redesenhar();
     })
     .catch(e => console.warn('sincronizarMutirao:', e));
+}
+
+// O PG do próprio aparelho — usado pelas telas do participante, que não recebem o número.
+function mutiraoMeuPgNum() {
+  const mg = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
+  return (mg && mutiraoPgNumValido(mg.grupoNum)) ? mg.grupoNum : null;
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -16013,10 +16079,11 @@ async function autoTesteMutiraoMatriz() {
 
     // ── T9 ────────────────────────────────────────────────────────────────
     bloqueado('T9 dois aparelhos — sincronização',
-      'A sincronização EXISTE desde a FASE 12 (documento jdpg/mutirao, com trava de concorrência ' +
-      'provada em autoTesteMutiraoSync). O que falta agora é EXECUÇÃO EM CAMPO: dois aparelhos ' +
-      'físicos e a regra do Firestore para jdpg/mutirao publicada no Console. Sem a regra ' +
-      'publicada, toda gravação volta 403 e aparece ao usuário como "sem conexão".');
+      'A sincronização EXISTE desde a FASE 12, agora com UM DOCUMENTO POR PG e por edição ' +
+      '(jdpg/mutirao/2026/{pgNum}), com trava de concorrência e isolamento entre PGs provados ' +
+      'em autoTesteMutiraoSync. O que falta agora é EXECUÇÃO EM CAMPO: dois aparelhos físicos ' +
+      'e a regra do Firestore dessa coleção publicada no Console. Sem a regra publicada, toda ' +
+      'gravação volta 403 e aparece ao usuário como "sem conexão".');
 
     // ── T10 ───────────────────────────────────────────────────────────────
     ok('T10a Progresso está OCULTO na Home', MOSTRAR_PROGRESSO_PG_HOME === false, 'chave=' + MOSTRAR_PROGRESSO_PG_HOME);
@@ -16063,6 +16130,9 @@ async function autoTesteMutiraoMatriz() {
 // pré-condição de verdade — recusa a gravação cujo `baseUpdateTime` não bate com a versão
 // atual do documento. É assim que o cenário de lost update é reproduzido de propósito.
 // Nenhuma rede é tocada. As duas funções originais são restauradas no finally.
+//
+// Desde 2026-09-09 o servidor falso guarda UM DOCUMENTO POR PG, e a seção 6 prova o
+// isolamento entre eles — o modo de falha que a arquitetura nova introduz.
 async function autoTesteMutiraoSync() {
   if (!MODO_TESTE) {
     console.error('autoTesteMutiraoSync exige o modo de teste isolado. Abra o app com ?teste=1.');
@@ -16071,35 +16141,48 @@ async function autoTesteMutiraoSync() {
   const r = [];
   const ok = (nome, passou, detalhe) => r.push({ teste: nome, resultado: passou ? 'PASSOU' : 'FALHOU', detalhe: detalhe || '' });
 
-  const PG = PEQUENOS_GRUPOS[PEQUENOS_GRUPOS.length - 1].num;
+  const PG    = PEQUENOS_GRUPOS[PEQUENOS_GRUPOS.length - 1].num;   // PG sob teste
+  const PGB   = PEQUENOS_GRUPOS[PEQUENOS_GRUPOS.length - 2].num;   // PG vizinho, para o isolamento
   const origRead = window.mutiraoFbRead, origWrite = window.mutiraoFbWrite;
   const guarda = localStorage.getItem(MUTIRAO_KEY);
 
-  const ent = (id, kg, removed) => ({
-    entregaId: id, mutiraoNatal: '2026', pgNum: PG, pgId: null,
+  const entPg = (pg, id, kg, removed, edicao) => ({
+    entregaId: id, mutiraoNatal: edicao || '2026', pgNum: pg, pgId: null,
     tipoOrigem: 'PARTICIPANTE_PG', quantidadeKg: kg, data: '2026-12-10', ts: 1000 + kg,
     registradoPor: { memberId: 'qa', nome: 'QA', papel: 'colaborador' },
     participante: { memberId: 'qa', nome: 'QA' }, externo: null, removed: !!removed,
   });
-  const ids = (lista) => (lista || []).map(e => e.entregaId).sort().join(',');
+  const ent  = (id, kg, removed) => entPg(PG, id, kg, removed);
+  const ids  = (lista) => (lista || []).map(e => e.entregaId).sort().join(',');
+  const idsPg = (pg) => ids(mutiraoFatiaDoPG(mutiraoLoadEntregas(), pg));
 
-  // ── Firestore falso, com pré-condição de verdade ──────────────────────────
-  const srv = { doc: null, versao: 0, leituras: 0, gravacoes: 0, recusas: 0, falharCom: null, staleUmaVez: null };
+  // ── Firestore falso, com pré-condição de verdade e UM DOCUMENTO POR PG ─────
+  // `docs` é um mapa pgNum → documento. É esta troca (de um documento só para um mapa) que
+  // faz a bateria exercitar a arquitetura nova: se o código voltasse a gravar tudo num lugar
+  // só, os testes de isolamento abaixo quebrariam.
+  const srv = { docs: new Map(), versao: 0, leituras: 0, gravacoes: 0, recusas: 0,
+                falharCom: null, staleUmaVez: null };
   const clonar = (x) => JSON.parse(JSON.stringify(x));
-  window.mutiraoFbRead = async () => {
+  const docDe  = (pg) => srv.docs.get(pg) || null;
+  window.mutiraoFbRead = async (cfg, pgNum) => {
     srv.leituras++;
     if (srv.falharCom) return srv.falharCom;
-    if (srv.staleUmaVez) { const s = srv.staleUmaVez; srv.staleUmaVez = null; return s; }
-    return srv.doc ? { entregas: clonar(srv.doc.entregas), updateTime: srv.doc.updateTime }
-                   : { entregas: [], updateTime: null };
+    if (srv.staleUmaVez && srv.staleUmaVez.pgNum === pgNum) {
+      const s = srv.staleUmaVez.resposta; srv.staleUmaVez = null; return s;
+    }
+    const d = docDe(pgNum);
+    return d ? { entregas: clonar(d.entregas), updateTime: d.updateTime }
+             : { entregas: [], updateTime: null };
   };
-  window.mutiraoFbWrite = async (cfg, entregas, base) => {
+  window.mutiraoFbWrite = async (cfg, pgNum, entregas, base) => {
     srv.gravacoes++;
-    const atual = srv.doc ? srv.doc.updateTime : null;
+    const d = docDe(pgNum);
+    const atual = d ? d.updateTime : null;
     if (base !== atual) { srv.recusas++; return { ok: false, preconditionFailed: true }; }
     srv.versao++;
-    srv.doc = { entregas: clonar(entregas), updateTime: 'v' + srv.versao };
-    return { ok: true, updateTime: srv.doc.updateTime };
+    const novo = { entregas: clonar(entregas), updateTime: 'v' + srv.versao };
+    srv.docs.set(pgNum, novo);
+    return { ok: true, updateTime: novo.updateTime };
   };
 
   try {
@@ -16119,68 +16202,135 @@ async function autoTesteMutiraoSync() {
        mutiraoMesclar(mutiraoMesclar([anulada], [A]), [A])[0].removed === true);
 
     // ═══ 2. O laço de sincronização ════════════════════════════════════════
-    srv.doc = null; srv.versao = 0; srv.gravacoes = 0; srv.recusas = 0;
+    srv.docs.clear(); srv.versao = 0; srv.gravacoes = 0; srv.recusas = 0;
     mutiraoSaveEntregas([A]);
-    const s1 = await sincronizarMutirao();
-    ok('N-06 primeira sincronização CRIA o documento e envia o local',
-       s1.ok === true && ids(srv.doc.entregas) === 'A', JSON.stringify(s1));
+    const s1 = await sincronizarMutirao(PG);
+    ok('N-06 primeira sincronização CRIA o documento do PG e envia o local',
+       s1.ok === true && ids(docDe(PG).entregas) === 'A', JSON.stringify(s1));
 
     const gravAntes = srv.gravacoes;
-    const s2 = await sincronizarMutirao();
+    const s2 = await sincronizarMutirao(PG);
     ok('N-07 sem mudança, não grava de novo',
        s2.ok === true && s2.semMudanca === true && srv.gravacoes === gravAntes, JSON.stringify(s2));
 
     // outra pessoa registrou algo na nuvem
-    srv.doc = { entregas: [clonar(A), clonar(B)], updateTime: 'v99' };
-    const s3 = await sincronizarMutirao();
+    srv.docs.set(PG, { entregas: [clonar(A), clonar(B)], updateTime: 'v99' });
+    const s3 = await sincronizarMutirao(PG);
     ok('N-08 a nuvem traz de volta a entrega de outra pessoa',
-       s3.ok === true && ids(mutiraoLoadEntregas()) === 'A,B', ids(mutiraoLoadEntregas()));
+       s3.ok === true && idsPg(PG) === 'A,B', idsPg(PG));
 
     // ═══ 3. ⭐ LOST UPDATE — o teste que o requisito exige ═════════════════
     // Aparelho A e aparelho B leem o MESMO estado e gravam quase ao mesmo tempo.
-    srv.doc = { entregas: [clonar(A)], updateTime: 'v1' };
+    srv.docs.set(PG, { entregas: [clonar(A)], updateTime: 'v1' });
     srv.versao = 1; srv.gravacoes = 0; srv.recusas = 0;
 
     // Aparelho A: tem A + A1 e sincroniza primeiro, sem disputa.
     const A1 = ent('A1', 10);
     mutiraoSaveEntregas([clonar(A), A1]);
-    const sA = await sincronizarMutirao();
+    const sA = await sincronizarMutirao(PG);
 
     // Aparelho B: tem A + B1 e JÁ TINHA LIDO a versão v1, antes de A gravar.
     const B1 = ent('B1', 20);
     mutiraoSaveEntregas([clonar(A), B1]);
-    srv.staleUmaVez = { entregas: [clonar(A)], updateTime: 'v1' };   // leitura velha, de propósito
-    const sB = await sincronizarMutirao();
+    srv.staleUmaVez = { pgNum: PG, resposta: { entregas: [clonar(A)], updateTime: 'v1' } };  // leitura velha, de propósito
+    const sB = await sincronizarMutirao(PG);
 
     ok('N-09 aparelho A gravou', sA.ok === true, JSON.stringify(sA));
     ok('N-10 aparelho B teve a gravação RECUSADA pela trava e tentou de novo',
        srv.recusas === 1 && sB.ok === true, 'recusas=' + srv.recusas + ' · ' + JSON.stringify(sB));
     ok('N-11 ⭐ NENHUMA ENTREGA SE PERDEU — as duas sobreviveram',
-       ids(srv.doc.entregas) === 'A,A1,B1', 'nuvem = ' + ids(srv.doc.entregas));
-    ok('N-12 o aparelho B terminou enxergando as duas', ids(mutiraoLoadEntregas()) === 'A,A1,B1',
-       ids(mutiraoLoadEntregas()));
+       ids(docDe(PG).entregas) === 'A,A1,B1', 'nuvem = ' + ids(docDe(PG).entregas));
+    ok('N-12 o aparelho B terminou enxergando as duas', idsPg(PG) === 'A,A1,B1', idsPg(PG));
 
     // ═══ 4. Falhas ═════════════════════════════════════════════════════════
     // Conflito que não passa: devolve erro e NÃO apaga nada do aparelho.
-    srv.doc = { entregas: [clonar(A)], updateTime: 'vX' };
+    srv.docs.set(PG, { entregas: [clonar(A)], updateTime: 'vX' });
     mutiraoSaveEntregas([clonar(A), ent('Z', 5)]);
     const origW = window.mutiraoFbWrite;
     window.mutiraoFbWrite = async () => ({ ok: false, preconditionFailed: true });
-    const sConf = await sincronizarMutirao({ tentativas: 2 });
+    const sConf = await sincronizarMutirao(PG, { tentativas: 2 });
     window.mutiraoFbWrite = origW;
     ok('N-13 conflito persistente devolve erro, sem perder nada no aparelho',
-       sConf.ok === false && sConf.motivo === 'conflito_persistente' && ids(mutiraoLoadEntregas()).indexOf('Z') >= 0,
-       sConf.motivo + ' · local=' + ids(mutiraoLoadEntregas()));
+       sConf.ok === false && sConf.motivo === 'conflito_persistente' && idsPg(PG).indexOf('Z') >= 0,
+       sConf.motivo + ' · local=' + idsPg(PG));
 
     // Erro permanente (403 = regra do Firestore recusando) não vira laço infinito.
     srv.falharCom = { erro: true, http: 403, motivoHttp: 'sem_permissao', transitorio: false };
-    const s403 = await sincronizarMutirao();
+    const s403 = await sincronizarMutirao(PG);
     srv.falharCom = null;
     ok('N-14 erro permanente (403) é reportado, não retentado',
        s403.ok === false && s403.motivo === 'sem_permissao' && s403.transitorio === false, JSON.stringify(s403));
 
     // ═══ 5. Isolamento ════════════════════════════════════════════════════
     ok('N-15 a chave real nunca foi tocada', localStorage.getItem('jdpg_mutirao_natal_v1') === null);
+
+    // ═══ 6. ⭐ ISOLAMENTO ENTRE PGs (arquitetura de 2026-09-09) ═════════════
+    // O que estes testes protegem: com um documento por PG, o erro que passa a ser possível
+    // não é mais "perder uma entrega" — é gravar a entrega no PG ERRADO, ou apagar do
+    // aparelho as entregas de um PG ao sincronizar outro. Nenhum dos dois faz barulho quando
+    // acontece: o total do PG certo simplesmente fica errado, e ninguém sabe por quê.
+    srv.docs.clear(); srv.versao = 0; srv.gravacoes = 0; srv.recusas = 0;
+    const pa = ent('PA', 1), pb = entPg(PGB, 'PB', 2);
+    mutiraoSaveEntregas([clonar(pa), clonar(pb)]);
+    const iA = await sincronizarMutirao(PG);
+    const iB = await sincronizarMutirao(PGB);
+    ok('N-16 cada PG grava no SEU documento, e só com as entregas dele',
+       iA.ok === true && iB.ok === true &&
+       ids(docDe(PG).entregas) === 'PA' && ids(docDe(PGB).entregas) === 'PB',
+       'PG=' + ids(docDe(PG).entregas) + ' · PGB=' + ids(docDe(PGB).entregas));
+
+    const tempoB = docDe(PGB).updateTime;
+    mutiraoSaveEntregas(mutiraoLoadEntregas().concat([ent('PA2', 3)]));
+    await sincronizarMutirao(PG);
+    ok('N-17 sincronizar o PG A não altera o documento do PG B',
+       docDe(PGB).updateTime === tempoB, 'antes=' + tempoB + ' depois=' + docDe(PGB).updateTime);
+    ok('N-18 a lista do aparelho conservou as entregas do outro PG',
+       idsPg(PGB) === 'PB' && idsPg(PG) === 'PA,PA2', 'PGB=' + idsPg(PGB) + ' · PG=' + idsPg(PG));
+
+    srv.docs.set(PGB, { entregas: [clonar(pb), entPg(PGB, 'PB2', 4)], updateTime: 'w1' });
+    await sincronizarMutirao(PGB);
+    ok('N-19 o que chega da nuvem do PG B não entra no PG A',
+       idsPg(PG) === 'PA,PA2' && idsPg(PGB) === 'PB,PB2', 'PG=' + idsPg(PG) + ' · PGB=' + idsPg(PGB));
+
+    // Conflito num PG não pode respingar no vizinho.
+    srv.docs.set(PG, { entregas: [clonar(pa)], updateTime: 'vY' });
+    const marcaB = docDe(PGB).updateTime;
+    const origW2 = window.mutiraoFbWrite;
+    window.mutiraoFbWrite = async (...a) => (a[1] === PG ? { ok: false, preconditionFailed: true } : origW2(...a));
+    const sConfA = await sincronizarMutirao(PG, { tentativas: 2 });
+    window.mutiraoFbWrite = origW2;
+    ok('N-20 conflito insistente no PG A não mexe no documento do PG B',
+       sConfA.ok === false && sConfA.motivo === 'conflito_persistente' && docDe(PGB).updateTime === marcaB,
+       sConfA.motivo + ' · B=' + docDe(PGB).updateTime);
+
+    // ── A guarda de isolamento da gravação REAL (não a do servidor falso) ────
+    const gMisto = await origWrite(null, PG, [clonar(pa), clonar(pb)], null);
+    ok('N-21 ⭐ a gravação real RECUSA conjunto com entrega de outro PG',
+       gMisto.ok === false && gMisto.motivo === 'pg_misturado', JSON.stringify(gMisto));
+    const gEdicao = await origWrite(null, PG, [entPg(PG, 'X9', 1, false, '2027')], null);
+    ok('N-22 a gravação real RECUSA entrega de outra edição da campanha',
+       gEdicao.ok === false && gEdicao.motivo === 'pg_misturado', JSON.stringify(gEdicao));
+
+    // ── O endereço: é ele que decide em qual documento a entrega cai ─────────
+    const cfgFalso = { projectId: 'proj-de-teste', apiKey: 'chave' };
+    const urlA = mutiraoDocUrl(cfgFalso, PG), urlB = mutiraoDocUrl(cfgFalso, PGB);
+    ok('N-23 o endereço leva a edição e o número do PG, e nunca toca jdpg/grupos',
+       urlA.indexOf('/jdpg/mutirao/2026/' + PG + '?') > 0 && urlA !== urlB &&
+       urlA.indexOf('/jdpg/grupos') < 0, urlA);
+
+    const gravouAntes = srv.gravacoes;
+    const sSemPg = await sincronizarMutirao(null);
+    ok('N-24 sincronizar sem PG válido é recusado e não grava nada',
+       sSemPg.ok === false && sSemPg.motivo === 'pg_invalido' && srv.gravacoes === gravouAntes,
+       JSON.stringify(sSemPg));
+
+    // Edição anterior no aparelho: não sobe, e também não é apagada.
+    srv.docs.clear(); srv.versao = 0;
+    mutiraoSaveEntregas([ent('N1', 1), entPg(PG, 'V1', 7, false, '2025')]);
+    await sincronizarMutirao(PG);
+    ok('N-25 entrega de outra edição não é enviada e continua no aparelho',
+       ids(docDe(PG).entregas) === 'N1' && ids(mutiraoLoadEntregas()) === 'N1,V1',
+       'nuvem=' + ids(docDe(PG).entregas) + ' · local=' + ids(mutiraoLoadEntregas()));
 
   } finally {
     window.mutiraoFbRead = origRead;

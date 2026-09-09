@@ -15,10 +15,15 @@
 //
 // Última sincronização com o Console: 2026-08-19 (versão publicada às 09:20).
 //
-// ⚠️ DIVERGÊNCIA CONHECIDA (2026-09-08): o bloco `/jdpg/mutirao` abaixo foi ACRESCENTADO
-// aqui mas AINDA NÃO FOI PUBLICADO no Console. Enquanto não for, toda gravação do Mutirão
-// volta 403 e o app mostra "sem conexão" — a armadilha já conhecida deste projeto. Os
-// outros dois blocos não mudaram uma vírgula.
+// ⚠️ DIVERGÊNCIA CONHECIDA (2026-09-09): o bloco do Mutirão abaixo foi ACRESCENTADO aqui
+// mas AINDA NÃO FOI PUBLICADO no Console — e não deve ser publicado sem autorização
+// explícita do usuário. Enquanto não for, toda gravação do Mutirão volta 403 e o app mostra
+// "sem conexão" — a armadilha já conhecida deste projeto. Os outros dois blocos não mudaram
+// uma vírgula desde a publicação de 2026-08-19.
+//
+// HISTÓRICO DESTE BLOCO: em 08/09 ele era `/jdpg/mutirao`, um documento institucional único.
+// Em 09/09 o usuário decidiu trocar por um documento POR PG e POR EDIÇÃO. A versão de 08/09
+// nunca chegou a ser publicada nem gravada — não há dado a migrar.
 //
 // O que essa versão mudou em relação à anterior (2026-07-08):
 //   1) Bloco novo `/embaixadoresExternos/{registro}` — liberou o app dos
@@ -54,14 +59,33 @@ service cloud.firestore {
         && (!('embaixadoresExternos' in request.resource.data) || request.resource.data.embaixadoresExternos is string);
     }
 
-    // ── Mutirão de Natal (FASE 12, 2026-09-08) ───────────────────────────────
-    // Documento PRÓPRIO, separado de `jdpg/grupos` por decisão do usuário (Opção 2):
-    // isolamento, orçamento de tamanho próprio, invisível para o app publicado e mais
-    // fácil de auditar. Este bloco é ADITIVO — não altera nada dos outros dois.
+    // ── Mutirão de Natal — UM DOCUMENTO POR PG, POR EDIÇÃO (2026-09-09) ──────
+    // Endereço:  jdpg / mutirao / 2026 / 12   ← as entregas do PG 12 na campanha de 2026
+    //            └coleção └documento └coleção └documento
+    //
+    // POR QUE POR PG: a campanha fica aberta de setembro ao início de dezembro e cada pessoa
+    // registra várias vezes. Num documento institucional único o teto (~1 012 entregas) seria
+    // alcançado no meio da campanha, e alcançar o teto aqui significa gravação recusada. O
+    // limite não deixa de existir — cada documento continua tendo o seu; ele deixa de ser um
+    // gargalo único e passa a ser distribuído entre os PGs. Ganho igualmente importante: a
+    // disputa de gravação passa a ser só entre as pessoas do mesmo PG.
+    //
+    // A CHAVE É `pgNum` (o número do slot), NÃO `pgId`: no retrato de produção de 04/09,
+    // `pgId` está vazio em 66 dos 70 slots — chavear por ele jogaria 66 PGs no mesmo
+    // documento "null".
+    //
+    // ⚠️ POR QUE ESTE BLOCO NÃO ALCANÇA `jdpg/grupos`: o caminho tem QUATRO segmentos e o de
+    // `jdpg/grupos` tem DOIS. Em Security Rules um `match` só casa com caminhos da mesma
+    // profundidade, e não há aqui nenhum curinga recursivo (`{x=**}`), que é a única forma de
+    // um match atravessar níveis. Não existe caminho por onde esta regra afete os 70 PGs.
     //
     // A trava de concorrência (`currentDocument.updateTime` / `currentDocument.exists`)
     // é enviada pelo app; a regra só valida a FORMA do que chega.
-    match /jdpg/mutirao {
+    //
+    // ESCOLHA A REVER COM O USUÁRIO: `{edicao}` é curinga, então a campanha de 2027 nasce
+    // sem tocar nesta regra. Para travar só em 2026, troque `{edicao}` por `2026` — a regra
+    // fica mais restrita e 2027 exigirá uma linha nova, publicada de propósito.
+    match /jdpg/mutirao/{edicao}/{pgNum} {
       allow read: if true;
       // `create, update` em vez de `write`: assim a exclusão do documento fica negada de
       // forma EXPLÍCITA, e não por efeito colateral de `request.resource` ser nulo no delete.
