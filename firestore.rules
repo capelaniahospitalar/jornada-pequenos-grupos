@@ -13,17 +13,17 @@
 // COMO USAR: ao alterar as regras no Console, cole aqui o texto novo e faça um
 // commit. Se as duas versões divergirem, a do Console é a verdadeira.
 //
-// Última sincronização com o Console: 2026-08-19 (versão publicada às 09:20).
+// Última sincronização com o Console: 2026-09-09 (versão publicada às 09:54).
 //
-// ⚠️ DIVERGÊNCIA CONHECIDA (2026-09-09): o bloco do Mutirão abaixo foi ACRESCENTADO aqui
-// mas AINDA NÃO FOI PUBLICADO no Console — e não deve ser publicado sem autorização
-// explícita do usuário. Enquanto não for, toda gravação do Mutirão volta 403 e o app mostra
-// "sem conexão" — a armadilha já conhecida deste projeto. Os outros dois blocos não mudaram
-// uma vírgula desde a publicação de 2026-08-19.
+// ✅ SEM DIVERGÊNCIA. O texto abaixo foi publicado no Console em 2026-09-09 às 09:54 e
+// CONFERIDO byte a byte contra o que voltou da aba Regras — os dois têm o mesmo md5
+// (38440fd0cc374c7044aa89823bc0c8a8). O que mudou em relação à publicação de 19/08 foram
+// 7 linhas ACRESCENTADAS (o bloco `/jdpg/mutirao/2026/{pgNum}`); nenhuma removida, nenhuma
+// alterada. Os blocos `jdpg/grupos` e `embaixadoresExternos` seguem idênticos.
 //
 // HISTÓRICO DESTE BLOCO: em 08/09 ele era `/jdpg/mutirao`, um documento institucional único.
 // Em 09/09 o usuário decidiu trocar por um documento POR PG e POR EDIÇÃO. A versão de 08/09
-// nunca chegou a ser publicada nem gravada — não há dado a migrar.
+// nunca chegou a ser publicada nem gravada — não houve dado a migrar.
 //
 // O que essa versão mudou em relação à anterior (2026-07-08):
 //   1) Bloco novo `/embaixadoresExternos/{registro}` — liberou o app dos

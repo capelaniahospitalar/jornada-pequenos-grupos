@@ -1,7 +1,10 @@
 # MUTIRÃO DE NATAL 2026 · FASE 14 — Um documento por PG e por edição
 
 **Data:** 2026-09-09 · **Branch:** `audit/fix-invite-reentry` · **Status:** ✅ implementada e verificada
-**`main` intocada em `1aafe63`.** Nada publicado, nada gravado em produção, nenhum R2 executado.
+**`main` intocada em `1aafe63`.** Nenhuma gravação em produção, nenhum R2 executado.
+**A regra do Firestore foi publicada em 09/09 às 09:54** e conferida byte a byte (§5) — publicar a
+regra não publica o app: a `main` continua na `1.2.0-rc1` e nenhum aparelho em campo conhece o
+endereço novo.
 
 ---
 
@@ -176,7 +179,26 @@ E `mutiraoDocUrl(cfg, null)` lança erro em vez de montar um endereço.
 
 ---
 
-# 5. A regra do Firestore — **NÃO PUBLICADA**
+# 5. A regra do Firestore — ✅ **PUBLICADA EM 2026-09-09 ÀS 09:54**
+
+> **Conferência pós-publicação — feita, e o resultado é positivo.** O usuário copiou de volta o
+> texto da aba Regras do Console e ele foi comparado byte a byte com o `firestore.rules` do
+> commit `960b8d7`: **md5 idêntico, `38440fd0cc374c7044aa89823bc0c8a8`**. Nenhum caractere se
+> perdeu na colagem.
+>
+> Contra a regra que estava em produção desde 19/08: **7 linhas acrescentadas, 0 removidas,
+> 0 alteradas**. Os blocos `jdpg/grupos` (os 70 PGs) e `embaixadoresExternos` seguem idênticos
+> — os celulares em campo não foram afetados.
+>
+> Auditoria do texto que está no ar: curingas presentes são `{database}` (boilerplate),
+> `{registro}` (Embaixadores, pré-existente) e `{pgNum}` (novo, último segmento). **Curinga
+> recursivo `{x=**}`: zero.** Profundidades: `jdpg/grupos` 2 segmentos, `jdpg/mutirao/2026/{pgNum}`
+> **4** — não há caminho pelo qual a regra nova alcance os grupos.
+>
+> ⚠️ A verificação por requisição de rede (um GET no documento novo, em que `403` significaria
+> regra ausente e `404` regra publicada) **foi bloqueada pelo ambiente do assistente**, que barra
+> chamadas com credencial. A conferência do texto substituiu essa via e é mais forte: pega
+> colagem parcial e bloco perdido, que é o que realmente falha.
 
 ```
 match /jdpg/mutirao/2026/{pgNum} {
@@ -213,7 +235,7 @@ Num projeto que já teve gravação indevida em produção, essa segunda barreir
 
 | | |
 |---|---|
-| Publicar a regra no Console | ⛔ **não autorizado** — só depois da decisão do §5.1 |
+| Publicar a regra no Console | ✅ **feito 09/09 às 09:54**, conferido byte a byte (§5) |
 | **R2 do Mutirão** (`MUTIRAO-13`, revisto hoje) | ⛔ não executado |
 | **R2 do `AUDIT-17`** (reentrada de convite) | ⛔ não executado, independente |
 | Merge para a `main` | ⛔ **exige autorização explícita do usuário** |
