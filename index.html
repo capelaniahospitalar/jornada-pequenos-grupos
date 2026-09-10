@@ -3744,7 +3744,9 @@ async function registrarEncontroPg(grupoNum, monthKey, nome) {
   loadGrupos();
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
   if (!g) return mostrarErroEncontro(monthKey, 'Não foi possível encontrar este Pequeno Grupo. Volte à lista de grupos e tente de novo.');
-  const total = (g.participantes || []).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i).length;
+  // participantesAtivos() descarta quem foi removido do PG. Sem ele, o "total" gravado no
+  // encontro incluía gente que já saiu (achado de campo do PG 4, 10/09/2026).
+  const total = participantesAtivos(g).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i).length;
   presentes = Math.max(0, Math.min(presentes, total));
   const encontro = { id: uuid(), data, presentes, total, marcadoPor: nome, ts: Date.now() };
   const mesAtual = (g.reunioesMes || {})[monthKey] || { encontros: [] };
@@ -3820,7 +3822,7 @@ function gerarRelatorioMensal(nome, grupoNumParam, monthKeyParam) {
   const somaPresentes = encontros.reduce((s, e) => s + e.presentes, 0);
   const somaTotal = encontros.reduce((s, e) => s + e.total, 0);
   const pctPresenca = somaTotal ? Math.round(somaPresentes / somaTotal * 100) : null;
-  const totalParticipantesAtual = (g.participantes || []).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i).length;
+  const totalParticipantesAtual = participantesAtivos(g).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i).length;
   const { min: dataMin, max: dataMax } = limitesEncontroMes(monthKey);
   const regularidade = calcularRegularidadeReunioesMes(g, monthKey);
 
@@ -3846,7 +3848,7 @@ function gerarRelatorioMensal(nome, grupoNumParam, monthKeyParam) {
         <div id="freq-aviso-${monthKey}" style="display:${fbPendingSync ? 'block' : 'none'};margin-top:.4rem;background:${AVISOS_ENCONTRO.pendente.bg};border:0.5px solid ${AVISOS_ENCONTRO.pendente.borda};border-radius:var(--radius-sm);padding:.5rem .65rem;font-size:13px;color:${AVISOS_ENCONTRO.pendente.cor};line-height:1.4;font-family:var(--ff-body)">${fbPendingSync ? AVISOS_ENCONTRO.pendente.txt : ''}</div>
       </div>`;
 
-  const participantesSemDup = (g.participantes || []).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
+  const participantesSemDup = participantesAtivos(g).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
   const total = participantesSemDup.length;
   const participaram = participantesSemDup.filter(p => p.embaixadores && p.embaixadores[monthKey] && p.embaixadores[monthKey].participou).length;
   const pct = total ? Math.round(participaram / total * 100) : 0;
@@ -3887,7 +3889,7 @@ function montarTextoRelatorioMensal(grupoNum, monthKey) {
   const somaPresentes = encontros.reduce((s, e) => s + e.presentes, 0);
   const somaTotal = encontros.reduce((s, e) => s + e.total, 0);
   const pctPresenca = somaTotal ? Math.round(somaPresentes / somaTotal * 100) : null;
-  const participantesSemDup = (g.participantes || []).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
+  const participantesSemDup = participantesAtivos(g).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
   const total = participantesSemDup.length;
   const participaram = participantesSemDup.filter(p => p.embaixadores && p.embaixadores[monthKey] && p.embaixadores[monthKey].participou).length;
   const pct = total ? Math.round(participaram / total * 100) : 0;
@@ -10227,6 +10229,35 @@ async function autoTesteB1() {
                        mensagemConvite(m).texto !== generico, mensagemConvite(m).titulo));
     ok('B1-29 texto de "utilizado" não acusa "outra pessoa"',
        mensagemConvite('utilizado').texto.indexOf('outra pessoa') < 0, mensagemConvite('utilizado').texto.slice(0, 60) + '…');
+
+    // ── 5 (B1.5). RELATÓRIO MENSAL não pode contar quem foi REMOVIDO do PG ─────
+    // Achado de campo em 10/09/2026: o Coordenador do PG 4 reclamou do total de participantes
+    // do Embaixadores. O relatório contava 13 pessoas sendo que 1 havia sido removida — e ela
+    // era a MESMA pessoa que reentrou com o nome curto, então contava em dobro. Três funções
+    // do relatório usavam `g.participantes` cru em vez de participantesAtivos().
+    const MES_QA = '2026-08';
+    applyGruposData([{ num: SLOT, nome: 'PG RELATORIO QA', tutor: 'Tutor QA', coordenador: 'Coord QA',
+      diaReuniao: 'Quinta-feira', horaReuniao: '19:00', gratidoes: [], reunioesMes: {}, participantes: [
+        { nome: 'Ativa Participou', wa: '5521900000010', tipo: 'colaborador', ts: T0 - 5e5,
+          memberId: 'QA-REL-1', embaixadores: { '2026-08': { participou: true } } },
+        { nome: 'Ativa Ausente', wa: '5521900000011', tipo: 'colaborador', ts: T0 - 4e5,
+          memberId: 'QA-REL-2' },
+        { nome: 'Removida Participou', wa: '5521900000012', tipo: 'colaborador', ts: T0 - 3e5,
+          memberId: 'QA-REL-3', removed: true, embaixadores: { '2026-08': { participou: true } } }
+      ] }]);
+    // montarTextoRelatorioMensal() chama loadGrupos(), que relê do armazenamento local —
+    // sem gravar, a montagem acima seria descartada e o teste mediria outro grupo.
+    saveGruposLocal();
+    const txtRel = montarTextoRelatorioMensal(SLOT, MES_QA);
+    ok('B1-30 relatório não conta o participante removido no total',
+       txtRel.indexOf('Participantes: 2') > -1,
+       (txtRel.match(/Participantes: \d+/) || ['(não encontrado)'])[0] + ' — 3 no array, 1 removida');
+    ok('B1-31 nem no numerador de quem participou',
+       txtRel.indexOf('Participaram: 1') > -1,
+       (txtRel.match(/Participaram: \d+/) || ['(não encontrado)'])[0]);
+    ok('B1-32 e o percentual sai correto',
+       txtRel.indexOf('Percentual: 50%') > -1,
+       (txtRel.match(/Percentual: \d+%/) || ['(não encontrado)'])[0] + ' — antes do fix daria 67%');
 
   } catch (e) {
     ok('B1 — execução da bateria', false, 'exceção: ' + (e && e.message));
