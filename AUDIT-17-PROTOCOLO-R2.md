@@ -1,11 +1,15 @@
 # AUDIT-17-PROTOCOLO-R2 — Validação real de concorrência, PWA e reentrada
 
-**Gate:** R2 · **Branch:** `audit/fix-invite-reentry` @ `ed366c0`
+**Gate:** R2 · **Branch:** `audit/fix-invite-reentry` @ **`4b9ccb2`**
 **Versão candidata:** `1.3.0-rc1` / build `2026-08-31`
-**Data:** 2026-08-31
-**Status:** 📋 **PROTOCOLO — não executado.** Requer dois aparelhos físicos e uma pessoa operando.
+**Data:** 2026-08-31 · **Revisto em 2026-09-10** (ver `MUTIRAO-16-CONSISTENCIA-PRE-SESSAO.md`)
+**Status:** 📋 **PROTOCOLO — não executado.** Requer um celular, um navegador de PC e uma pessoa
+operando (ver o desvio controlado C-04 em `MUTIRAO-13` §6.1).
 
 > **Etapa 1 já concluída** no commit `ed366c0` (generalização do AUDIT-03). Árvore limpa.
+>
+> ⚠️ **Os bytes a testar são os do commit `4b9ccb2`** — o `ed366c0` acima é apenas o registro
+> histórico de onde a Etapa 1 foi concluída, não a versão a servir. *(Revisão MUTIRÃO-16 / C-08.)*
 
 ---
 
@@ -37,10 +41,15 @@ R2 precisa de **escrita real e concorrente**. A saída:
 > **Servir a versão candidata pela rede local e apontar os aparelhos para um projeto Firebase
 > de TESTE — sem alterar uma linha do código candidato.**
 
-Isto é possível porque o próprio aplicativo permite trocar o destino da sincronização: na tela
-**Grupos**, o selo **"☁️ Nuvem ativa ✓"** é tocável e abre a tela de configuração, onde se
+Isto é possível porque o próprio aplicativo permite trocar o destino da sincronização: no
+**Painel do Tutor**, o botão **"☁️ Nuvem: `<projeto>`"** abre a tela de configuração, onde se
 informa `Project ID` e `API Key` de outro projeto. O destino fica em `localStorage`
 (`jdpg_fb_config`) e `loadFbConfig()` passa a usá-lo.
+
+⚠️ *(Revisão MUTIRÃO-16 / C-01.)* **Até o commit `4b9ccb2` esta afirmação era falsa.** O acesso
+descrito aqui era o selo da tela **Grupos** — tela removida no FUNC-02c, levando o selo junto e
+deixando `openFbSetup()` sem nenhum chamador. O botão do Painel foi criado para restabelecer a
+premissa em que todo este protocolo se apoia.
 
 **Consequência:** os aparelhos rodam **os bytes exatos da versão candidata**, com rede real e
 concorrência real, e **nenhuma escrita chega à produção**.
