@@ -3546,6 +3546,7 @@ function renderTutorGruposList(nome) {
       <button onclick="renderCriarPgForm('${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">
         ➕ Criar Primeiro Pequeno Grupo
       </button>
+      ${htmlBotaoNuvemPainel()}
       <button onclick="tutorLogout()" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">← Sair</button>`;
     return;
   }
@@ -3600,7 +3601,27 @@ function renderTutorGruposList(nome) {
     <button onclick="renderEmbaixadoresInstitucional('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">🌟 Embaixadores da Esperança — Painel Institucional (consulta)</button>
     ${souTutorDeAlgum ? `<button onclick="renderCriarPgForm('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:var(--teal);border:none;border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:16px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body)">➕ Criar outro Pequeno Grupo</button>` : ''}
     <button onclick="renderTutorResetPassScreen('${nome.replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">🔑 Trocar minha senha</button>
+    ${htmlBotaoNuvemPainel()}
     <button onclick="tutorLogout()" style="width:100%;background:transparent;border:none;padding:.5rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">🚪 Sair</button>`;
+}
+
+// A tela de configuração da nuvem (openFbSetup) existe desde sempre, mas ficou INALCANÇÁVEL
+// quando a `screen-grupos` foi removida no FUNC-02c: o selo "☁️ Nuvem ativa" morava dentro
+// dela e foi junto. Ninguém notou porque, sem configuração salva, o app usa a produção por
+// padrão — a tela só faz falta para apontar o app a OUTRO projeto (o caso do R2 em campo) ou
+// para reconfigurar um aparelho que tenha perdido a configuração.
+// Descoberto em 10/09/2026, com a sessão de campo já montada.
+//
+// O rótulo mostra o projeto ATIVO de propósito: o protocolo AUDIT-17 §1.3 passo 12 exige
+// "verificar em cada aparelho que a tela mostra o Project ID de teste". Assim a conferência
+// acontece de relance, sem abrir nada.
+function htmlBotaoNuvemPainel() {
+  const cfg = loadFbConfig() || {};
+  const pid = cfg.projectId || '';
+  const producao = pid === (FB_DEFAULT_CONFIG.projectId || '');
+  const cor = pid ? (producao ? 'var(--text3)' : 'var(--orange)') : 'var(--gold)';
+  const texto = pid ? ('☁️ Nuvem: ' + sanitize(pid)) : '⚠️ Nuvem não configurada — tocar para ativar';
+  return `<button onclick="openFbSetup()" style="width:100%;background:transparent;border:none;padding:.5rem;font-size:14px;color:${cor};cursor:pointer;font-family:var(--ff-body)">${texto}</button>`;
 }
 
 // ── Relatórios Mensais: frequência do PG × participação nos Embaixadores ────
@@ -16412,6 +16433,40 @@ async function autoTesteMutiraoMatriz() {
     ok('T13d "Confirmo" só tira a faixa, sem cancelar nada',
        painel12().indexOf('Está certo?') === -1 && kgDoPg() === kgAntes13b,
        String(kgDoPg()) + ' kg');
+
+    // ── T14 — a tela de configuração da nuvem tem de estar ALCANÇÁVEL ────────
+    // Achado de 10/09/2026: openFbSetup() existia mas nenhum caminho da interface chamava ela,
+    // porque o selo "Nuvem ativa" morava na screen-grupos, removida no FUNC-02c. Isso IMPEDIA
+    // apontar um aparelho ao projeto de teste — bloqueou a sessão de campo já montada.
+    // Os DOIS caminhos do Painel precisam do botão: o tutor com PGs e o tutor sem nenhum
+    // (este último é justamente quem pode ter perdido a configuração do aparelho).
+    ok('T14a o Painel do Tutor tem o botão da nuvem nos DOIS caminhos',
+       typeof htmlBotaoNuvemPainel === 'function' &&
+       (renderTutorGruposList.toString().match(/htmlBotaoNuvemPainel\(\)/g) || []).length === 2,
+       (renderTutorGruposList.toString().match(/htmlBotaoNuvemPainel\(\)/g) || []).length + ' de 2 caminhos');
+    ok('T14b e ele chama openFbSetup',
+       htmlBotaoNuvemPainel().indexOf('openFbSetup()') > -1 && typeof openFbSetup === 'function');
+
+    const guardaCfg = localStorage.getItem(FB_CONFIG_KEY);
+    try {
+      saveFbConfig({ projectId: 'projeto-de-teste-qa', apiKey: 'chave-qa' });
+      const htmlTeste = htmlBotaoNuvemPainel();
+      ok('T14c o rótulo mostra o projeto ATIVO (a conferência do §1.3 passo 12)',
+         htmlTeste.indexOf('projeto-de-teste-qa') > -1, htmlTeste.replace(/<[^>]*>/g, '').trim());
+      ok('T14d projeto diferente da produção fica destacado em laranja',
+         htmlTeste.indexOf('var(--orange)') > -1);
+
+      saveFbConfig({ projectId: FB_DEFAULT_CONFIG.projectId, apiKey: 'x' });
+      const htmlProd = htmlBotaoNuvemPainel();
+      ok('T14e apontando para a produção, sem destaque',
+         htmlProd.indexOf(FB_DEFAULT_CONFIG.projectId) > -1 && htmlProd.indexOf('var(--orange)') === -1,
+         htmlProd.replace(/<[^>]*>/g, '').trim());
+    } finally {
+      try {
+        if (guardaCfg === null) localStorage.removeItem(FB_CONFIG_KEY);
+        else localStorage.setItem(FB_CONFIG_KEY, guardaCfg);
+      } catch (_) {}
+    }
 
   } finally {
     window.loadMeuGrupo = origLMG;
