@@ -46,9 +46,19 @@ validade do R2-D, o procedimento de servir a candidata e a versão de referênci
 | **C-06** | `AUDIT-17` §1.3 p.2 | Extrai só `index.html` e `manifest.json`. **Faltam `icon-192.png` e `icon-512.png`**, referenciados pelo manifest | 🟡 Menor | ✅ Kit já serve os **4** arquivos; comprovado por registro de acesso do celular |
 | **C-07** | `AUDIT-17` §1.3 p.3 | Manda servir com `http://+:8099/` e "liberar a porta no firewall". Isso exige `netsh http add urlacl` — **comando de administrador, impossível nesta máquina** | 🔴 **Bloqueador** | ✅ **Superado**: kit usa `TcpListener` (socket comum, sem privilégio). Firewall comprovadamente desnecessário |
 | **C-08** | `AUDIT-17` §1.3 p.1 | Espera HEAD em `ed366c0` | 🟡 Menor | Atualizar referência para `4b9ccb2` |
+| **C-09** | `MUTIRAO-13` §6 e §6.3 | Critério de validade dizia *"`mutiraoConflitos ≥ 1` **nos dois aparelhos somados**"*. Com o desvio C-04 **não há como somar** — só o aparelho B tem contador legível. Pior: quem incrementa o contador é **quem perde a disputa**; se for o aparelho A, B marca `0` mesmo tendo havido disputa real | 🟠 **Método** | ✅ Corrigido: critério conservador (ver abaixo) |
 
-**Total:** 8 divergências — **4 bloqueadoras** (2 corrigidas no app, 1 resolvida por procedimento,
-1 estrutural pendente), 1 operacional e 3 menores.
+**Total:** 9 divergências — **4 bloqueadoras** (2 corrigidas no app, 1 resolvida por procedimento,
+1 estrutural), 2 de método/operação e 3 menores.
+
+> **C-09 foi encontrado na checagem pós-commit**, não na varredura inicial — apareceu como
+> contradição interna criada pela **própria** correção do C-04. É o motivo pelo qual a checagem
+> final não é formalidade: uma correção pode introduzir a inconsistência seguinte.
+>
+> **Critério conservador adotado:** vale apenas `mutiraoConflitos ≥ 1` **lido no aparelho B**.
+> Um `0` é **inconclusivo, não negativo** — repetir o passo 3 até que o próprio B registre ≥ 1.
+> Repetir a mais é barato; declarar válido um R2-D que não disputou é o pior resultado possível,
+> porque parece sucesso.
 
 ---
 
@@ -157,6 +167,7 @@ coordenadores com link que fura o cache), não na sessão de campo.
 | C-03 / TC-3 | 🟠 **Bloqueado e formalmente justificado** |
 | C-04 | 🟠 **Aprovado com desvio controlado** |
 | C-05 a C-08 | ✅ Tratados |
+| C-09 (achado na checagem pós-commit) | ✅ Corrigido — critério conservador |
 | `AUDIT-17-PROTOCOLO-R2.md` | ✅ Atualizado |
 | `MUTIRAO-13-PROTOCOLO-R2.md` | ✅ Atualizado |
 | Homologação em campo | ❌ **Ainda não iniciada** |

@@ -216,8 +216,22 @@ console.log('sync:', s, '| conflitos:', mutiraoConflitos);
 > Isso é mais difícil de montar do que antes — e é justamente a propriedade que queríamos:
 > na campanha real, uma pessoa do PG 12 nunca disputa gravação com uma do PG 40.
 >
-> **Como saber que o teste é válido:** ao final, `mutiraoConflitos ≥ 1` nos dois aparelhos
-> somados. Se der 0, os dois não estavam no mesmo PG — refaça.
+> **Como saber que o teste é válido:** ao final, `mutiraoConflitos ≥ 1`.
+>
+> ⚠️ *(Revisão MUTIRÃO-16 / C-09, 10/09/2026.)* **A redação anterior — "nos dois aparelhos
+> somados" — deixou de ser executável** com o desvio controlado C-04: o contador vive só na
+> memória do JavaScript e, no celular, não há console para lê-lo. **Só o aparelho B (o navegador
+> do PC) tem contador legível.**
+>
+> **E há uma assimetria que muda o critério:** quem incrementa o contador é o cliente que **perde**
+> a disputa — o segundo a gravar, que é recusado pela pré-condição e refaz. Se quem perder for o
+> celular, **o contador do PC fica em 0 mesmo tendo havido disputa real**, e o contador do celular
+> é inacessível.
+>
+> **Critério conservador adotado:** vale apenas `mutiraoConflitos ≥ 1` **lido no aparelho B**.
+> Um `0` **não prova ausência de disputa** — prova apenas que ela não foi observada. Nesse caso,
+> **repetir o passo 3 até que o próprio B registre ≥ 1.** Repetir a mais é barato; declarar
+> válido um teste que não disputou é o pior resultado possível, porque parece sucesso.
 
 ## 6.1 Preparação
 
@@ -277,10 +291,10 @@ mutiraoConflitos
 *(Revisão MUTIRÃO-16 / C-04: a instrução anterior dizia "em qualquer um dos aparelhos" — no
 celular isso é inexecutável. É por causa desta leitura que o aparelho B passou a ser o PC.)*
 
-| Valor | Leitura |
+| Valor lido em **B** | Leitura |
 |---|---|
-| `≥ 1` | ✅ **a trava atuou** — houve disputa real e o laço resolveu |
-| `0` | as gravações não se cruzaram. **Repita o passo 3 mais rápido** até conseguir pelo menos uma disputa |
+| `≥ 1` | ✅ **a trava atuou** — houve disputa real e o laço resolveu. **R2-D válido** |
+| `0` | **inconclusivo, não negativo** *(C-09)*. Ou as gravações não se cruzaram, ou quem perdeu a disputa foi o aparelho A — cujo contador não é legível. **Repita o passo 3 mais rápido** até que **B** registre ≥ 1 |
 
 Também aparece no console a linha — **texto real conferido no código em 10/09** *(C-05; a citação
 anterior era anterior à migração por PG de 09/09 e não incluía o número do PG)*:
@@ -361,7 +375,7 @@ updateTime ANTES :
 updateTime DEPOIS:
 Nº ENTREGAS ANTES:
 Nº ENTREGAS DEPOIS:
-mutiraoConflitos :
+mutiraoConflitos :  (lido no aparelho B — o PC; ver C-09)
 RESULTADO        :
 PASS / FAIL      :
 EVIDÊNCIA        :  (captura do Console do Firebase)
@@ -380,7 +394,7 @@ jdpg/grupos MUDOU?: (tem de ser NÃO)
 [ ] R2-C  o laço releu, remesclou e gravou sem perder nada
 [ ] R2-D  os dois aparelhos estavam MESMO no mesmo PG (senão o teste não vale)
 [ ] R2-D  ⭐ as duas entregas simultâneas sobreviveram
-[ ] R2-D  mutiraoConflitos ≥ 1 (houve disputa real)
+[ ] R2-D  mutiraoConflitos ≥ 1 LIDO EM B (0 é inconclusivo, não negativo — C-09)
 [ ] R2-D  o documento de OUTRO PG não foi alterado durante o teste
 [ ] R2-E  a entrega sobreviveu a fechar e reabrir o PWA
 [ ] R2-E  o histórico sobreviveu à reentrada
