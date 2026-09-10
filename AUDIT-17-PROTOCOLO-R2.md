@@ -63,18 +63,34 @@ concorrência real, e **nenhuma escrita chega à produção**.
    git status
    git log -1 --format="%H %s"
    ```
-   Esperado: árvore limpa, HEAD em `ed366c0` (ou posterior, na mesma branch).
+   Esperado: árvore limpa, HEAD em **`4b9ccb2`** (ou posterior, na mesma branch).
+   *(Revisão MUTIRÃO-16 / C-08 — a referência anterior, `ed366c0`, ficou para trás.)*
 
-2. Extrair a candidata **do commit**, não da pasta de trabalho:
+2. Extrair a candidata **do commit**, não da pasta de trabalho — **os quatro arquivos**:
    ```bash
-   git show HEAD:index.html > SERVIR/index.html
-   git show HEAD:manifest.json > SERVIR/manifest.json
+   git show HEAD:index.html    > campo/index.html
+   git show HEAD:manifest.json > campo/manifest.json
+   git show HEAD:icon-192.png  > campo/icon-192.png
+   git show HEAD:icon-512.png  > campo/icon-512.png
    ```
+   *(Revisão MUTIRÃO-16 / C-06 — a versão anterior extraía só dois. O `manifest.json` referencia
+   os dois ícones, e o aparelho os busca: comprovado no registro de acesso de 10/09.)*
 
-3. Servir na rede local (o servidor precisa aceitar conexões de fora do `localhost` — trocar
-   `http://localhost:8099/` por `http://+:8099/` e liberar a porta no firewall).
+   ⚠️ **Os bytes vêm do Git, nunca da pasta de trabalho.** Com `core.autocrlf=true` o arquivo em
+   disco tem CRLF e o repositório (e o GitHub Pages) servem LF — 1 byte de diferença por linha.
+   Servir o arquivo da pasta faria os aparelhos testarem bytes que nunca vão ao ar.
 
-4. Descobrir o IP do computador (`ipconfig`) e anotar o endereço: `http://<IP>:8099/`
+3. Servir na rede local. ⚠️ **Não use `http://+:8099/` com `HttpListener`**: isso exige
+   `netsh http add urlacl`, **comando de administrador**, e a conta desta máquina não é
+   administradora. Use **`System.Net.Sockets.TcpListener`** em `0.0.0.0:8099`, que abre socket
+   comum sem privilégio. Script pronto e testado: `servidor-campo.ps1`, no kit da sessão.
+   *(Revisão MUTIRÃO-16 / C-07.)*
+
+   **Regra de firewall não foi necessária** — comprovado em 01/09 e reconfirmado em 10/09, com o
+   aparelho em outra faixa da rede (`10.31.34.x` → PC em `10.31.121.117`).
+
+4. Descobrir o IP do computador e anotar o endereço: `http://<IP>:8099/index.html`
+   O próprio script imprime o endereço ao subir. **O IP muda — usar sempre o do dia.**
 
 **No Firebase:**
 
@@ -84,13 +100,29 @@ concorrência real, e **nenhuma escrita chega à produção**.
 
 **Nos dois aparelhos (A e B):**
 
-8. Abrir `http://<IP>:8099/` no navegador.
-9. Ir à tela **Grupos** e tocar no selo **"☁️ Nuvem ativa ✓"**.
+8. Abrir `http://<IP>:8099/index.html` no navegador. ⚠️ **Abrir no navegador de verdade**
+   (Safari/Chrome), não no navegador embutido do WhatsApp — ele guarda os dados num lugar
+   separado e o app "esquece" tudo depois.
+
+   ⚠️ **A partir deste instante o aparelho já está apontado para a PRODUÇÃO.** Sem configuração
+   salva, o app usa `FB_DEFAULT_CONFIG`, que é a produção, e sincroniza sozinho ao abrir.
+   **Não tocar em mais nada até concluir o passo 10.**
+
+9. Entrar no **Painel do Tutor** e tocar no botão **"☁️ Nuvem: `<projeto>`"**, logo acima de "Sair".
+
+   ⚠️ *(Revisão MUTIRÃO-16 / C-01.)* **A instrução anterior — "ir à tela Grupos e tocar no selo
+   ☁️ Nuvem ativa" — era inexecutável.** A `screen-grupos` foi removida no FUNC-02c e o selo, que
+   era criado dentro dela, foi junto; `openFbSetup()` ficou sem nenhum chamador na interface.
+   Descoberto em 10/09/2026 **com a sessão já montada e uma pessoa disponível**, o que obrigou a
+   adiá-la. O botão do Painel foi criado no commit `4b9ccb2` para resolver isso.
+
 10. Informar o `Project ID` e a `API Key` **do projeto de teste**.
 11. No **aparelho A apenas**, aceitar "enviar os dados deste aparelho para iniciá-la" — isso semeia
     o projeto de teste. No **aparelho B**, a nuvem já terá conteúdo.
-12. **Verificar em cada aparelho, antes de qualquer teste:** a tela de configuração deve mostrar o
-    `Project ID` **de teste**.
+12. **Verificar em cada aparelho, antes de qualquer teste:** o próprio botão passa a exibir
+    `☁️ Nuvem: <Project ID>` e fica **laranja** quando o projeto **não** é a produção.
+    **Ler o nome em voz alta.** Se aparecer `jornada-pequenos-grupos` — ou se o botão estiver
+    cinza —, **parar tudo**.
 
 ## 1.4 Regras de segurança do R2
 
@@ -233,7 +265,36 @@ sozinho).
 
 ---
 
-## TC-3 — VERSÃO (candidata × publicada)
+## TC-3 — VERSÃO (candidata × publicada) — 🟠 **BLOQUEADO**
+
+> ## ⛔ DECISÃO FORMAL DO USUÁRIO — 2026-09-10
+>
+> **O TC-3 fica BLOQUEADO / não executável nesta homologação.**
+>
+> **Motivo da impossibilidade:** o teste exige o aparelho B rodando a versão **publicada** e
+> apontado ao projeto de teste. A versão publicada (`1aafe63`) tem **o mesmo defeito C-01** — não
+> possui caminho na interface para configurar a nuvem. Mantê-la apontada à produção violaria a
+> regra 🔒 do §1.4 ("nenhum aparelho apontado para a produção durante o R2").
+>
+> **Razão da decisão, nas palavras do usuário:** *"Não devemos publicar a versão candidata apenas
+> para criar a condição necessária para testar a publicação. Isso inverteria a lógica da
+> homologação."*
+>
+> **Registro:** o TC-3 permanece como **teste não executado por ausência de pré-condição** — não
+> como aprovado, nem como reprovado. Mesmo tratamento dado ao T9 na matriz do Mutirão: não é
+> defeito de código, é ausência de condição de execução.
+>
+> **Transferência de risco:** o risco que o TC-3 investiga — a versão antiga sobrescrevendo dado
+> novo — fica **formalmente transferido para a FASE 6 do lançamento**, cujo mecanismo é o aviso aos
+> coordenadores com **link que fura o cache**. Esse risco continua **aberto** até lá.
+>
+> Ver `MUTIRAO-16-CONSISTENCIA-PRE-SESSAO.md` §5.
+
+**O texto original do teste fica preservado abaixo**, para quando a pré-condição existir — isto é,
+depois de a candidata estar publicada, quando "candidata × publicada" passará a comparar a versão
+nova contra a *próxima* candidata.
+
+---
 
 **Objetivo:** verificar se a versão publicada consegue destruir alteração feita pela candidata.
 
@@ -316,8 +377,32 @@ se algum PG sumir, é um defeito **da versão publicada**, e muito mais grave qu
 |---|---|
 | Onde o link abriu | navegador embutido / padrão / PWA |
 | Se o atalho reconheceu a pessoa | **é o achado de campo mais recorrente do projeto** |
-| Se apareceu algum Service Worker | não deve existir nenhum |
-| A versão exibida | conferir que é `1.3.0-rc1` |
+| Se apareceu algum Service Worker | não deve existir nenhum — o app **desregistra** qualquer um que encontre |
+| A versão em execução | ver o procedimento abaixo — **não há versão exibida na tela** |
+
+### Como conferir a versão — *(Revisão MUTIRÃO-16 / C-02)*
+
+⚠️ **O app não exibe a versão em lugar nenhum.** `APP_VERSION` existe no código, mas só aparece
+dentro de uma mensagem técnica de erro. A exigência original — *"conferir que a versão exibida é
+`1.3.0-rc1`"* — era inexecutável.
+
+**Decidido não alterar o app para isso.** A verificação passa a ser feita assim, e vale como
+"conferida, não presumida":
+
+| Passo | |
+|---|---|
+| 1 | Cada participante toca no botão **🔄** no alto da Home. Ele recarrega com `?atualizar=<timestamp>`, forçando o download do arquivo |
+| 2 | Confere-se a linha correspondente em **`registro-da-sessao.txt`**, gravada pelo servidor do kit: `HH:MM:SS  <IP>  /index.html  200 OK` |
+| 3 | Só então a rodada roda |
+
+Como o md5 do arquivo servido é conferido contra o commit na montagem do kit, cada linha prova:
+*"este aparelho baixou, nesta hora, exatamente os bytes de `4b9ccb2`"*.
+
+**A ausência da linha denuncia o F-74** — página antiga ainda viva na memória, retomada do segundo
+plano sem recarregar. Nesse caso **a rodada não vale**.
+
+O servidor ainda envia `Cache-Control: no-store`, o que elimina o cache como causa e deixa apenas
+o caso da página em memória, coberto pelo ritual acima.
 
 ⚠️ **Atenção especial:** ao **retomar** o app do segundo plano, o código **não é recarregado**
 (achado F-74). Se o aparelho tiver aberto a versão publicada antes, pode continuar rodando ela.
@@ -332,8 +417,8 @@ Uma por cenário. **"Funcionou" não é evidência.**
 ```
 TESTE          :
 DISPOSITIVO    :  (modelo, sistema, navegador)
-VERSÃO         :  (conferida na tela, não presumida)
-PROJETO FIREBASE: (confirmar: TESTE)
+VERSÃO         :  (linha do registro-da-sessao.txt após o 🔄 — hora e IP)
+PROJETO FIREBASE: (lido no botão "☁️ Nuvem:" do Painel — deve estar LARANJA)
 HORÁRIO        :
 AÇÃO A         :
 AÇÃO B         :
@@ -359,9 +444,10 @@ Firestore → `jdpg/grupos`) antes e depois, com o `updateTime`.
 [ ] mesmo convite tratado de forma idempotente               (TC-4)
 [ ] WhatsApp funcionou                                       (TC-5)
 [ ] retomada do PWA funcionou                                (TC-5)
-[ ] identidade permaneceu consistente                        (TC-4b, TC-3)
+[ ] identidade permaneceu consistente                        (TC-4b)
 [ ] progresso permaneceu íntegro                             (TC-4, TC-4c)
-[ ] versão antiga não destruiu estado novo                   (TC-3)
+[—] versão antiga não destruiu estado novo                   (TC-3 — BLOQUEADO,
+                                                              risco transferido à FASE 6)
 [ ] nenhum comportamento inexplicável
 ```
 

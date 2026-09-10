@@ -221,10 +221,31 @@ console.log('sync:', s, '| conflitos:', mutiraoConflitos);
 
 ## 6.1 Preparação
 
+> ## 🟠 DESVIO CONTROLADO, APROVADO PELO USUÁRIO — 2026-09-10
+>
+> **O aparelho B deixa de ser um segundo celular e passa a ser o navegador do PC.**
+>
+> **Este é um desvio declarado, não o cenário original.** O R2-D foi especificado para dois
+> celulares; o que será executado é **um celular e um navegador de PC**.
+>
+> **Motivo:** o sinal de validade deste teste — `mutiraoConflitos` (§6.3) — vive apenas na memória
+> do JavaScript e só é legível pelo **console do navegador**. Um iPhone não oferece console
+> acessível, e o valor não aparece em nenhuma tela do app. Sem o PC, o teste rodaria **sem
+> possibilidade de saber se valeu** — e um R2-D que "passa" sem disputa é o pior resultado
+> possível, porque parece sucesso.
+>
+> **O que se preserva:** dois clientes reais, do mesmo PG, executando a mesma candidata, gravando
+> concorrentemente no mesmo documento — que é exatamente o que o teste exige.
+>
+> **O que se perde, e fica registrado como limitação:** o cenário "dois celulares em rede móvel".
+> A degradação de rede **continua testável no aparelho A** pela variante §6.4.
+>
+> Ver `MUTIRAO-16-CONSISTENCIA-PRE-SESSAO.md` §4 (C-04).
+
 | | |
 |---|---|
-| Aparelho **A** | versão candidata, participante inscrito **no mesmo PG do aparelho B** |
-| Aparelho **B** | versão candidata, participante inscrito **no mesmo PG do aparelho A** |
+| Aparelho **A** | **celular** do segundo participante, em rede móvel, versão candidata, inscrito **no mesmo PG do aparelho B** |
+| Aparelho **B** | **navegador do PC**, autenticado como Tutor, versão candidata, inscrito **no mesmo PG do aparelho A** |
 | Quantia | **0,1 kg** nos dois — marcador mínimo, fácil de identificar e anular depois |
 
 ## 6.2 O teste
@@ -247,19 +268,27 @@ console.log('sync:', s, '| conflitos:', mutiraoConflitos);
 
 ## 6.3 A trava disparou?
 
-Em qualquer um dos aparelhos, no Console do navegador:
+**No aparelho B (o navegador do PC)**, no Console:
 
 ```
 mutiraoConflitos
 ```
+
+*(Revisão MUTIRÃO-16 / C-04: a instrução anterior dizia "em qualquer um dos aparelhos" — no
+celular isso é inexecutável. É por causa desta leitura que o aparelho B passou a ser o PC.)*
 
 | Valor | Leitura |
 |---|---|
 | `≥ 1` | ✅ **a trava atuou** — houve disputa real e o laço resolveu |
 | `0` | as gravações não se cruzaram. **Repita o passo 3 mais rápido** até conseguir pelo menos uma disputa |
 
-Também aparece no console a linha:
-`Mutirão: trava de concorrência disparou na tentativa 1 — outro aparelho gravou primeiro.`
+Também aparece no console a linha — **texto real conferido no código em 10/09** *(C-05; a citação
+anterior era anterior à migração por PG de 09/09 e não incluía o número do PG)*:
+
+```
+Mutirão: trava de concorrência disparou no PG <N>, tentativa <N> — outro aparelho
+gravou primeiro. Relendo e remesclando.
+```
 
 ## 6.4 Variante sob rede ruim (opcional, mas é o cenário do hospital)
 
@@ -281,7 +310,12 @@ Repetir com **um** aparelho em rede fraca ou modo avião por 2 s no meio da grav
 
 **Esperado:** a entrega continua no histórico e o total do PG está correto.
 
-> É o achado de campo mais recorrente deste projeto. **Confirmar a versão na tela antes de cada rodada** — ao retomar do segundo plano o código não é recarregado (achado F-74).
+> É o achado de campo mais recorrente deste projeto. **Confirmar a versão antes de cada rodada** —
+> ao retomar do segundo plano o código não é recarregado (achado F-74).
+>
+> *(Revisão MUTIRÃO-16 / C-02: o app **não exibe a versão na tela**. O procedimento é tocar no
+> botão **🔄** da Home e conferir a linha correspondente em `registro-da-sessao.txt`, gravada pelo
+> servidor do kit. **Ausência da linha = o aparelho não recarregou = a rodada não vale.**)*
 
 ## 7.2 Reentrada
 
@@ -319,7 +353,8 @@ Uma por etapa.
 ```
 ETAPA            :  R2-A / B / C / D / E
 DISPOSITIVO      :  (modelo, sistema, navegador)
-VERSÃO NA TELA   :  (conferida, não presumida)
+VERSÃO           :  (linha do registro-da-sessao.txt após o 🔄 — hora e IP;
+                     o app NÃO exibe versão na tela — ver MUTIRÃO-16 / C-02)
 REGRA PUBLICADA  :  (data e hora)
 HORÁRIO          :
 updateTime ANTES :
