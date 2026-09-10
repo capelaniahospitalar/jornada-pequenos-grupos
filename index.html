@@ -1420,6 +1420,20 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 }
 .mut-linha:last-child{border-bottom:none}
 
+/* Correção de entrega (FASE 1 §7.1 — decidido em 10/09/2026) */
+.mut-corrigir{
+  background:none;border:none;padding:.2rem .3rem;cursor:pointer;
+  font-size:13px;color:var(--text3);font-family:var(--ff-body);text-decoration:underline
+}
+.mut-corrigir:hover{color:var(--coral)}
+.mut-conf-acoes{display:flex;gap:8px;margin-top:.6rem;flex-wrap:wrap}
+.mut-conf-btn{
+  flex:1;min-width:120px;border-radius:var(--radius-sm);padding:.6rem .7rem;
+  font-size:15px;font-weight:600;cursor:pointer;font-family:var(--ff-body)
+}
+.mut-conf-sim{background:var(--orange);color:#fff;border:none}
+.mut-conf-nao{background:var(--card);color:var(--text2);border:0.5px solid var(--border)}
+
 /* Dashboard do PG (FASE 7) */
 .mut-kpi-lbl{
   font-size:11px;letter-spacing:1.3px;text-transform:uppercase;color:var(--text3);
@@ -4135,7 +4149,13 @@ function htmlMutiraoDashboard(pgNum) {
 // ══════════════════════════════════════════════════════════════════════════
 // Três blocos: (A) entregas dos participantes, (B) registro de colaborador externo — só
 // para o Coordenador do próprio PG — e (C) resumo do PG.
-function renderMutiraoPainel(grupoNum, nome, msg) {
+// Mesma razão da faixa da tela do participante (ver mutiraoFaixa): o retorno da sincronização
+// redesenha o Painel, e sem guardar a faixa aqui a pergunta "Está certo?" sumiria antes da
+// resposta. Com 3 argumentos ou mais define a faixa; com 2, preserva a que estiver na tela.
+let mutiraoFaixaPainel = null;   // { msg, confirmarId } ou null
+
+function renderMutiraoPainel(grupoNum, nome, msg, confirmarId) {
+  if (arguments.length > 2) mutiraoFaixaPainel = msg ? { msg: msg, confirmarId: confirmarId || null } : null;
   const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
   const body = document.getElementById('tutorpanel-body');
   if (!g || !body) return;
@@ -4163,12 +4183,17 @@ function renderMutiraoPainel(grupoNum, nome, msg) {
   // FASE 6 — histórico dos externos já lançados, IMEDIATAMENTE acima do formulário: é vendo
   // "João · 08/12 · 20 kg" que o Coordenador percebe que aquela entrega já foi lançada.
   const externos = listarEntregasExternasDoPG(grupoNum);
+  // O "corrigir" só existe para quem pode corrigir de fato (mesma condição do formulário):
+  // entrega externa é sempre lançada pelo Coordenador, então é ele quem a conserta. A lista
+  // das entregas dos PARTICIPANTES não ganha este botão de propósito — quem registra pelo
+  // próprio app corrige pelo próprio app (decisão do usuário, 10/09/2026).
   const externosHtml = externos.length
     ? externos.slice().reverse().map(e => `
         <div class="mut-linha">
           <span style="font-size:14.5px;color:var(--text2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${sanitize((e.externo && e.externo.nome) || '—')}</span>
           <span style="font-size:13px;color:var(--text3);margin:0 8px;flex-shrink:0">${dataBr(e.data)}</span>
           <span style="font-size:15px;font-weight:700;color:var(--orange);flex-shrink:0">${mutiraoFmt(e.quantidadeKg)} kg</span>
+          ${podeExterno ? `<button class="mut-corrigir" style="flex-shrink:0;margin-left:10px" onclick="corrigirExternoMutiraoUI(${grupoNum}, '${voltar}', '${e.entregaId}')">corrigir</button>` : ''}
         </div>`).join('')
     : `<div style="font-size:14.5px;color:var(--text3);font-family:var(--ff-body)">Nenhum colaborador externo registrado ainda.</div>`;
 
@@ -4199,12 +4224,19 @@ function renderMutiraoPainel(grupoNum, nome, msg) {
       <div style="font-size:14.5px;color:var(--text3);font-family:var(--ff-body)">Só o Coordenador deste Pequeno Grupo registra entregas de colaboradores externos.</div>
     </div>`;
 
+  const faixaP = mutiraoFaixaPainel;
+  const faixaPAcoes = (faixaP && faixaP.confirmarId) ? `
+    <div class="mut-conf-acoes">
+      <button class="mut-conf-btn mut-conf-sim" onclick="confirmarExternoMutiraoUI(${grupoNum}, '${voltar}')">Confirmo</button>
+      <button class="mut-conf-btn mut-conf-nao" onclick="corrigirExternoMutiraoUI(${grupoNum}, '${voltar}', '${faixaP.confirmarId}')">Preciso corrigir</button>
+    </div>` : '';
+
   body.innerHTML = `
     <div class="content-card">
       <div class="phase-tag" style="color:var(--orange);margin-bottom:4px">🎁 Mutirão de Natal ${MUTIRAO_NATAL.edicao}</div>
       <p class="body-text" style="margin:0">${sanitize(g.nome || 'Grupo ' + grupoNum)}</p>
     </div>
-    ${msg ? `<div class="panel-section" style="background:var(--orange-light);border-color:var(--orange)"><div style="font-size:15px;color:var(--text2);font-family:var(--ff-body)">${msg}</div></div>` : ''}
+    ${faixaP ? `<div class="panel-section" style="background:var(--orange-light);border-color:var(--orange)"><div style="font-size:15px;color:var(--text2);font-family:var(--ff-body)">${faixaP.msg}</div>${faixaPAcoes}</div>` : ''}
 
     <div class="panel-section">
       <div class="panel-title">Entregas dos participantes (${entregas.length})</div>
@@ -4236,8 +4268,7 @@ function registrarExternoMutiraoUI(grupoNum, nome) {
   }
   const kg = mutiraoNormalizarKg(elKg.value);
   if (kg === null) {
-    if (aviso) aviso.textContent = 'Informe um valor entre ' + mutiraoFmt(MUTIRAO_NATAL.kgMin) +
-      ' e ' + mutiraoFmt(MUTIRAO_NATAL.kgMax) + ' kg.';
+    if (aviso) aviso.textContent = mutiraoAvisoKg(elKg.value);
     elKg.focus(); return;
   }
 
@@ -4266,14 +4297,60 @@ function registrarExternoMutiraoUI(grupoNum, nome) {
       : 'Não foi possível registrar (' + (r.detalhe || r.motivo) + ').';
     return;
   }
+  // Mesma pergunta da tela do participante: aqui o Coordenador está transcrevendo o número de
+  // OUTRA pessoa, que é justamente onde o erro de digitação é mais provável.
   renderMutiraoPainel(grupoNum, nome,
-    '✅ Entrega de ' + mutiraoFmt(kg) + ' kg registrada para ' + sanitize(nomeExt) + '.');
+    '✅ Entrega de ' + mutiraoFmt(kg) + ' kg registrada para ' + sanitize(nomeExt) + '. Está certo?',
+    r.entrega && r.entrega.entregaId);
   mutiraoSincronizarEDepois(grupoNum, () => renderMutiraoPainel(grupoNum, nome));
+}
+
+// "Confirmo" no Painel — não grava nada, só tira a pergunta da tela.
+function confirmarExternoMutiraoUI(grupoNum, nome) {
+  renderMutiraoPainel(grupoNum, nome, null);
+}
+
+// "corrigir" na lista de externos do Painel — mesmo motor e mesma autoridade da tela do
+// participante: anula (tombstone, não apaga) e devolve os TRÊS campos ao formulário, para o
+// Coordenador relançar a entrega certa sem redigitar nome e data.
+const MUT_EXT_CAMPOS = ['mut-ext-nome', 'mut-ext-kg', 'mut-ext-data'];
+
+function corrigirExternoMutiraoUI(grupoNum, nome, entregaId) {
+  const antes = mutiraoLoadEntregas().find(x => x.entregaId === entregaId);
+
+  const r = anularEntregaNatal(entregaId);
+  if (!r.ok) {
+    renderMutiraoPainel(grupoNum, nome, r.motivo === 'sem_autoridade'
+      ? '⚠️ Só o Coordenador deste Pequeno Grupo pode corrigir uma entrega externa.'
+      : '⚠️ Não foi possível corrigir (' + r.motivo + ').');
+    return;
+  }
+
+  renderMutiraoPainel(grupoNum, nome, '✏️ Entrega cancelada. Lance abaixo os dados corretos.');
+  if (antes) {
+    const elNome = document.getElementById('mut-ext-nome');
+    const elKg   = document.getElementById('mut-ext-kg');
+    const elData = document.getElementById('mut-ext-data');
+    if (elNome) elNome.value = (antes.externo && antes.externo.nome) || '';
+    if (elData && antes.data) elData.value = antes.data;
+    if (elKg) { elKg.value = mutiraoFmt(antes.quantidadeKg); elKg.focus(); elKg.select(); }
+  }
+
+  // O cancelamento precisa chegar aos outros aparelhos do PG, senão o total continua errado
+  // para todo mundo. Ao voltar, o redesenho preserva o que já estiver preenchido no formulário.
+  mutiraoSincronizarEDepois(grupoNum, () => {
+    const guardado = MUT_EXT_CAMPOS.map(id => (document.getElementById(id) || {}).value || '');
+    renderMutiraoPainel(grupoNum, nome);
+    MUT_EXT_CAMPOS.forEach((id, i) => {
+      const el = document.getElementById(id);
+      if (el && guardado[i]) el.value = guardado[i];
+    });
+  });
 }
 
 // Abre a área do Mutirão no Painel já puxando o que os outros aparelhos registraram.
 function abrirMutiraoPainel(grupoNum, nome) {
-  renderMutiraoPainel(grupoNum, nome);
+  renderMutiraoPainel(grupoNum, nome, null);   // null = abre sem faixa nenhuma
   mutiraoSincronizarEDepois(grupoNum, () => renderMutiraoPainel(grupoNum, nome));
 }
 
@@ -13189,14 +13266,21 @@ function renderMutiraoBtnHome() {
 // não uma validação que se possa contornar.
 function openMutirao() {
   if (typeof loadGrupos === 'function') loadGrupos();
-  renderMutirao();
+  renderMutirao(null);           // null = abre a tela sem faixa nenhuma
   showScreen('mutirao');
   // Puxa o que os outros aparelhos do PG registraram. A tela já apareceu com o dado local:
   // a rede não segura a interface, só a atualiza quando chega.
   mutiraoSincronizarEDepois(mutiraoMeuPgNum(), () => renderMutirao());
 }
 
-function renderMutirao(msg) {
+// A faixa de aviso vive FORA do render porque a sincronização redesenha a tela quando volta
+// da nuvem — sem guardar isto aqui, a pergunta "Está certo?" sumiria sozinha da tela antes
+// de a pessoa responder. renderMutirao() sem argumento nenhum (o caso do callback de sync)
+// mantém a faixa que estiver na tela; renderMutirao(null) apaga.
+let mutiraoFaixa = null;   // { msg, confirmarId } ou null
+
+function renderMutirao(msg, confirmarId) {
+  if (arguments.length > 0) mutiraoFaixa = msg ? { msg: msg, confirmarId: confirmarId || null } : null;
   const body = document.getElementById('mutirao-body');
   if (!body) return;
 
@@ -13220,12 +13304,22 @@ function renderMutirao(msg) {
     ? minhas.slice().reverse().map(e => `
         <div class="mut-linha">
           <span style="font-size:14.5px;color:var(--text2)">${dataBr(e.data)}</span>
-          <span style="font-size:15px;font-weight:700;color:var(--orange)">${mutiraoFmt(e.quantidadeKg)} kg</span>
+          <span style="display:flex;align-items:baseline;gap:10px">
+            <span style="font-size:15px;font-weight:700;color:var(--orange)">${mutiraoFmt(e.quantidadeKg)} kg</span>
+            <button class="mut-corrigir" onclick="corrigirEntregaMutiraoUI('${e.entregaId}')">corrigir</button>
+          </span>
         </div>`).join('')
     : `<div style="font-size:14.5px;color:var(--text3);font-family:var(--ff-body)">Você ainda não registrou nenhuma entrega.</div>`;
 
+  const faixa = mutiraoFaixa;
+  const faixaAcoes = (faixa && faixa.confirmarId) ? `
+    <div class="mut-conf-acoes">
+      <button class="mut-conf-btn mut-conf-sim" onclick="confirmarEntregaMutiraoUI()">Confirmo</button>
+      <button class="mut-conf-btn mut-conf-nao" onclick="corrigirEntregaMutiraoUI('${faixa.confirmarId}')">Preciso corrigir</button>
+    </div>` : '';
+
   body.innerHTML = `
-    ${msg ? `<div style="background:var(--orange-light);border:0.5px solid var(--orange);border-radius:var(--radius-sm);padding:.7rem .85rem;margin-bottom:.85rem;font-size:15px;color:var(--text2);font-family:var(--ff-body)">${msg}</div>` : ''}
+    ${faixa ? `<div style="background:var(--orange-light);border:0.5px solid var(--orange);border-radius:var(--radius-sm);padding:.7rem .85rem;margin-bottom:.85rem;font-size:15px;color:var(--text2);font-family:var(--ff-body)">${faixa.msg}${faixaAcoes}</div>` : ''}
 
     <div class="content-card">
       <div class="mut-sec-tit">Minha entrega</div>
@@ -13268,8 +13362,7 @@ function registrarEntregaMutiraoUI() {
 
   const kg = mutiraoNormalizarKg(inp.value);
   if (kg === null) {
-    if (aviso) aviso.textContent = 'Informe um valor entre ' + mutiraoFmt(MUTIRAO_NATAL.kgMin) +
-      ' e ' + mutiraoFmt(MUTIRAO_NATAL.kgMax) + ' kg.';
+    if (aviso) aviso.textContent = mutiraoAvisoKg(inp.value);
     inp.focus();
     return;
   }
@@ -13303,10 +13396,46 @@ function registrarEntregaMutiraoUI() {
       : 'Não foi possível registrar (' + (r.detalhe || r.motivo) + ').';
     return;
   }
-  renderMutirao('✅ ' + mutiraoFmt(kg) + ' kg registrados. Veja abaixo, no seu histórico.');
+  // FASE 1 §7.1 (10/09/2026): pergunta na hora, que é quando a pessoa ainda lembra do número.
+  // O mesmo "corrigir" continua em cada linha do histórico, para quem só perceber depois.
+  renderMutirao('✅ ' + mutiraoFmt(kg) + ' kg registrados. Está certo?',
+                r.entrega && r.entrega.entregaId);
   // A entrega já está salva no aparelho. O envio para a nuvem acontece em seguida e não
   // pode fazer a pessoa esperar — se falhar, a entrega continua aqui e sobe no próximo sync.
   mutiraoSincronizarEDepois(mutiraoMeuPgNum(), () => renderMutirao());
+}
+
+// "Confirmo" — não grava nada: a entrega já está registrada. Só tira a pergunta da tela.
+function confirmarEntregaMutiraoUI() {
+  renderMutirao(null);
+}
+
+// "Preciso corrigir" — anula a entrega (tombstone: não apaga, marca) e devolve o valor ao
+// campo, para a pessoa digitar o número certo sem ter de lembrar o que errou.
+function corrigirEntregaMutiraoUI(entregaId) {
+  const antes = mutiraoLoadEntregas().find(x => x.entregaId === entregaId);
+  const kgAntes = antes ? antes.quantidadeKg : null;
+
+  const r = anularEntregaNatal(entregaId);
+  if (!r.ok) {
+    renderMutirao(r.motivo === 'sem_autoridade'
+      ? '⚠️ Só quem registrou esta entrega, ou o Coordenador do Pequeno Grupo, pode corrigi-la.'
+      : '⚠️ Não foi possível corrigir (' + r.motivo + ').');
+    return;
+  }
+
+  renderMutirao('✏️ Entrega cancelada. Digite abaixo o valor correto.');
+  const inp = document.getElementById('mut-kg');
+  if (inp && kgAntes !== null) { inp.value = mutiraoFmt(kgAntes); inp.focus(); inp.select(); }
+
+  // O cancelamento precisa chegar aos outros aparelhos do PG, senão o total continua errado
+  // para todo mundo. Ao voltar, o redesenho preserva o que a pessoa já estiver digitando.
+  mutiraoSincronizarEDepois(mutiraoMeuPgNum(), () => {
+    const atual = (document.getElementById('mut-kg') || {}).value || '';
+    renderMutirao();
+    const depois = document.getElementById('mut-kg');
+    if (depois && atual) depois.value = atual;
+  });
 }
 
 
@@ -15102,8 +15231,9 @@ const MUTIRAO_KEY = chaveTeste('jdpg_mutirao_natal_v1');
 
 const MUTIRAO_ORIGEM = Object.freeze({ PARTICIPANTE: 'PARTICIPANTE_PG', EXTERNO: 'EXTERNO' });
 
-// kgMax existe para barrar erro de digitação (1000 no lugar de 10). Os três valores são
-// PROVISÓRIOS — pendentes de confirmação do usuário (FASE 1 §7.1, perguntas 2 e 3).
+// kgMax existe para barrar erro de digitação (1000 no lugar de 10). kgMax = 200 foi
+// CONFIRMADO pelo usuário em 10/09/2026, com aviso específico na tela (mutiraoAvisoKg).
+// kgMin e casas seguem provisórios (FASE 1 §7.1).
 const MUTIRAO_NATAL = Object.freeze({ edicao: '2026', kgMin: 0.1, kgMax: 200, casas: 2 });
 
 function mutiraoLoadEntregas() {
@@ -15127,6 +15257,25 @@ function mutiraoNormalizarKg(v) {
   if (!isFinite(n) || n <= 0) return null;
   const r = Number(n.toFixed(MUTIRAO_NATAL.casas));
   return (r < MUTIRAO_NATAL.kgMin || r > MUTIRAO_NATAL.kgMax) ? null : r;
+}
+
+// FASE 1 §7.1 — o teto de 200 kg foi confirmado em 10/09. Quem passa do teto precisa saber
+// o limite e que a diferença entra em um novo acesso, em vez de receber a frase genérica.
+// Pergunta separada de propósito: mutiraoNormalizarKg() também valida registro gravado
+// (validarEntregaNatal) e não pode mudar de contrato só para explicar o motivo na tela.
+function mutiraoAcimaDoTeto(v) {
+  const n = Number(String(v == null ? '' : v).replace(',', '.').trim());
+  return isFinite(n) && Number(n.toFixed(MUTIRAO_NATAL.casas)) > MUTIRAO_NATAL.kgMax;
+}
+
+// Mensagem única para os dois formulários (participante e externo).
+function mutiraoAvisoKg(valorDigitado) {
+  return mutiraoAcimaDoTeto(valorDigitado)
+    ? 'O máximo por registro é ' + mutiraoFmt(MUTIRAO_NATAL.kgMax) +
+      ' kg. Registre ' + mutiraoFmt(MUTIRAO_NATAL.kgMax) +
+      ' kg agora e digite a diferença em um novo acesso.'
+    : 'Informe um valor entre ' + mutiraoFmt(MUTIRAO_NATAL.kgMin) +
+      ' e ' + mutiraoFmt(MUTIRAO_NATAL.kgMax) + ' kg.';
 }
 
 // INVARIANTE DA FASE 1 §4.1 — todo registro tem EXATAMENTE uma identidade de doador.
@@ -15676,6 +15825,15 @@ async function autoTesteMutirao() {
     ok('M-02 recusa zero e negativo', mutiraoNormalizarKg(0) === null && mutiraoNormalizarKg(-5) === null);
     ok('M-03 recusa texto', mutiraoNormalizarKg('dez') === null);
     ok('M-04 recusa acima do teto (erro de digitação)', mutiraoNormalizarKg(1000) === null, 'teto=' + MUTIRAO_NATAL.kgMax);
+    ok('M-04a acima do teto recebe aviso do limite e do novo acesso',
+       mutiraoAvisoKg('350').indexOf('novo acesso') > -1 &&
+       mutiraoAvisoKg('350').indexOf(mutiraoFmt(MUTIRAO_NATAL.kgMax)) > -1, mutiraoAvisoKg('350'));
+    ok('M-04b valor inválido que NÃO é excesso mantém a frase genérica',
+       mutiraoAvisoKg('dez').indexOf('novo acesso') === -1 &&
+       mutiraoAvisoKg('').indexOf('novo acesso') === -1 &&
+       mutiraoAvisoKg('0,05').indexOf('novo acesso') === -1, mutiraoAvisoKg('dez'));
+    ok('M-04c o próprio teto NÃO é excesso', mutiraoAcimaDoTeto(MUTIRAO_NATAL.kgMax) === false &&
+       mutiraoAcimaDoTeto(MUTIRAO_NATAL.kgMax + 0.01) === true);
 
     // ── 2. O invariante do §4.1 — exclusividade mútua ────────────────────────
     const base = { entregaId: 'QA-1', mutiraoNatal: '2026', pgNum: SLOT, quantidadeKg: 10,
@@ -16106,6 +16264,123 @@ async function autoTesteMutiraoMatriz() {
       });
     } catch (_) {}
     ok('T10g o CSS do Progresso continua no arquivo', temCss === true);
+
+    // ── T11 — correção de entrega (FASE 1 §7.1, decidido pelo usuário em 10/09/2026) ──
+    ok('T11a as duas ações de correção existem',
+       typeof confirmarEntregaMutiraoUI === 'function' && typeof corrigirEntregaMutiraoUI === 'function');
+
+    vestir('T-CORRIGE', 'Carla Dias', 'colaborador');
+    const e11 = registrarMinhaEntregaNatal({ quantidadeKg: 50, data: '2026-12-06' });
+    const kgAntes11 = kgDoPg();
+    const corpo11 = () => (document.getElementById('mutirao-body') || {}).innerHTML || '';
+
+    renderMutirao('✅ 50 kg registrados. Está certo?', e11.entrega.entregaId);
+    ok('T11b a faixa oferece Confirmo e Preciso corrigir',
+       corpo11().indexOf('Confirmo') > -1 && corpo11().indexOf('Preciso corrigir') > -1);
+    ok('T11c o histórico ganhou o botão corrigir em cada linha',
+       (corpo11().match(/mut-corrigir/g) || []).length >= 1,
+       (corpo11().match(/mut-corrigir/g) || []).length + ' botão(ões)');
+
+    // renderMutirao() SEM argumento é o que o retorno da sincronização chama. Sem a faixa
+    // guardada fora do render, a pergunta sumiria da tela sozinha antes da resposta.
+    renderMutirao();
+    ok('T11d o retorno da sincronização NÃO apaga a pergunta da tela',
+       corpo11().indexOf('Preciso corrigir') > -1);
+
+    corrigirEntregaMutiraoUI(e11.entrega.entregaId);
+    ok('T11e corrigir tira os 50 kg do total do PG', kgDoPg() === kgAntes11 - 50,
+       kgAntes11 + ' → ' + kgDoPg() + ' kg');
+    const campo11 = document.getElementById('mut-kg');
+    ok('T11f o valor errado volta ao campo, pronto para correção',
+       !!campo11 && campo11.value === '50', campo11 ? campo11.value : '(sem campo)');
+    ok('T11g o registro cancelado continua no banco como trilha',
+       mutiraoLoadEntregas().some(x => x.entregaId === e11.entrega.entregaId && x.removed === true));
+
+    // Quem NÃO registrou e NÃO é coordenador não corrige a entrega alheia.
+    const e11b = registrarMinhaEntregaNatal({ quantidadeKg: 7, data: '2026-12-06' });
+    vestir('T-ESTRANHO', 'Estranho Qualquer', 'colaborador');
+    const kgAntes11b = kgDoPg();
+    corrigirEntregaMutiraoUI(e11b.entrega.entregaId);
+    ok('T11h sem autoridade, o botão avisa e NÃO cancela nada',
+       kgDoPg() === kgAntes11b && corpo11().indexOf('pode corrigi-la') > -1,
+       kgAntes11b + ' → ' + kgDoPg() + ' kg');
+
+    confirmarEntregaMutiraoUI();
+    ok('T11i "Confirmo" só tira a faixa da tela, sem cancelar nada',
+       corpo11().indexOf('Preciso corrigir') === -1 && kgDoPg() === kgAntes11b,
+       String(kgDoPg()) + ' kg');
+
+    // ── T12 — correção da entrega EXTERNA, no Painel do Coordenador (10/09/2026) ──
+    // Regra do usuário: o Painel só REGISTRA externo; entrega de participante é lançada e
+    // corrigida pelo próprio, no app dele. Logo, o "corrigir" do Painel é só dos externos.
+    const painel12 = () => (document.getElementById('tutorpanel-body') || {}).innerHTML || '';
+
+    vestir('T-COORD12', 'Ana Beatriz', 'coordenador');
+    const x12 = registrarEntregaExternaNatal({ nome: 'Joao Externo', quantidadeKg: 80, data: '2026-12-07' });
+    ok('T12a a entrega externa de 80 kg entrou', x12.ok === true, x12.motivo || '');
+
+    const kgAntes12 = kgDoPg();
+    renderMutiraoPainel(PG, 'Ana Beatriz', null);
+    ok('T12b o Coordenador vê o botão corrigir na lista de externos',
+       painel12().indexOf('corrigirExternoMutiraoUI') > -1);
+    // Um botão por EXTERNO e nenhum a mais: prova que a lista dos participantes ficou de fora.
+    const nBotoes12  = (painel12().match(/corrigirExternoMutiraoUI/g) || []).length;
+    const nExternos12 = listarEntregasExternasDoPG(PG).length;
+    const nPartic12   = listarEntregasParticipantesDoPG(PG).length;
+    ok('T12c um botão por externo e nenhum na lista dos participantes',
+       nBotoes12 === nExternos12 && nPartic12 > 0,
+       nBotoes12 + ' botões · ' + nExternos12 + ' externos · ' + nPartic12 + ' entregas de participantes');
+
+    corrigirExternoMutiraoUI(PG, 'Ana Beatriz', x12.entrega.entregaId);
+    ok('T12d corrigir tira os 80 kg do total do PG', kgDoPg() === kgAntes12 - 80,
+       kgAntes12 + ' → ' + kgDoPg() + ' kg');
+    ok('T12e nome, quilo e data voltam ao formulário',
+       (document.getElementById('mut-ext-nome') || {}).value === 'Joao Externo' &&
+       (document.getElementById('mut-ext-kg') || {}).value === '80' &&
+       (document.getElementById('mut-ext-data') || {}).value === '2026-12-07',
+       [(document.getElementById('mut-ext-nome')||{}).value,
+        (document.getElementById('mut-ext-kg')||{}).value,
+        (document.getElementById('mut-ext-data')||{}).value].join(' · '));
+    ok('T12f o registro externo cancelado continua no banco como trilha',
+       mutiraoLoadEntregas().some(x => x.entregaId === x12.entrega.entregaId && x.removed === true));
+
+    // Quem NÃO é o Coordenador não pode ver nem usar o botão.
+    vestir('T-COORD12', 'Ana Beatriz', 'coordenador');
+    const x12b = registrarEntregaExternaNatal({ nome: 'Maria Externa', quantidadeKg: 9, data: '2026-12-07' });
+    vestir('T-COMUM12', 'Comum Qualquer', 'colaborador');
+    renderMutiraoPainel(PG, 'Comum Qualquer', null);
+    ok('T12g participante comum NÃO vê o botão corrigir dos externos',
+       painel12().indexOf('corrigirExternoMutiraoUI') === -1);
+    const kgAntes12b = kgDoPg();
+    corrigirExternoMutiraoUI(PG, 'Comum Qualquer', x12b.entrega.entregaId);
+    ok('T12h e, se forçado, o app recusa sem cancelar nada',
+       kgDoPg() === kgAntes12b && painel12().indexOf('pode corrigir uma entrega externa') > -1,
+       kgAntes12b + ' → ' + kgDoPg() + ' kg');
+
+    // ── T13 — a mesma pergunta "Está certo?" no Painel, ao lançar um externo (10/09/2026) ──
+    vestir('T-COORD13', 'Ana Beatriz', 'coordenador');
+    renderMutiraoPainel(PG, 'Ana Beatriz', null);
+    document.getElementById('mut-ext-nome').value = 'Pedro Externo';
+    document.getElementById('mut-ext-kg').value   = '15';
+    document.getElementById('mut-ext-data').value = '2026-12-09';
+    const kgAntes13 = kgDoPg();
+    registrarExternoMutiraoUI(PG, 'Ana Beatriz');
+    ok('T13a lançar externo pelo formulário soma no PG', kgDoPg() === kgAntes13 + 15,
+       kgAntes13 + ' → ' + kgDoPg() + ' kg');
+    ok('T13b e a faixa pergunta "Está certo?" com os dois botões',
+       painel12().indexOf('Está certo?') > -1 && painel12().indexOf('Confirmo') > -1 &&
+       painel12().indexOf('Preciso corrigir') > -1);
+
+    // O retorno da sincronização redesenha o Painel — a pergunta não pode sumir sozinha.
+    renderMutiraoPainel(PG, 'Ana Beatriz');
+    ok('T13c o retorno da sincronização NÃO apaga a pergunta do Painel',
+       painel12().indexOf('Preciso corrigir') > -1);
+
+    const kgAntes13b = kgDoPg();
+    confirmarExternoMutiraoUI(PG, 'Ana Beatriz');
+    ok('T13d "Confirmo" só tira a faixa, sem cancelar nada',
+       painel12().indexOf('Está certo?') === -1 && kgDoPg() === kgAntes13b,
+       String(kgDoPg()) + ' kg');
 
   } finally {
     window.loadMeuGrupo = origLMG;
