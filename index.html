@@ -1379,13 +1379,17 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 }
 .mutirao-hdr{
   background:linear-gradient(135deg,var(--orange),var(--orange-mid));
-  padding:.7rem 1rem;display:flex;align-items:center;gap:8px;
+  padding:.8rem 1rem;display:flex;align-items:center;gap:8px;
   border:none;cursor:pointer;width:100%;text-align:left;font:inherit
 }
-.mutirao-ico{font-size:20px;flex-shrink:0}
+.mutirao-ico{font-size:26px;flex-shrink:0}
 .mutirao-title{flex:1;min-width:0}
-.mutirao-name{font-size:15px;font-weight:700;color:#fff;font-family:var(--ff-body)}
-.mutirao-sub{font-size:11.5px;color:rgba(255,255,255,.72);font-family:var(--ff-body);margin-top:1px}
+/* Título em caixa alta e corpo grande: é a chamada do Mutirão na Home. O total em kg fica
+   na segunda linha (.mutirao-l2) para o título caber inteiro mesmo em tela de 320px. */
+.mutirao-name{font-size:21px;font-weight:800;color:#fff;font-family:var(--ff-body);
+  text-transform:uppercase;letter-spacing:.4px;line-height:1.15}
+.mutirao-l2{display:flex;align-items:center;gap:8px;margin-top:3px}
+.mutirao-sub{font-size:12px;color:rgba(255,255,255,.72);font-family:var(--ff-body)}
 .mutirao-total{
   display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.18);
   border-radius:20px;padding:3px 9px;font-size:12px;color:#fff;
@@ -13299,10 +13303,12 @@ function renderMutiraoBtnHome() {
       <span class="mutirao-ico">🎁</span>
       <div class="mutirao-title">
         <div class="mutirao-name">Mutirão de Natal</div>
-        <div class="mutirao-sub">Registre a sua entrega</div>
+        <div class="mutirao-l2">
+          <span class="mutirao-sub">Registre a sua entrega</span>
+          <span class="mutirao-total">${mutiraoFmt(t.total)} kg</span>
+        </div>
       </div>
-      <div class="mutirao-total">${mutiraoFmt(t.total)} kg</div>
-      <span style="color:#fff;font-size:18px;flex-shrink:0">›</span>
+      <span style="color:#fff;font-size:20px;flex-shrink:0">›</span>
     </button>`;
 
   // Depois do Progresso quando ele existir, logo após a âncora quando estiver oculto —
