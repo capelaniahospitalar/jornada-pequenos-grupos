@@ -111,6 +111,14 @@ function mesAtual() {
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
 }
+const MESES_PT = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+// O selo do período usa este cálculo (mesmo princípio do embMonthLabel do app dos PGs) em vez
+// de um mês fixo no texto — o selo "AGOSTO" ficou preso mesmo depois que setembro começou,
+// porque a tela de acolhimento e a porta de entrada tinham o mês escrito à mão.
+function mesLabel(mk) {
+  const [y, m] = mk.split('-');
+  return MESES_PT[parseInt(m, 10) - 1] + '/' + y;
+}
 function sanitize(s) {
   return String(s == null ? '' : s).replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
 }
@@ -127,8 +135,8 @@ let ESCOLHAS = carregar(CHAVE_ESCOLHAS) || {};
 if (ESCOLHAS.monthKey !== mesAtual()) ESCOLHAS = { monthKey: mesAtual() };
 function salvarEscolhas() { guardar(CHAVE_ESCOLHAS, ESCOLHAS); }
 
-let ETAPA = 0;   // 0 = acolhimento · 1..7 = telas da jornada
-let SUB = 0;     // revelação em partes dentro da tela 2
+let ETAPA = 0;   // 0 = acolhimento · 1..8 = telas da jornada (diferença, ponte, espelho,
+                 // entrega, força, missão, desafio, participação)
 
 // PORTA DE ENTRADA — este app é só para quem NÃO participa de Pequeno Grupo. Quem já está
 // em um PG precisa registrar pelo app da Jornada, senão a participação não conta para o
@@ -154,8 +162,8 @@ const SETORES = [
 
 // ── TELAS ─────────────────────────────────────────────────────────────────────
 function dotsHtml() {
-  if (ETAPA < 1 || ETAPA > 7) return '';
-  return '<div class="phase-dots">' + [1,2,3,4,5,6,7].map(n =>
+  if (ETAPA < 1 || ETAPA > 8) return '';
+  return '<div class="phase-dots">' + [1,2,3,4,5,6,7,8].map(n =>
     `<span class="pdot ${n < ETAPA ? 'done' : n === ETAPA ? 'active' : ''}"></span>`).join('') + '</div>';
 }
 function botaoHtml(rotulo, atraso) {
@@ -165,10 +173,11 @@ function botaoHtml(rotulo, atraso) {
 // PORTA 1 — A PERGUNTA. Os dois botões têm o mesmo peso visual de propósito: destacar um
 // deles induziria a resposta, e o que se quer aqui é a resposta verdadeira.
 function portaHtml() {
+  const selo = mesLabel(mesAtual()).split('/')[0].toUpperCase();
   return `
     <div style="background:linear-gradient(160deg,var(--navy),var(--navy2));padding:2rem 1.25rem 1.75rem;text-align:center">
       <div style="font-size:44px;line-height:1;margin-bottom:.6rem">🌟</div>
-      <div style="display:inline-block;font-size:12px;font-weight:700;letter-spacing:2.5px;color:var(--gold-mid);border:1px solid rgba(212,160,23,.45);border-radius:99px;padding:3px 12px;margin-bottom:.7rem">AGOSTO</div>
+      <div style="display:inline-block;font-size:12px;font-weight:700;letter-spacing:2.5px;color:var(--gold-mid);border:1px solid rgba(212,160,23,.45);border-radius:99px;padding:3px 12px;margin-bottom:.7rem">${selo}</div>
       <div style="font-family:var(--ff-serif);font-size:30px;font-weight:500;color:#fff;line-height:1.25">Embaixadores da Esperança</div>
     </div>
     <div style="padding:1.25rem 1rem;display:flex;flex-direction:column;gap:1rem">
