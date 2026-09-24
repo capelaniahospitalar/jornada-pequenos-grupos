@@ -1,5 +1,25 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-09-24] — Home: botão verde "Embaixadores <mês>" no lugar do card do grupo
+
+**Pedido do Capelão:** a participação mensal nos Embaixadores saiu de Desafios do Discipulado e foi
+para a Home, logo abaixo de "Iniciar estudo" e acima do Mutirão de Natal.
+
+- **Home (`renderGruposBtnHome`)**: o card de identificação do PG (flâmula + "Grupo N — nome") fica
+  **escondido, não removido** — chave `MOSTRAR_CARD_GRUPO_HOME = false`. No lugar dele entra um botão
+  verde (`--teal`) com o texto "Embaixadores <mês>", que muda sozinho a cada mês e abre a mesma
+  jornada de sempre (`abrirEmbaixadoresAgosto()`). Aparece para quem está num PG, antes e depois do
+  registro (depois do registro a jornada abre no retorno "Como foi sua missão?"). A inscrição continua
+  acessível pelo chip do grupo no cabeçalho.
+- **Desafios do Discipulado (`renderEmbaixadoresMissoes`)**: saiu só o bloco "COMEÇAR A JORNADA" de
+  quem ainda não registrou. Continuam o selo "✓ Participação registrada", o aviso de vínculo, a
+  entrada "Experiência digital" (para quem já registrou) e as 2 missões semanais. O CSS do pulso
+  dourado (`.emb-ago-cta`), usado só por aquele bloco, foi removido.
+- **Cabeçalho da jornada** ("Experiência digital · Agosto", fixo no HTML) passa a mostrar o mês
+  atual, atualizado em `abrirEmbaixadoresAgosto()` — única porta de entrada daquela tela.
+- Nenhuma função de gravação foi tocada. Testado em `?teste=1` (tela de 375px): botão entre
+  "Iniciar estudo" e Mutirão, abre a jornada; Desafios correto nos dois estados.
+
 ## [2026-09-23] — Embaixadores da Esperança: conteúdo de setembro ("Construindo pontes") + nova tela "O desafio"
 
 **Pedido do Capelão:** o texto de agosto continuava valendo mesmo com setembro em andamento — a tela

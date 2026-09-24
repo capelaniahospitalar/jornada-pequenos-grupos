@@ -163,12 +163,7 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 /* Botão travado até a pessoa escolher (tela do Espelho). Classe própria para não mudar
    o comportamento de nenhum .start-btn já existente no app. */
 .emb-ago-btn:disabled{background:var(--border);color:var(--text3);cursor:default}
-/* Botão "COMEÇAR A JORNADA" do cartão dos Embaixadores (Desafios do Discipulado) — pulso
-   suave para chamar atenção para o conteúdo novo de setembro/2026, e cor própria (dourado)
-   para não ficar igual ao botão branco de antes. */
-@keyframes embAgoCtaPulse{0%,100%{box-shadow:0 3px 12px rgba(212,160,23,.35)}50%{box-shadow:0 3px 20px rgba(212,160,23,.75)}}
-.emb-ago-cta{animation:embAgoCtaPulse 2.2s ease-in-out infinite}
-@media (prefers-reduced-motion:reduce){.emb-ago-in{animation:none}.emb-ago-cta{animation:none}}
+@media (prefers-reduced-motion:reduce){.emb-ago-in{animation:none}}
 
 .study-body{padding:.75rem 1rem 1.5rem;display:flex;flex-direction:column;gap:.75rem;flex:1}
 
@@ -1883,7 +1878,7 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
   <div class="study-hdr">
     <button class="back-btn" onclick="voltarEmbaixadoresAgosto()" aria-label="Voltar">&#8592;</button>
     <div class="sh-info">
-      <div class="sh-step" style="color:rgba(255,255,255,0.55)">Experiência digital · Agosto</div>
+      <div class="sh-step" id="emb-ago-hdr-mes" style="color:rgba(255,255,255,0.55)">Experiência digital · Agosto</div>
       <div class="sh-title">Embaixadores da Esperança</div>
     </div>
   </div>
@@ -5426,6 +5421,9 @@ function renderEmbaixadoresMissoes() {
   // aviso, o cartão inteiro sumia da tela sem nenhuma explicação. A saída (pedir novo convite
   // ao Coordenador com o MESMO nome/WhatsApp) já existe e recupera os dados via IDENT-01
   // (buscarCadastroExistente) — só faltava apontar pra ela.
+  // 2026-09-24 (pedido do Capelão): o bloco "COMEÇAR A JORNADA" de quem ainda não registrou
+  // saiu daqui — a participação do mês agora entra pelo botão verde da Home
+  // (renderGruposBtnHome). O resto do cartão continua igual.
   const embRow = euEmb ? (embRegistro && embRegistro.participou ? `
       <div class="mission-item">
         <div class="mission-check done">✓</div>
@@ -5434,18 +5432,7 @@ function renderEmbaixadoresMissoes() {
           <div class="mission-name" style="color:var(--navy);font-size:19px;font-weight:800;line-height:1.25">🌟 Embaixadores da Esperança</div>
           <div class="mission-meta">✔ Participação registrada em ${embRegistro.data}</div>
         </div>
-      </div>` : `
-      <div style="background:linear-gradient(160deg,var(--navy),var(--navy2));border-radius:var(--radius);padding:1rem .9rem;margin:.35rem 0;box-shadow:0 3px 12px rgba(13,33,55,.28)">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:.6rem">
-          <div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🌟</div>
-          <div style="flex:1;min-width:0">
-            <div style="display:inline-block;font-size:14px;font-weight:800;letter-spacing:2px;color:var(--gold-mid);border:1px solid rgba(212,160,23,.45);border-radius:99px;padding:2px 11px;margin-bottom:4px;font-family:var(--ff-body)">${embLabel.split('/')[0].toUpperCase()}</div>
-            <div style="font-family:var(--ff-serif);font-size:18.5px;color:#fff;line-height:1.25">Embaixadores da Esperança</div>
-          </div>
-        </div>
-        <div style="font-size:13.5px;color:rgba(255,255,255,.8);line-height:1.5;margin-bottom:.75rem;font-family:var(--ff-body)"><strong style="color:var(--gold-mid)">Construindo pontes:</strong> uma jornada curta para refletir, olhar para si mesmo e receber uma missão.<br><strong style="color:#fff">Sua participação é registrada ao final dela.</strong></div>
-        <button class="emb-ago-cta" onclick="abrirEmbaixadoresAgosto()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:linear-gradient(135deg,var(--gold-mid),var(--gold));color:#fff;border:none;border-radius:var(--radius-sm);padding:.8rem;font-size:16px;font-weight:800;letter-spacing:.8px;cursor:pointer;font-family:var(--ff-body)">🌟 COMEÇAR A JORNADA</button>
-      </div>`) : (meuGrupo ? `
+      </div>` : '') : (meuGrupo ? `
       <div style="background:#FDECEA;border:0.5px solid #F3B8B4;border-radius:var(--radius-sm);padding:.6rem .75rem;margin:.2rem 0">
         <div style="font-weight:700;font-size:14px;color:#E05050;margin-bottom:2px">⚠️ Não conseguimos confirmar seu vínculo com o Pequeno Grupo "${sanitize(meuGrupo.grupoNome || ('Grupo ' + meuGrupo.grupoNum))}" neste aparelho.</div>
         <div style="font-size:13px;color:var(--text2);line-height:1.4">Peça ao seu Coordenador um novo link de convite. Ao aceitar com o mesmo nome e WhatsApp de antes, seu progresso é recuperado automaticamente — nada se perde.</div>
@@ -5523,6 +5510,9 @@ function abrirEmbaixadoresAgosto() {
   // Quem já recebeu a missão deste mês, ao voltar, cai no retorno sobre ela (etapa 9) em
   // vez de recomeçar a experiência do zero. De lá dá para rever tudo desde o início.
   EMB_AGO_ETAPA = getForcaEmbAgosto() ? 9 : 0;
+  // O cabeçalho vinha fixo em "Agosto" — agora mostra o mês atual (2026-09-24).
+  const hdrMes = document.getElementById('emb-ago-hdr-mes');
+  if (hdrMes) hdrMes.textContent = 'Experiência digital · ' + MESES_PT[new Date().getMonth()];
   showScreen('embaixadores-ago');
   renderEmbaixadoresAgosto();
 }
@@ -13307,7 +13297,15 @@ function renderGruposBtnHome() {
   // true, este div volta a ser só a âncora e o card volta para dentro do Progresso — nunca
   // aparecendo duas vezes.
   const mgHome = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
-  div.innerHTML = (!MOSTRAR_PROGRESSO_PG_HOME && mgHome) ? htmlCardDoGrupo(mgHome, true) : '';
+  // 2026-09-24 (pedido do Capelão): o card do grupo acima fica ESCONDIDO (o chip do grupo no
+  // cabeçalho continua abrindo a inscrição) e o lugar dele passa a ser do botão verde de
+  // participação nos Embaixadores do mês, que antes ficava em Desafios do Discipulado. O mês
+  // do texto muda sozinho. Para trazer o card de volta: MOSTRAR_CARD_GRUPO_HOME = true.
+  const MOSTRAR_CARD_GRUPO_HOME = false;
+  const mesEmb = MESES_PT[new Date().getMonth()];
+  const btnEmbHtml = mgHome ? `
+    <button onclick="abrirEmbaixadoresAgosto()" style="width:100%;background:var(--teal);color:#fff;border:none;border-radius:var(--radius);padding:.9rem 1rem;font-size:21px;font-weight:800;line-height:1.15;cursor:pointer;font-family:var(--ff-body)">Embaixadores ${mesEmb}</button>` : '';
+  div.innerHTML = (MOSTRAR_CARD_GRUPO_HOME && !MOSTRAR_PROGRESSO_PG_HOME && mgHome) ? htmlCardDoGrupo(mgHome, true) : btnEmbHtml;
 
   // UX-01: o card "Mural de Gratidão" foi removido daqui — consolidado no único card
   // "Painel da Comunidade" (renderComunidadeBtnHome). O chip do grupo acima é preservado.
