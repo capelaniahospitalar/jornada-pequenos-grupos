@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Embaixadores da Esperança — Agosto</title>
+<title>Embaixadores da Esperança</title>
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -73,7 +73,7 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 
 <script>
 // ══════════════════════════════════════════════════════════════════════════════
-// EMBAIXADORES DA ESPERANÇA — AGOSTO · versão para colaboradores SEM Pequeno Grupo
+// EMBAIXADORES DA ESPERANÇA · versão para colaboradores SEM Pequeno Grupo
 //
 // App independente do index.html (app dos Pequenos Grupos). Roda no mesmo endereço,
 // então compartilha o localStorage do navegador — por isso TODA chave daqui usa o
@@ -118,6 +118,7 @@ function mesLabel(mk) {
   const [y, m] = mk.split('-');
   return MESES_PT[parseInt(m, 10) - 1] + '/' + y;
 }
+document.title = 'Embaixadores da Esperança — ' + mesLabel(mesAtual());
 function sanitize(s) {
   return String(s == null ? '' : s).replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
 }
