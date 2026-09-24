@@ -214,75 +214,82 @@ function avisoTemPgHtml() {
 }
 
 function aberturaHtml() {
+  const selo = mesLabel(mesAtual()).split('/')[0].toUpperCase();
   return `
     <div style="background:linear-gradient(160deg,var(--navy),var(--navy2));padding:2rem 1.25rem 1.75rem;text-align:center">
       <div style="font-size:44px;line-height:1;margin-bottom:.6rem">🌟</div>
-      <div style="display:inline-block;font-size:12px;font-weight:700;letter-spacing:2.5px;color:var(--gold-mid);border:1px solid rgba(212,160,23,.45);border-radius:99px;padding:3px 12px;margin-bottom:.7rem">AGOSTO</div>
+      <div style="display:inline-block;font-size:12px;font-weight:700;letter-spacing:2.5px;color:var(--gold-mid);border:1px solid rgba(212,160,23,.45);border-radius:99px;padding:3px 12px;margin-bottom:.7rem">${selo}</div>
       <div style="font-family:var(--ff-serif);font-size:30px;font-weight:500;color:#fff;line-height:1.25">Embaixadores da Esperança</div>
-      <div style="font-family:var(--ff-serif);font-style:italic;font-size:20px;color:var(--gold-mid);margin-top:.55rem">A esperança começa em mim.</div>
+      <div style="font-family:var(--ff-serif);font-style:italic;font-size:20px;color:var(--gold-mid);margin-top:.55rem">Construindo pontes</div>
     </div>
     <div style="padding:1.25rem 1rem;display:flex;flex-direction:column;gap:1rem">
       <div class="content-card">
-        <p class="body-text" style="margin:0 0 .9rem">Vivemos em um mundo marcado por diferenças, divisões e conflitos.</p>
-        <p class="body-text" style="margin:0 0 .9rem">Muitas vezes aprendemos a enxergar primeiro aquilo que separa as pessoas.</p>
-        <p class="body-text" style="margin:0">Nesta jornada, o convite é diferente: olhar para o outro, olhar para nós mesmos e descobrir como podemos nos tornar instrumentos de esperança.</p>
+        <p class="body-text" style="margin:0 0 .9rem"><strong>Você não precisa mudar o mundo inteiro.</strong></p>
+        <p class="body-text" style="margin:0 0 .9rem">Às vezes, a esperança começa quando duas pessoas que pensam diferente conseguem permanecer na mesma conversa.</p>
+        <p class="body-text" style="margin:0">Começa quando você escolhe ouvir em vez de atacar. Quando decide compreender antes de julgar. Quando enxerga alguém que todos ignoraram.</p>
       </div>
       <div class="content-card" style="border-left:3px solid var(--teal)">
-        <p class="body-text" style="margin:0"><strong>Você não precisa mudar o mundo inteiro.</strong><br>Pode começar por uma pessoa.</p>
+        <p class="body-text" style="margin:0"><strong>A próxima ponte pode começar com você.</strong></p>
       </div>
       <button class="start-btn" style="letter-spacing:1.5px;font-weight:700" onclick="avancar()">COMEÇAR A JORNADA</button>
     </div>`;
 }
 
-// TELA 1 — O MUNDO.
+// TELA 1 — A DIFERENÇA. Texto de setembro/2026 ("Construindo pontes").
 function tela1Html() {
-  const diferencas = ['Pensamos diferente.','Votamos diferente.','Temos culturas diferentes.','Temos histórias diferentes.','Pertencemos a grupos diferentes.'];
+  const diferencas = ['Pensamos diferente.','Acreditamos diferente.','Temos histórias diferentes.','Viemos de lugares diferentes.','Pertencemos a grupos diferentes.'];
   const linhas = diferencas.map((d, i) =>
     `<div class="emb-ago-in" style="animation-delay:${(0.35 + i * 0.22).toFixed(2)}s;font-size:19px;line-height:1.6;color:var(--text2)">${d}</div>`).join('');
-  const fim = 0.35 + diferencas.length * 0.22 + 0.25;
+  const atrasoLados = 0.35 + diferencas.length * 0.22 + 0.25;
+  const atrasoCard2 = atrasoLados + 0.8;
+  const atrasoCard3 = atrasoCard2 + 0.4;
   return `
     ${dotsHtml()}
     <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
       <div class="content-card">
-        <div class="phase-tag tag-content">O mundo</div>
+        <div class="phase-tag tag-content">A diferença</div>
         <p class="body-text emb-ago-in" style="margin:0 0 1rem">Vivemos cercados por diferenças.</p>
         <div style="display:flex;flex-direction:column;gap:.35rem;padding-left:.85rem;border-left:3px solid var(--blue-light)">${linhas}</div>
-        <p class="body-text emb-ago-in" style="margin:1.1rem 0 0;animation-delay:${fim.toFixed(2)}s"><strong>A diferença, porém, não precisa produzir divisão.</strong></p>
+        <p class="body-text emb-ago-in" style="margin:1.1rem 0 0;animation-delay:${atrasoLados.toFixed(2)}s">E quanto mais diferentes nos sentimos, mais facilmente criamos dois lados: <strong>"Nós" e "eles".</strong></p>
       </div>
-      ${botaoHtml('CONTINUAR', (fim + 0.3).toFixed(2))}
+      <div class="content-card emb-ago-in" style="animation-delay:${atrasoCard2.toFixed(2)}s">
+        <p class="body-text" style="margin:0 0 .8rem">Mas existe algo que não podemos esquecer: antes de pertencer a qualquer grupo, cada pessoa é uma pessoa.</p>
+        <p class="body-text" style="margin:0"><strong>Tem uma história. Tem medos. Tem sonhos. Tem feridas que talvez ninguém conheça.</strong></p>
+      </div>
+      <div class="content-card emb-ago-in" style="animation-delay:${atrasoCard3.toFixed(2)}s;border-left:3px solid var(--teal)">
+        <p class="body-text" style="margin:0">A diferença não precisa desaparecer para que exista respeito. <strong>Podemos discordar sem desumanizar.</strong></p>
+      </div>
+      ${botaoHtml('CONTINUAR', (atrasoCard3 + 0.4).toFixed(2))}
     </div>`;
 }
 
-// TELA 2 — O PROBLEMA (revelação em 3 momentos).
-const ROTULOS = [
-  'Ele é de direita.','Ela é de esquerda.','Ele é rico.','Ela é pobre.','Ele é branco.',
-  'Ele é negro.','Ele é machista.','Ele é daquele grupo.','Ela pensa diferente de mim.'
-];
+// TELA 2 — A PONTE. Substitui a antiga "O problema" (rótulos revelados em 3 etapas via SUB,
+// removido — esta tela não precisa de revelação em partes).
 function tela2Html() {
-  const rotulos = ROTULOS.map((r, i) => `
-        <div style="display:flex;justify-content:${i % 2 ? 'flex-end' : 'flex-start'}">
-          <span class="emb-ago-rotulo ${SUB === 0 ? 'emb-ago-in' : ''}" ${SUB === 0 ? `style="animation-delay:${(0.3 + i * 0.24).toFixed(2)}s"` : ''}>“${r}”</span>
-        </div>`).join('');
-  const fimRotulos = 0.3 + ROTULOS.length * 0.24;
-  const consequencia = SUB >= 1 ? `
-      <div class="content-card ${SUB === 1 ? 'emb-ago-in' : ''}" style="border-left:3px solid var(--coral)">
-        <p class="body-text" style="margin:0">Quando isso acontece, o outro deixa de ser uma pessoa e passa a ser <strong>um rótulo</strong>.</p>
-      </div>` : '';
-  const efeito = SUB >= 2 ? `
-      <div class="content-card emb-ago-in" style="border-left:3px solid var(--coral)">
-        <p class="body-text" style="margin:0">E quando transformamos pessoas em rótulos, fica muito mais fácil julgá-las, rejeitá-las ou entrar em conflito com elas.</p>
-      </div>` : '';
+  const trocas = [
+    { antes: '"Eu sei como ele é."',        depois: '"O que eu ainda não sei sobre ele?"' },
+    { antes: '"Ela está errada."',           depois: '"O que posso compreender antes de responder?"' },
+    { antes: '"Ele é diferente de mim."',    depois: '"Mesmo diferente de mim, ele continua tendo valor."' },
+  ];
+  const cartoesTroca = trocas.map((t, i) => `
+      <div class="content-card emb-ago-in" style="animation-delay:${(0.9 + i * 0.3).toFixed(2)}s">
+        <p class="body-text" style="margin:0 0 .3rem;color:var(--text3)">${t.antes}</p>
+        <p class="body-text" style="margin:0">por: <strong>${t.depois}</strong></p>
+      </div>`).join('');
   return `
     ${dotsHtml()}
     <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
       <div class="content-card">
-        <div class="phase-tag tag-insight">O problema</div>
-        <p class="body-text" style="margin:0">O problema começa quando deixamos de enxergar <strong>a pessoa</strong> e passamos a enxergar apenas <strong>o grupo</strong> ao qual ela pertence.</p>
+        <div class="phase-tag tag-insight">A ponte</div>
+        <p class="body-text emb-ago-in" style="margin:0 0 .8rem">Na jornada anterior, você descobriu como os rótulos podem nos impedir de enxergar pessoas.</p>
+        <p class="body-text emb-ago-in" style="margin:0 0 .8rem;animation-delay:.4s">Mas existe um passo além. Não basta apenas evitar julgar.</p>
+        <p class="body-text emb-ago-in" style="margin:0;animation-delay:.7s"><strong>Precisamos aprender a construir pontes.</strong></p>
       </div>
-      <div style="display:flex;flex-direction:column;gap:.45rem">${rotulos}</div>
-      ${consequencia}
-      ${efeito}
-      ${botaoHtml(SUB < 2 ? 'CONTINUAR' : 'E SE VOCÊ TAMBÉM FIZER ISSO?', SUB === 0 ? (fimRotulos + 0.3).toFixed(2) : '0.35')}
+      <div style="display:flex;flex-direction:column;gap:.45rem">${cartoesTroca}</div>
+      <div class="content-card emb-ago-in" style="animation-delay:2.1s;border-left:3px solid var(--teal)">
+        <p class="body-text" style="margin:0">Construir pontes não significa concordar com tudo. <strong>Significa escolher compreender antes de rejeitar.</strong></p>
+      </div>
+      ${botaoHtml('E VOCÊ?', '2.5')}
     </div>`;
 }
 
