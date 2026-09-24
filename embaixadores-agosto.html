@@ -46,7 +46,6 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 
 @keyframes embAgoIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .emb-ago-in{animation:embAgoIn .5s ease both}
-.emb-ago-rotulo{display:inline-block;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.45rem .8rem;font-size:16px;color:var(--text2);font-family:var(--ff-body);box-shadow:0 1px 3px rgba(0,0,0,0.07);max-width:85%}
 .emb-ago-btn:disabled{background:var(--border);color:var(--text3);cursor:default}
 @media (prefers-reduced-motion:reduce){.emb-ago-in{animation:none}}
 
@@ -293,25 +292,28 @@ function tela2Html() {
     </div>`;
 }
 
-// TELA 3 — O ESPELHO. Revisão editorial de 2026-08-17: era a tela 4 e trocou de lugar com a
-// entrega, para que o diagnóstico venha ANTES da pergunta espiritual. Mesma mudança aplicada
-// ao app dos Pequenos Grupos (index.html) — as duas cópias precisam andar juntas.
+// TELA 3 — O ESPELHO. Texto de setembro/2026 reformulado ("pontos cegos" em vez de
+// "rótulos"); mecânica de escolha única igual, agora com 9 alternativas.
 function tela3Html() {
   const e = ESCOLHAS.dificuldade;
   const opcoes = ESPELHO.map((o, i) => `
         <button class="opt-btn${e && e.id === o.id ? ' chosen' : ''} emb-ago-in" data-opcao="${o.id}"
-                style="animation-delay:${(1.35 + i * 0.06).toFixed(2)}s" onclick="escolherEspelho('${o.id}')">${o.texto}</button>`).join('');
+                style="animation-delay:${(1.55 + i * 0.06).toFixed(2)}s" onclick="escolherEspelho('${o.id}')">${o.texto}</button>`).join('');
   return `
     ${dotsHtml()}
     <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
       <div class="content-card">
         <div class="phase-tag tag-decision">O espelho</div>
-        <p class="body-text emb-ago-in" style="margin:0 0 .9rem">Foi fácil perceber os rótulos que colocamos nos outros.</p>
-        <p class="body-text emb-ago-in" style="margin:0 0 .9rem;animation-delay:.5s">Mas e quando o rótulo está nas nossas próprias atitudes?</p>
-        <p class="body-text emb-ago-in" style="margin:0;animation-delay:1s"><strong>Agora é a sua vez de olhar para o espelho.</strong></p>
+        <p class="body-text emb-ago-in" style="margin:0 0 .8rem">Talvez você não se considere uma pessoa preconceituosa. <strong>Mas todos nós temos pontos cegos.</strong></p>
+        <div class="emb-ago-in" style="animation-delay:.5s;display:flex;flex-direction:column;gap:.35rem;padding-left:.85rem;border-left:3px solid var(--blue-light);font-size:16px;line-height:1.55;color:var(--text2)">
+          <div>Às vezes ouvimos apenas para responder.</div>
+          <div>Às vezes precisamos estar certos.</div>
+          <div>Às vezes conversamos somente com quem concorda conosco.</div>
+          <div>Às vezes somos rápidos para exigir compreensão e lentos para oferecer compreensão.</div>
+        </div>
       </div>
-      <div class="content-card emb-ago-in" style="animation-delay:1.2s">
-        <p class="body-text" style="margin:0 0 .85rem">Quando encontro alguém muito diferente de mim, qual é minha maior dificuldade?</p>
+      <div class="content-card emb-ago-in" style="animation-delay:1.4s">
+        <p class="body-text" style="margin:0 0 .85rem">Quando encontro alguém muito diferente de mim, qual é meu maior desafio?</p>
         <div id="espelho-opcoes" style="display:flex;flex-direction:column;gap:.45rem">${opcoes}</div>
       </div>
       <div id="espelho-dica" style="${e ? 'display:none;' : ''}text-align:center;font-size:14px;color:var(--text3)">Escolha uma opção para continuar.</div>
@@ -321,14 +323,15 @@ function tela3Html() {
 
 // Alternativas do espelho (usadas pela tela 3, acima).
 const ESPELHO = [
-  { id:'ouvir', texto:'Ouvir sem julgar' },
-  { id:'paciencia', texto:'Ter paciência' },
-  { id:'opinioes', texto:'Respeitar opiniões diferentes' },
-  { id:'reacoes', texto:'Controlar minhas reações' },
-  { id:'perdoar', texto:'Perdoar' },
-  { id:'empatia', texto:'Demonstrar empatia' },
-  { id:'valor', texto:'Reconhecer o valor do outro' },
-  { id:'refletir', texto:'Não sei — preciso refletir sobre isso' }
+  { id:'ouvir_preparar', texto:'Ouvir sem preparar minha resposta' },
+  { id:'admitir_erro',   texto:'Admitir que posso estar errado' },
+  { id:'respeitar',      texto:'Respeitar alguém de quem discordo' },
+  { id:'empatia',        texto:'Ter empatia por alguém de quem não gosto' },
+  { id:'reacoes',        texto:'Controlar minhas reações' },
+  { id:'pedir_perdao',   texto:'Pedir perdão quando eu erro' },
+  { id:'perdoar_seguir', texto:'Perdoar e seguir em frente' },
+  { id:'aproximar',      texto:'Aproximar-me de quem costuma ser ignorado' },
+  { id:'refletir',       texto:'Não sei — preciso refletir sobre isso' }
 ];
 function escolherEspelho(id) {
   const o = ESPELHO.find(x => x.id === id);
@@ -339,22 +342,28 @@ function escolherEspelho(id) {
   const btn = document.getElementById('espelho-continuar'); if (btn) btn.disabled = false;
   const dica = document.getElementById('espelho-dica'); if (dica) dica.style.display = 'none';
 }
-// TELA 4 — A ENTREGA. Era a tela 3 ("A pergunta"); agora chega depois do espelho e se refere
-// à dificuldade que a pessoa acabou de reconhecer.
+// TELA 4 — A ENTREGA. Chega depois do diagnóstico do espelho: a entrega se refere à
+// dificuldade que a pessoa acabou de reconhecer.
 function tela4Html() {
+  const talvez = ['aprender a ouvir','abandonar um preconceito','pedir perdão','perdoar','simplesmente voltar a enxergar alguém como pessoa'];
+  const linhasTalvez = talvez.map((t, i) =>
+    `<div class="emb-ago-in" style="animation-delay:${(0.9 + i * 0.18).toFixed(2)}s;font-size:17px;line-height:1.6;color:var(--text2)">Talvez precise ${t}.</div>`).join('');
+  const atrasoMudanca = 0.9 + talvez.length * 0.18 + 0.3;
   return `
     ${dotsHtml()}
     <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
       <div class="content-card">
         <div class="phase-tag tag-question">A entrega</div>
-        <p class="body-text emb-ago-in" style="margin:0 0 1rem">Você acabou de reconhecer uma dificuldade que existe em você.</p>
-        <p class="body-text emb-ago-in" style="margin:0;animation-delay:.9s"><strong>Reconhecer é um começo. Mas transformação exige entrega.</strong></p>
+        <p class="body-text emb-ago-in" style="margin:0 0 .5rem">Reconhecer uma dificuldade não é fracasso.</p>
+        <p class="body-text emb-ago-in" style="margin:0 0 1rem;animation-delay:.4s"><strong>É o começo da transformação.</strong></p>
+        <div style="display:flex;flex-direction:column;gap:.3rem;padding-left:.85rem;border-left:3px solid var(--blue-light)">${linhasTalvez}</div>
+        <p class="body-text emb-ago-in" style="margin:1.1rem 0 0;animation-delay:${atrasoMudanca.toFixed(2)}s">A mudança começa quando paramos de tentar transformar primeiro o outro... <strong>e permitimos que Deus transforme primeiro a nós.</strong></p>
       </div>
-      <div class="emb-ago-in" style="animation-delay:2s;background:linear-gradient(160deg,var(--navy),var(--navy2));border-radius:var(--radius);padding:1.35rem 1.15rem;text-align:center">
+      <div class="emb-ago-in" style="animation-delay:${(atrasoMudanca + 0.6).toFixed(2)}s;background:linear-gradient(160deg,var(--navy),var(--navy2));border-radius:var(--radius);padding:1.35rem 1.15rem;text-align:center">
         <div style="font-size:26px;line-height:1;margin-bottom:.6rem">🙏</div>
-        <p style="font-family:var(--ff-serif);font-size:22px;line-height:1.5;color:#fff;margin:0">O que preciso entregar a Deus para servir melhor ao meu semelhante?</p>
+        <p style="font-family:var(--ff-serif);font-size:22px;line-height:1.5;color:#fff;margin:0">O que preciso entregar a Deus para me tornar uma presença de esperança na vida de outras pessoas?</p>
       </div>
-      ${botaoHtml('DESCOBRIR UMA FORÇA', '2.6')}
+      ${botaoHtml('ENTREGAR A DEUS', (atrasoMudanca + 1.2).toFixed(2))}
     </div>`;
 }
 
@@ -396,9 +405,9 @@ function virtudesHtml() {
     ${dotsHtml()}
     <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
       <div class="content-card">
-        <div class="phase-tag tag-apply">Forças de caráter</div>
-        <p class="body-text emb-ago-in" style="margin:0 0 .9rem">Todos nós podemos desenvolver forças que nos ajudam a viver melhor e a servir melhor.</p>
-        <p class="body-text emb-ago-in" style="margin:0;animation-delay:.35s"><strong>Qual destas dimensões você gostaria de fortalecer hoje?</strong></p>
+        <div class="phase-tag tag-apply">Uma força para construir pontes</div>
+        <p class="body-text emb-ago-in" style="margin:0 0 .9rem">Todos podemos desenvolver forças que nos ajudam a viver melhor e servir melhor.</p>
+        <p class="body-text emb-ago-in" style="margin:0;animation-delay:.35s"><strong>Qual dimensão você gostaria de fortalecer hoje?</strong></p>
       </div>
       <div style="display:flex;flex-direction:column;gap:.45rem">${cartoes}</div>
     </div>`;
@@ -417,46 +426,46 @@ function forcasHtml() {
     ${dotsHtml()}
     <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
       <div class="content-card">
-        <div class="phase-tag tag-apply">Forças de caráter</div>
+        <div class="phase-tag tag-apply">Uma força para construir pontes</div>
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:.85rem">
           <span style="font-size:26px">${def.icone}</span>
           <span style="font-size:19px;font-weight:700;letter-spacing:.5px;color:var(--navy)">${def.nome}</span>
         </div>
-        <p class="body-text" style="margin:0 0 .85rem">Qual destas forças você gostaria de praticar hoje?</p>
+        <p class="body-text" style="margin:0 0 .85rem">Qual força você gostaria de praticar hoje?</p>
         <div id="forcas-opcoes" style="display:flex;flex-direction:column;gap:.45rem">${opcoes}</div>
         <button onclick="trocarVirtude()" style="margin-top:.85rem;background:none;border:none;padding:0;color:var(--blue);font-size:14px;font-weight:600;cursor:pointer;font-family:var(--ff-body)">‹ Escolher outra dimensão</button>
       </div>
       <div id="forcas-dica" style="${escolha ? 'display:none;' : ''}text-align:center;font-size:14px;color:var(--text3)">Escolha uma força para continuar.</div>
-      <button id="forcas-continuar" class="start-btn emb-ago-btn" style="letter-spacing:1.5px;font-weight:700" ${escolha ? '' : 'disabled'} onclick="avancar()">CONTINUAR</button>
+      <button id="forcas-continuar" class="start-btn emb-ago-btn" style="letter-spacing:1.5px;font-weight:700" ${escolha ? '' : 'disabled'} onclick="avancar()">ESCOLHER UMA FORÇA</button>
     </div>`;
 }
 
 // TELA 6 — A MISSÃO. Derivada da força escolhida; nunca é requisito de participação.
 const MISSOES = {
-  'Criatividade':'Encontre hoje um jeito novo e simples de tornar o dia de alguém mais leve — um gesto que a pessoa não espera.',
-  'Curiosidade':'Pergunte hoje a alguém sobre algo da vida dela que você nunca perguntou antes. E escute a resposta inteira.',
-  'Amor ao aprendizado':'Peça hoje a alguém que lhe ensine algo que essa pessoa faz bem. Aprenda com ela, sem pressa.',
-  'Mente aberta':'Converse com alguém que pensa diferente de você. Faça uma pergunta para compreender a pessoa — não para convencê-la.',
-  'Perspectiva':'Diante de uma situação difícil hoje, pergunte-se como ela é vista pelos olhos da outra pessoa antes de opinar.',
-  'Generosidade':'Ofereça hoje algo seu a alguém — seu tempo, sua ajuda ou sua atenção — sem esperar nada em troca.',
-  'Amor':'Demonstre hoje cuidado concreto por alguém, com um gesto simples que mostre que aquela pessoa importa para você.',
-  'Inteligência emocional':'Hoje, procure alguém que normalmente passa despercebido e demonstre interesse genuíno por essa pessoa.',
-  'Justiça':'Se hoje alguém for tratado com injustiça ou deixado de lado, fique ao lado dessa pessoa, com respeito.',
-  'Liderança':'Ajude hoje sua equipe a incluir alguém que costuma ficar de fora das conversas ou das decisões.',
-  'Trabalho em equipe':'Ofereça ajuda hoje a um colega em algo que não é sua obrigação, apenas porque vocês estão no mesmo time.',
+  'Criatividade':'Faça hoje algo inesperado para tornar o dia de alguém mais leve.',
+  'Curiosidade':'Pergunte a alguém sobre uma parte da vida dela que você ainda não conhece — e escute a resposta inteira.',
+  'Amor ao aprendizado':'Aprenda algo com alguém que faz alguma coisa bem.',
+  'Mente aberta':'Converse com alguém que pensa diferente. Faça uma pergunta para compreender, não para convencer.',
+  'Perspectiva':'Antes de julgar uma atitude difícil, pergunte: "O que eu não estou vendo nessa situação?"',
+  'Generosidade':'Ofereça seu tempo, ajuda ou atenção sem esperar retorno.',
+  'Amor':'Faça algo concreto que comunique a alguém: "Você importa."',
+  'Inteligência emocional':'Perceba alguém que normalmente passa despercebido e demonstre interesse genuíno por essa pessoa.',
+  'Justiça':'Se alguém for tratado injustamente, encontre uma maneira respeitosa de defender sua dignidade.',
+  'Liderança':'Inclua em uma conversa ou decisão alguém que normalmente fica de fora.',
+  'Trabalho em equipe':'Ajude hoje alguém que não pode oferecer nenhuma vantagem a você.',
   'Perdão':'Pense em alguém que você precisa perdoar e dê hoje um pequeno passo nessa direção.',
-  'Humildade':'Em uma conversa hoje, permita que a outra pessoa seja ouvida sem sentir necessidade de mostrar que você está certo.',
-  'Prudência':'Antes de falar hoje sobre alguém, pergunte-se se é verdadeiro, necessário e gentil. Se não for, guarde.',
-  'Autocontrole':'Quando surgir uma situação que normalmente provocaria uma reação negativa, faça uma pausa antes de responder.',
-  'Bravura':'Diga hoje uma verdade necessária com gentileza — ou defenda alguém que não pôde se defender sozinho.',
-  'Integridade':'Cumpra hoje exatamente o que você prometeu, mesmo que ninguém vá conferir.',
-  'Perseverança':'Aproxime-se hoje, mais uma vez, de alguém de quem você já tinha desistido de cuidar.',
-  'Vitalidade':'Leve hoje sua melhor energia para um lugar onde as pessoas costumam chegar cansadas.',
-  'Admiração da beleza e excelência':'Repare hoje em algo bem-feito por alguém e diga a essa pessoa exatamente o que você viu.',
-  'Gratidão':'Agradeça sinceramente alguém cujo trabalho, presença ou cuidado você normalmente considera garantido.',
-  'Esperança':'Procure alguém que esteja desanimado e ofereça uma palavra verdadeira de encorajamento.',
-  'Humor':'Traga hoje leveza a um ambiente tenso — um sorriso, uma boa risada, sem que ninguém seja alvo de piada.',
-  'Espiritualidade':'Ore hoje por alguém pelo nome. Se houver abertura, ore junto com essa pessoa.'
+  'Humildade':'Em uma conversa, faça duas perguntas antes de apresentar sua própria opinião.',
+  'Prudência':'Antes de falar sobre alguém, pergunte: É verdadeiro? É necessário? É construtivo?',
+  'Autocontrole':'Quando surgir uma provocação, faça uma pausa antes de responder.',
+  'Bravura':'Defenda respeitosamente alguém que está sendo humilhado ou injustiçado.',
+  'Integridade':'Cumpra hoje exatamente o que você prometeu, mesmo que ninguém esteja cobrando.',
+  'Perseverança':'Retome o cuidado com alguém de quem você já havia desistido.',
+  'Vitalidade':'Leve sua melhor energia para um ambiente onde as pessoas costumam chegar cansadas.',
+  'Admiração da beleza e excelência':'Reconheça algo bem-feito por alguém e diga exatamente o que você admirou.',
+  'Gratidão':'Agradeça alguém cuja presença ou cuidado você costuma considerar garantido.',
+  'Esperança':'Procure alguém desanimado. Primeiro escute. Depois ofereça uma palavra verdadeira de encorajamento.',
+  'Humor':'Faça alguém sorrir sem transformar ninguém em alvo de piada.',
+  'Espiritualidade':'Ore hoje por alguém. Se houver abertura, pergunte: "Posso orar com você?"'
 };
 function minhaMissao() { return ESCOLHAS.forca ? (MISSOES[ESCOLHAS.forca.nome] || null) : null; }
 function tela6Html() {
@@ -467,22 +476,53 @@ function tela6Html() {
     <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
       <div class="content-card">
         <div class="phase-tag tag-apply">A missão</div>
-        <p class="body-text emb-ago-in" style="margin:0 0 .9rem">Um Embaixador da Esperança não apenas pensa diferente. <strong>Ele procura agir diferente.</strong></p>
-        <p class="body-text emb-ago-in" style="margin:0;animation-delay:.5s">Esta é uma pequena missão para você praticar hoje.</p>
+        <p class="body-text emb-ago-in" style="margin:0 0 .9rem">Uma força só se torna parte de nós quando passa da intenção para a prática.</p>
+        <p class="body-text emb-ago-in" style="margin:0;animation-delay:.5s">Escolha uma pequena missão. Você não precisa realizá-la imediatamente — quando surgir a oportunidade, pratique.</p>
       </div>
       <div class="emb-ago-in" style="animation-delay:1.1s;background:linear-gradient(160deg,var(--navy),var(--navy2));border-radius:var(--radius);padding:1.35rem 1.15rem">
         <div style="font-size:12.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold-mid);margin-bottom:.6rem">${sanitize(ESCOLHAS.forca.nome)}</div>
         <p style="font-family:var(--ff-serif);font-size:21px;line-height:1.55;color:#fff;margin:0">${missao}</p>
       </div>
-      <p class="body-text emb-ago-in" style="margin:0;animation-delay:1.7s;text-align:center;color:var(--text2)">Você pode realizar esta missão quando tiver oportunidade.</p>
-      ${botaoHtml('CONTINUAR', '2.2')}
+      ${botaoHtml('CONTINUAR', '1.7')}
     </div>`;
 }
 
-// TELA 7 — IDENTIFICAÇÃO E REGISTRO DE PARTICIPAÇÃO.
+// TELA 7 — O DESAFIO (nova em setembro/2026). Fica entre a missão e o registro de
+// participação: fecha a reflexão da campanha ("Construindo pontes") antes do registro.
+function tela7Html() {
+  return `
+    ${dotsHtml()}
+    <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card">
+        <div class="phase-tag tag-question">O desafio</div>
+        <p class="body-text emb-ago-in" style="margin:0 0 .8rem">Existe uma diferença entre tolerar e valorizar.</p>
+        <p class="body-text emb-ago-in" style="margin:0 0 .3rem;animation-delay:.4s;color:var(--text3)">Tolerar pode significar:</p>
+        <p class="body-text emb-ago-in" style="margin:0 0 .8rem;animation-delay:.6s">"Eu não gosto de você, mas aceito que esteja aqui."</p>
+        <p class="body-text emb-ago-in" style="margin:0 0 .3rem;animation-delay:1s;color:var(--text3)">Valorizar significa:</p>
+        <p class="body-text emb-ago-in" style="margin:0;animation-delay:1.2s"><strong>"Mesmo sendo diferente de mim, reconheço que sua vida tem dignidade e valor."</strong></p>
+      </div>
+      <div class="content-card emb-ago-in" style="animation-delay:1.7s">
+        <p class="body-text" style="margin:0 0 .7rem">Um Embaixador da Esperança não precisa concordar com todos. Mas procura:</p>
+        <div style="display:flex;flex-direction:column;gap:.35rem;padding-left:.85rem;border-left:3px solid var(--blue-light);font-size:17px;line-height:1.55;color:var(--text2)">
+          <div>ouvir antes de responder;</div>
+          <div>compreender antes de julgar;</div>
+          <div>incluir antes de excluir;</div>
+          <div>perdoar antes de desistir.</div>
+        </div>
+      </div>
+      <div class="emb-ago-in" style="animation-delay:2.3s;background:linear-gradient(160deg,var(--navy),var(--navy2));border-radius:var(--radius);padding:1.35rem 1.15rem;text-align:center">
+        <p style="font-family:var(--ff-serif);font-size:19px;line-height:1.5;color:#fff;margin:0 0 .5rem">A próxima vez que encontrar alguém muito diferente de você, experimente fazer uma pergunta:</p>
+        <p style="font-family:var(--ff-serif);font-style:italic;font-size:21px;color:var(--gold-mid);margin:0">"O que eu ainda não sei sobre você?"</p>
+      </div>
+      ${botaoHtml('ACEITAR O DESAFIO', '2.8')}
+    </div>`;
+}
+
+// TELA 8 — IDENTIFICAÇÃO E REGISTRO DE PARTICIPAÇÃO. Era a tela 7; passou a ser a 8 quando
+// "O desafio" entrou na sequência em setembro/2026.
 // Aqui está a única diferença em relação ao app dos Pequenos Grupos: quem não pertence a
 // um PG não tem cadastro de participante, então informa nome e setor.
-function tela7Html() {
+function tela8Html() {
   const registro = carregar(CHAVE_REGISTRO);
   if (registro && registro.monthKey === mesAtual()) {
     return `
@@ -491,7 +531,7 @@ function tela7Html() {
       <div style="background:var(--teal-light);border:0.5px solid var(--teal);border-radius:var(--radius);padding:1.35rem 1.15rem;text-align:center">
         <div style="font-size:40px;line-height:1;margin-bottom:.5rem">✅</div>
         <div style="font-size:19px;font-weight:700;color:#04342C;line-height:1.35">Participação registrada</div>
-        <div style="font-size:16px;color:#04342C;margin-top:.35rem">Embaixadores da Esperança — Agosto/${mesAtual().split('-')[0]}</div>
+        <div style="font-size:16px;color:#04342C;margin-top:.35rem">Embaixadores da Esperança — ${mesLabel(mesAtual())}</div>
         <div style="font-size:14px;color:var(--text3);margin-top:.5rem">${sanitize(registro.nome)} · ${sanitize(registro.setor)}</div>
         <div style="font-size:14px;color:var(--text3);margin-top:.2rem">Registrada em ${sanitize(registro.data)}</div>
       </div>
@@ -507,7 +547,7 @@ function tela7Html() {
       <div class="content-card">
         <div class="phase-tag tag-close">Participação</div>
         <p class="body-text emb-ago-in" style="margin:0 0 .9rem"><strong>Sua participação termina aqui.</strong></p>
-        <p class="body-text emb-ago-in" style="margin:0;animation-delay:.4s">Registre sua participação para que a Capelania saiba que <strong>o seu setor</strong> esteve presente nos Embaixadores da Esperança de Agosto.</p>
+        <p class="body-text emb-ago-in" style="margin:0;animation-delay:.4s">Registre sua participação para que a Capelania saiba que <strong>o seu setor</strong> esteve presente nos Embaixadores da Esperança de ${mesLabel(mesAtual())}.</p>
       </div>
       ${resumoHtml()}
       <div class="content-card">
@@ -530,21 +570,22 @@ function tela7Html() {
     </div>`;
 }
 
-// BLOCO DO ENVIO — fecho do arco que abre na tela de acolhimento com "A esperança começa em
-// mim.". Só aparece depois do registro: quem ainda está diante do formulário pode registrar,
-// e o fecho ali seria um encerramento que a pessoa não pediu. Mesma regra do app dos PGs.
+// BLOCO DO ENVIO — fecho do arco que abre na tela de acolhimento com "A próxima ponte pode
+// começar com você" e termina aqui em "e escolho construir uma ponte." Só aparece depois do
+// registro: quem ainda está diante do formulário pode registrar, e o fecho ali seria um
+// encerramento que a pessoa não pediu. Mesma regra e mesmo texto do app dos PGs.
 function envioHtml() {
   return `
       <div class="content-card" style="border-left:3px solid var(--teal)">
         <div class="phase-tag tag-apply">O envio</div>
         <p class="body-text" style="margin:0 0 .9rem">Mas a jornada não termina aqui.</p>
-        <p class="body-text" style="margin:0 0 .9rem">A missão que você recebeu começa agora — quando você sair desta tela e voltar para a vida real.</p>
-        <p class="body-text" style="margin:0 0 .9rem"><strong>Você não precisa mudar o mundo inteiro.</strong> Comece mudando aquilo que está ao seu alcance: você mesmo.</p>
-        <p class="body-text" style="margin:0 0 .9rem">Permita que Deus transforme sua vida, fortaleça sua fé e faça de você um instrumento de esperança na vida de outras pessoas.</p>
-        <p class="body-text" style="margin:0">A jornada continua. E o próximo passo é seu.</p>
+        <p class="body-text" style="margin:0 0 .9rem">Talvez você não consiga mudar uma opinião. Talvez não consiga resolver um conflito. Talvez uma relação não seja reconstruída em um único encontro.</p>
+        <p class="body-text" style="margin:0 0 .9rem"><strong>Mas você pode escolher como estará diante do outro.</strong></p>
+        <p class="body-text" style="margin:0 0 .9rem">Permita que Deus transforme seu olhar, fortaleça sua fé e faça de você uma presença de esperança.</p>
+        <p class="body-text" style="margin:0"><strong>Você não precisa mudar o mundo inteiro.</strong> Comece pela próxima pessoa que Deus colocar no seu caminho.</p>
       </div>
       <div style="background:linear-gradient(160deg,var(--navy),var(--navy2));border-radius:var(--radius);padding:1.35rem 1.15rem;text-align:center">
-        <p style="font-family:var(--ff-serif);font-style:italic;font-size:21px;line-height:1.5;color:var(--gold-mid);margin:0">A esperança começa quando eu encontro o outro.</p>
+        <p style="font-family:var(--ff-serif);font-style:italic;font-size:21px;line-height:1.5;color:var(--gold-mid);margin:0">A esperança começa quando eu enxergo o outro — e escolho construir uma ponte.</p>
       </div>`;
 }
 
@@ -632,14 +673,13 @@ async function registrarParticipacao() {
 
 // ── NAVEGAÇÃO ─────────────────────────────────────────────────────────────────
 function avancar() {
-  if (ETAPA === 2 && SUB < 2) { SUB++; render(); return; }
-  if (ETAPA < 7) { ETAPA++; if (ETAPA !== 2) SUB = 0; render(); window.scrollTo(0, 0); }
+  if (ETAPA < 8) { ETAPA++; render(); window.scrollTo(0, 0); }
 }
-function reverExperiencia() { ETAPA = 0; SUB = 0; render(); window.scrollTo(0, 0); }
+function reverExperiencia() { ETAPA = 0; render(); window.scrollTo(0, 0); }
 function responderTemPg(temPg) { TEM_PG = temPg; render(); window.scrollTo(0, 0); }
 
 function render() {
-  const telas = [aberturaHtml, tela1Html, tela2Html, tela3Html, tela4Html, tela5Html, tela6Html, tela7Html];
+  const telas = [aberturaHtml, tela1Html, tela2Html, tela3Html, tela4Html, tela5Html, tela6Html, tela7Html, tela8Html];
   const faixa = MODO_TESTE ? '<div class="faixa-teste">MODO DE TESTE · nada é gravado na nuvem</div>' : '';
   const conteudo = TEM_PG === null ? portaHtml()
                  : TEM_PG === true ? avisoTemPgHtml()
@@ -652,7 +692,7 @@ function render() {
   const registro = carregar(CHAVE_REGISTRO);
   // Quem já registrou obviamente já respondeu a porta — repetir a pergunta deixaria a tela
   // de confirmação inalcançável.
-  if (registro && registro.monthKey === mesAtual()) { TEM_PG = false; ETAPA = 7; }
+  if (registro && registro.monthKey === mesAtual()) { TEM_PG = false; ETAPA = 8; }
   render();
 })();
 </script>
