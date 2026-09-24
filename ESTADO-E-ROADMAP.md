@@ -6,7 +6,96 @@
 
 ---
 
-# ⏰ RETOMAR EM 2026-08-28, A PARTIR DAS 08h — encerramento da sessão de 27/08
+# ⏰ RETOMAR NO PC DO TRABALHO — sessão de 2026-09-23
+
+> ⚠️ **Este documento ficou 4 semanas sem atualização** (o bloco anterior era de 27–28/08). No meio
+> desse tempo entraram no repositório os arquivos `AUDIT-00..17-*.md` e `MUTIRAO-00..17-*.md` (uma
+> auditoria grande de reentrada em convites + o recurso do Mutirão de Natal, que já está em produção),
+> e existe uma branch `audit/fix-invite-reentry` no GitHub ainda não mesclada ao `main`. Nada disso foi
+> feito nesta sessão nem está narrado aqui — só o que segue abaixo é desta sessão. Vale um
+> levantamento retroativo desse período antes de confiar cegamente na continuidade deste arquivo.
+
+## O que foi feito hoje (tudo já publicado — commits `1310fea` → `b798510`)
+
+**1. Levantamento de participação — Embaixadores da Esperança (leitura direta da produção, nada
+alterado).** Agosto: 61 confirmações / 334 participantes / 24 de 48 PGs. Setembro (ainda em
+andamento na hora da consulta): 44 confirmações / 16 PGs. Painel de contagem por setor (externos):
+zero em agosto, 1 lançamento em setembro (3 pessoas, 14/09). A coleção raiz `embaixadoresExternos`
+(onde o app dos externos grava individualmente) **é ilegível por fora** — `allow read: if false` em
+[firestore.rules:127](firestore.rules#L127), de propósito, para não expor nomes por consulta pública.
+Só dá para ver pelo **Console do Firebase**, com login de dono do projeto.
+
+**2. Conteúdo novo dos Embaixadores da Esperança para setembro ("Construindo pontes"), nos dois apps.**
+Pedido do Capelão: o texto de agosto continuava no ar mesmo com setembro rodando (o selo do mês na
+tela de abertura estava **fixo** em "AGOSTO" — bug real, corrigido). Trocado o texto das 8 telas e
+**acrescentada uma tela nova, "O desafio"**, entre a missão e o registro — a jornada passou de 8 para
+9 posições numeradas (retorno incluído). Detalhe que importa: os registros de participação de
+setembro feitos com o texto ANTIGO **continuam válidos** — `confirmarEmbaixadores()` (a função que
+grava) não foi tocada, e o bloqueio contra confirmar duas vezes é por **mês civil**, não por versão
+do texto.
+
+- `index.html`: telas `embAgoTela1Html`..`embAgoTela9Html` reescritas (abertura → diferença → ponte →
+  espelho [9 opções, era 8] → entrega → força → missão → **desafio [nova]** → participação → retorno
+  [ganhou a opção "Tentei, mas foi difícil." e "Percebi algo novo sobre mim."]). Removido o mecanismo
+  `EMB_AGO_SUB` (revelação em 3 partes), que só a antiga tela do "problema"/rótulos usava. As 24
+  missões (`EMB_AGO_MISSOES`) todas reescritas. Selo do mês agora usa `embMonthLabel(embMonthKey())`
+  em vez de texto fixo. Publicado no commit `1310fea` (verificado: diff local idêntico ao commit).
+- `embaixadores-agosto.html` (app dos externos, cópia de código independente): mesmas mudanças,
+  adaptadas aos nomes próprios do arquivo (`ETAPA`, `tela1Html..tela8Html`, `ESPELHO`, `MISSOES`).
+  Ganhou `mesLabel()`/`MESES_PT` (o app não tinha essas funções) e o `<title>` da aba também virou
+  dinâmico (commit `07dfdc2`).
+
+  **⚠️ INCIDENTE durante esta edição — registrar para não repetir.** O GitHub Desktop do usuário
+  **commitou e publicou sozinho, duas vezes, no meio da edição** (`d8d9788` e `d76f485`), pegando o
+  arquivo num estado inconsistente: a variável `SUB` tinha sido removida da declaração, mas
+  `avancar()`/`reverExperiencia()` ainda a referenciavam → `ReferenceError: SUB is not defined` em
+  **todo clique de avançar** — a jornada inteira do app dos externos ficou quebrada em produção por um
+  tempo, para qualquer pessoa real tentando usar. Corrigido terminando a edição e o usuário commitando
+  de novo (`942c417`); verificado ao vivo (fetch com cache-bust da URL publicada + clique em todas as
+  8 telas, sem erro). **Lição para a próxima vez que este arquivo for editado:** o GitHub Desktop
+  parece sincronizar em segundos, mesmo no meio de uma sequência de edições — para mudanças estruturais
+  que tocam uma variável usada em várias funções (como remover `SUB`), ou fazer tudo numa edição só, ou
+  pedir para o usuário pausar a sincronização automática enquanto dura a edição. Ver
+  [[feedback_arvore_sempre_publicavel]].
+
+**3. Botão do cartão "🌟 Embaixadores da Esperança" redesenhado**, em Desafios do Discipulado
+(`renderEmbaixadoresMissoes()`, `index.html` por volta da linha 5433). Pedido do Capelão: diferenciar
+do botão antigo, aumentar a fonte do selo do mês, e chamar atenção. Selo 10.5px→14px/peso 800; frase
+"**Construindo pontes:**" acrescentada antes da descrição; botão trocou de branco liso para gradiente
+dourado com brilho pulsante (`@keyframes embAgoCtaPulse` / classe `.emb-ago-cta`, respeita "reduzir
+movimento"). Publicado no commit `b798510`.
+
+**4. Mutirão de Natal — total consultado direto da produção** (`jdpg/mutirao/2026/{pgNum}`, leitura
+pública). Em 23/09: **só o PG 6 "Serviço Social" tem entregas** — 5 registros, **22,5 kg no total**,
+todos de participantes do próprio PG (zero de colaboradores externos). Os outros 69 PGs ainda não têm
+nenhum documento criado.
+
+**5. Imagem de convite para WhatsApp** (colaboradores sem Pequeno Grupo, direciona para o app dos
+externos). Entregue como arquivo direto ao usuário — **não entrou no repositório** (é peça de
+divulgação, não código do app; mesma lógica do "Fora do app (não versionar)" já usado neste
+documento). Passou por uma revisão a pedido do Capelão: frase de abertura trocada, uma linha nova
+adicionada, e o espaço do botão deixado **vazio de propósito** para ele inserir o botão dele depois.
+**Link real a colar como legenda no WhatsApp** (imagem sozinha nunca é clicável):
+`https://capelaniahospitalar.github.io/jornada-pequenos-grupos/embaixadores-agosto.html`
+
+## Arquivos só desta máquina — não precisam viajar, recriar se precisar
+
+`.claude/launch.json` (no `.gitignore`) com dois servidores locais de teste ("static" na porta 8000
+servindo a raiz do repo, "scratch" na porta 8001 servindo o scratchpad da sessão) + `serve.ps1` no
+scratchpad. Servem só para pré-visualizar com `?teste=1` antes de publicar; o app não depende disso.
+
+## Pendências abertas ao encerrar
+
+1. **Reconciliar os últimos ~30 dias deste documento** (2026-08-28 → 2026-09-23) — ver o aviso no
+   topo desta seção.
+2. **Conferir o total de participação de setembro perto do fim do mês**, para comparar com os
+   61/334/24 PGs de agosto.
+3. **A imagem de convite ainda precisa do botão** (o usuário vai inserir) e do link colado como
+   legenda na hora de enviar pelo WhatsApp.
+
+---
+
+## 🛑 PONTO DE PARADA — 2026-08-27/28 — encerramento daquela sessão (histórico)
 
 ## Publicado hoje
 

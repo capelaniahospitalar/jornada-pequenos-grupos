@@ -1,5 +1,36 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-09-23] — Embaixadores da Esperança: conteúdo de setembro ("Construindo pontes") + nova tela "O desafio"
+
+**Pedido do Capelão:** o texto de agosto continuava valendo mesmo com setembro em andamento — a tela
+de abertura tinha o selo do mês **fixo** em "AGOSTO" (bug real, corrigido para usar
+`embMonthLabel(embMonthKey())`, o mesmo cálculo já usado no resto do app). Trocado o texto das 8 telas
+e acrescentada uma tela nova, **"O desafio"**, entre a missão e o registro de participação — a jornada
+passa de 8 para 9 posições numeradas (contando o retorno opcional).
+
+**Escopo:** os dois apps (`index.html`, jornada dos PGs; `embaixadores-agosto.html`, jornada dos
+colaboradores sem PG — cópias de código independentes desde 17/08). Não tocou em
+`confirmarEmbaixadores()` nem em nenhuma função de gravação: quem já confirmou participação em
+setembro com o texto antigo continua registrado — o bloqueio contra duplicidade é por mês civil, não
+por versão do texto.
+
+**Detalhe técnico removido:** o mecanismo `SUB`/`EMB_AGO_SUB` (revelação em 3 partes que só a antiga
+tela do "problema"/rótulos usava) saiu dos dois arquivos — a tela nova "A ponte" não precisa dele.
+
+**Incidente e correção, só no `embaixadores-agosto.html`:** o GitHub Desktop publicou o arquivo duas
+vezes **no meio da edição**, com a variável `SUB` já removida da declaração mas ainda referenciada em
+`avancar()`/`reverExperiencia()` — `ReferenceError` em todo clique de avançar, quebrando a jornada
+inteira em produção por um tempo. Corrigido ao terminar a edição e publicar de novo; verificado ao
+vivo (fetch com cache-bust + clique nas 8 telas, sem erro).
+
+**Também nesta leva:** botão do cartão "🌟 Embaixadores da Esperança" em Desafios do Discipulado
+redesenhado (selo do mês maior, frase "Construindo pontes:", botão dourado com brilho pulsante em vez
+do branco liso — pedido explícito para diferenciar do anterior e chamar atenção).
+
+Ver `ESTADO-E-ROADMAP.md` (sessão de 23/09) para os detalhes completos, inclusive os números de
+participação consultados na produção (agosto: 61/334/24 PGs; setembro parcial: 44/334/16 PGs) e o
+total do Mutirão de Natal (22,5 kg, só o PG 6).
+
 ## [2026-08-28] — PG 47 "Diretoria": os 13 temas abertos ao mesmo tempo, em leitura livre
 
 **O pedido.** Os diretores acompanham Pequenos Grupos diferentes, e cada PG está parado num tema
