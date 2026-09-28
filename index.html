@@ -1383,17 +1383,17 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 }
 .mutirao-ico{font-size:26px;flex-shrink:0}
 .mutirao-title{flex:1;min-width:0}
-/* Título em caixa alta e corpo grande: é a chamada do Mutirão na Home. O total em kg fica
-   na segunda linha (.mutirao-l2) para o título caber inteiro mesmo em tela de 320px. */
+/* Título em caixa alta e corpo grande: é a chamada do Mutirão na Home. Quebrado em duas
+   linhas de propósito, para liberar a lateral direita para o total em kg (.mutirao-big). */
 .mutirao-name{font-size:21px;font-weight:800;color:#fff;font-family:var(--ff-body);
   text-transform:uppercase;letter-spacing:.4px;line-height:1.15}
-.mutirao-l2{display:flex;align-items:center;gap:8px;margin-top:3px}
-.mutirao-sub{font-size:12px;color:rgba(255,255,255,.72);font-family:var(--ff-body)}
-.mutirao-total{
-  display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.18);
-  border-radius:20px;padding:3px 9px;font-size:12px;color:#fff;
-  font-family:var(--ff-body);font-weight:600;flex-shrink:0
-}
+/* Total do PG em fonte gigante, na lateral — é o número que chama a atenção. */
+.mutirao-big{display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;
+  color:#fff;font-family:var(--ff-body);line-height:1}
+.mutirao-big-n{font-size:40px;font-weight:800;letter-spacing:-.5px}
+/* Acima de 5 caracteres (ex.: 1150,75) os 40px espremem o título em 3 linhas numa tela de 320px. */
+.mutirao-big-n.longo{font-size:30px}
+.mutirao-big-u{font-size:13px;font-weight:700;opacity:.85;margin-top:2px}
 .mutirao-body{padding:.85rem 1rem}
 
 /* Cabeçalho da tela do Mutirão — mesma forma do .comm-hdr, só a cor muda. */
@@ -13329,6 +13329,7 @@ function renderMutiraoBtnHome() {
   const t = (typeof calcularTotalKgNatalDoPG === 'function')
     ? calcularTotalKgNatalDoPG(mg.grupoNum)
     : { participantes: 0, externos: 0, total: 0, entregas: 0 };
+  const kg = mutiraoFmt(t.total);
   const div = document.createElement('div');
   div.id = 'mutirao-card';
   div.className = 'mutirao-card';
@@ -13338,12 +13339,12 @@ function renderMutiraoBtnHome() {
     <button class="mutirao-hdr" onclick="openMutirao()">
       <span class="mutirao-ico">🎁</span>
       <div class="mutirao-title">
-        <div class="mutirao-name">Mutirão de Natal</div>
-        <div class="mutirao-l2">
-          <span class="mutirao-sub">Registre a sua entrega</span>
-          <span class="mutirao-total">${mutiraoFmt(t.total)} kg</span>
-        </div>
+        <div class="mutirao-name">Mutirão<br>de Natal</div>
       </div>
+      <span class="mutirao-big">
+        <span class="mutirao-big-n${kg.length > 5 ? ' longo' : ''}">${kg}</span>
+        <span class="mutirao-big-u">kg</span>
+      </span>
       <span style="color:#fff;font-size:20px;flex-shrink:0">›</span>
     </button>`;
 
