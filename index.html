@@ -1394,6 +1394,17 @@ html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-
 /* Acima de 5 caracteres (ex.: 1150,75) os 40px espremem o título em 3 linhas numa tela de 320px. */
 .mutirao-big-n.longo{font-size:30px}
 .mutirao-big-u{font-size:13px;font-weight:700;opacity:.85;margin-top:2px}
+/* Total do PIX do PG, abaixo dos kg — menor, para não espremer o título em 320px. */
+.mutirao-big-r{font-size:16px;font-weight:800;margin-top:6px;white-space:nowrap}
+.mut-pix-chave{
+  font-size:12.5px;line-height:1.45;color:var(--text);background:var(--bg);word-break:break-all;
+  border:0.5px dashed var(--orange);border-radius:var(--radius-sm);padding:.6rem .7rem;font-family:monospace
+}
+.mut-btn-sec{
+  background:var(--card);color:var(--orange);border:1.5px solid var(--orange);border-radius:var(--radius-sm);
+  padding:.75rem;font-size:17px;font-weight:700;cursor:pointer;width:100%;
+  font-family:var(--ff-body);letter-spacing:.5px;text-transform:uppercase
+}
 .mutirao-body{padding:.85rem 1rem}
 
 /* Cabeçalho da tela do Mutirão — mesma forma do .comm-hdr, só a cor muda. */
@@ -4144,6 +4155,9 @@ function htmlMutiraoDashboard(pgNum) {
       <div class="mut-kpi-lbl">Arrecadação</div>
       <div style="font-size:36px;font-weight:700;color:var(--orange);font-family:var(--ff-body);line-height:1.1">${mutiraoFmt(r.totalKg)} kg</div>
       <div class="mut-kpi-sub" style="margin-bottom:.9rem">total arrecadado pelo Pequeno Grupo</div>
+      ${mutiraoPixAtivo() ? (() => { const p = calcularTotalPixNatalDoPG(pgNum); return `
+      <div style="font-size:28px;font-weight:700;color:var(--orange);font-family:var(--ff-body);line-height:1.1">${mutiraoFmtReais(p.total)}</div>
+      <div class="mut-kpi-sub" style="margin-bottom:.9rem">em PIX · ${p.lancamentos} ${plural(p.lancamentos, 'lançamento', 'lançamentos')}</div>`; })() : ''}
 
       <div style="display:flex;gap:.7rem;margin-bottom:1rem">
         <div class="mut-kpi">
@@ -13344,6 +13358,7 @@ function renderMutiraoBtnHome() {
       <span class="mutirao-big">
         <span class="mutirao-big-n${kg.length > 5 ? ' longo' : ''}">${kg}</span>
         <span class="mutirao-big-u">kg</span>
+        ${mutiraoPixAtivo() ? `<span class="mutirao-big-r">${mutiraoFmtReais(calcularTotalPixNatalDoPG(mg.grupoNum).total)}</span>` : ''}
       </span>
       <span style="color:#fff;font-size:20px;flex-shrink:0">›</span>
     </button>`;
@@ -13361,6 +13376,8 @@ function renderMutiraoBtnHome() {
 // não uma validação que se possa contornar.
 function openMutirao() {
   if (typeof loadGrupos === 'function') loadGrupos();
+  mutiraoPixAberto = false;      // o quadro do PIX sempre abre fechado, e vazio
+  const pixVelho = document.getElementById('mut-pix'); if (pixVelho) pixVelho.value = '';
   renderMutirao(null);           // null = abre a tela sem faixa nenhuma
   showScreen('mutirao');
   // Puxa o que os outros aparelhos do PG registraram. A tela já apareceu com o dado local:
@@ -13373,6 +13390,7 @@ function openMutirao() {
 // de a pessoa responder. renderMutirao() sem argumento nenhum (o caso do callback de sync)
 // mantém a faixa que estiver na tela; renderMutirao(null) apaga.
 let mutiraoFaixa = null;   // { msg, confirmarId } ou null
+let mutiraoPixAberto = false;   // quadro do PIX aberto? — sobrevive ao redesenho da sincronização
 
 function renderMutirao(msg, confirmarId) {
   if (arguments.length > 0) mutiraoFaixa = msg ? { msg: msg, confirmarId: confirmarId || null } : null;
@@ -13395,12 +13413,22 @@ function renderMutirao(msg, confirmarId) {
   const doPg     = calcularTotalKgNatalDoPG(mg.grupoNum);
   const dataBr   = mutiraoDataBr;   // FASE 6: fonte única
 
-  const historico = minhas.length
-    ? minhas.slice().reverse().map(e => `
+  // PIX: o código mostrado é o da gerência do setor do PG (MUTIRAO_PIX_SETOR_GERENCIA).
+  const pix         = mutiraoPixAtivo();
+  const gerPix      = pix ? mutiraoPixGerenciasDoPG(mg.grupoNum) : [];
+  const meusPix     = pix ? listarMeusPixNatal(mg.grupoNum) : [];
+  const meuTotalPix = Number(meusPix.reduce((a, e) => a + (e.valorReais || 0), 0).toFixed(2));
+  const doPgPix     = pix ? calcularTotalPixNatalDoPG(mg.grupoNum).total : 0;
+  // O redesenho da sincronização não pode apagar o valor que a pessoa está digitando.
+  const pixDigitado = (document.getElementById('mut-pix') || {}).value || '';
+
+  const meusRegistros = minhas.concat(meusPix).sort((a, b) => (a.ts || 0) - (b.ts || 0));
+  const historico = meusRegistros.length
+    ? meusRegistros.slice().reverse().map(e => `
         <div class="mut-linha">
-          <span style="font-size:14.5px;color:var(--text2)">${dataBr(e.data)}</span>
+          <span style="font-size:14.5px;color:var(--text2)">${dataBr(e.data)}${e.tipoOrigem === MUTIRAO_PIX_ORIGEM ? ' · PIX' : ''}</span>
           <span style="display:flex;align-items:baseline;gap:10px">
-            <span style="font-size:15px;font-weight:700;color:var(--orange)">${mutiraoFmt(e.quantidadeKg)} kg</span>
+            <span style="font-size:15px;font-weight:700;color:var(--orange)">${e.tipoOrigem === MUTIRAO_PIX_ORIGEM ? mutiraoFmtReais(e.valorReais) : mutiraoFmt(e.quantidadeKg) + ' kg'}</span>
             <button class="mut-corrigir" onclick="corrigirEntregaMutiraoUI('${e.entregaId}')">corrigir</button>
           </span>
         </div>`).join('')
@@ -13431,18 +13459,42 @@ function renderMutirao(msg, confirmarId) {
       <div style="font-size:12.5px;color:var(--text3);font-family:var(--ff-body);margin-top:.6rem;text-align:center">
         A entrega será registrada em seu nome: <strong>${sanitize(mg.nome || '')}</strong>
       </div>
+      ${pix ? `
+      <button class="mut-btn-sec" style="margin-top:1rem" onclick="alternarPixMutiraoUI()">💲 Registrar PIX</button>
+      <div id="mut-pix-box" style="display:${mutiraoPixAberto ? 'block' : 'none'};margin-top:.85rem">
+        ${gerPix.length ? gerPix.map(k => `
+        <div style="margin-bottom:.8rem">
+          <div style="font-size:14px;color:var(--text3);font-family:var(--ff-body);margin-bottom:4px">Código PIX — ${sanitize(MUTIRAO_PIX_GERENCIAS[k].nome)}</div>
+          <div class="mut-pix-chave">${sanitize(MUTIRAO_PIX_GERENCIAS[k].codigo)}</div>
+          <button id="mut-pix-copiar-${k}" class="mut-btn-sec" style="margin-top:.6rem;font-size:15px;padding:.6rem" onclick="copiarChavePixMutiraoUI('${k}')">Copiar código PIX</button>
+        </div>`).join('') + `
+        <div style="font-size:13px;color:var(--text3);font-family:var(--ff-body);margin:.2rem 0 .4rem">No app do seu banco, escolha <strong>PIX Copia e Cola</strong>, cole o código e confira o recebedor: <strong>${sanitize(MUTIRAO_PIX.recebedor)}</strong>. Digite o valor no banco, transfira e informe abaixo o valor enviado.<br><br>Caso você consiga uma doação de um amigo, copie este mesmo código PIX e envie para a pessoa via WhatsApp, e registre aqui o valor que o amigo enviou.</div>`
+        : `<div style="font-size:14.5px;color:var(--text2);font-family:var(--ff-body);margin-bottom:.6rem">O código PIX do setor do seu Pequeno Grupo ainda não foi cadastrado. Fale com a Capelania.</div>`}
+        ${gerPix.length ? `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:.35rem">
+          <span style="font-size:19px;font-weight:600;color:var(--text3);font-family:var(--ff-body)">R$</span>
+          <input id="mut-pix" class="mut-inp" type="text" inputmode="decimal" autocomplete="off"
+                 maxlength="9" placeholder="0,00" value="${sanitize(pixDigitado)}" onkeydown="if(event.key==='Enter')registrarPixMutiraoUI()">
+        </div>
+        <div id="mut-pix-aviso" style="font-size:13.5px;color:var(--coral);font-family:var(--ff-body);min-height:19px;margin-bottom:.5rem"></div>
+        <button id="mut-pix-btn" class="mut-btn" onclick="registrarPixMutiraoUI()">Confirmar PIX</button>` : ''}
+      </div>` : ''}
     </div>
 
     <div class="content-card" style="margin-top:.85rem">
       <div class="mut-sec-tit">Minha participação</div>
-      <div style="font-size:30px;font-weight:700;color:var(--orange);font-family:var(--ff-body);line-height:1.1">${mutiraoFmt(meuTotal)} kg</div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:30px;font-weight:700;color:var(--orange);font-family:var(--ff-body);line-height:1.1">
+        <span>${mutiraoFmt(meuTotal)} kg</span>${pix ? `<span style="font-size:24px">${mutiraoFmtReais(meuTotalPix)}</span>` : ''}
+      </div>
       <div style="font-size:13px;color:var(--text3);font-family:var(--ff-body);margin-bottom:.7rem">no total que você já entregou</div>
       ${historico}
     </div>
 
     <div class="content-card" style="margin-top:.85rem">
       <div class="mut-sec-tit">Meu PG — ${sanitize(mg.grupoNome || ('Grupo ' + mg.grupoNum))}</div>
-      <div style="font-size:30px;font-weight:700;color:var(--orange);font-family:var(--ff-body);line-height:1.1">${mutiraoFmt(doPg.total)} kg</div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:30px;font-weight:700;color:var(--orange);font-family:var(--ff-body);line-height:1.1">
+        <span>${mutiraoFmt(doPg.total)} kg</span>${pix ? `<span style="font-size:24px">${mutiraoFmtReais(doPgPix)}</span>` : ''}
+      </div>
       <div style="font-size:13px;color:var(--text3);font-family:var(--ff-body)">arrecadados pelo Pequeno Grupo</div>
     </div>
 
@@ -13509,6 +13561,7 @@ function confirmarEntregaMutiraoUI() {
 // campo, para a pessoa digitar o número certo sem ter de lembrar o que errou.
 function corrigirEntregaMutiraoUI(entregaId) {
   const antes = mutiraoLoadEntregas().find(x => x.entregaId === entregaId);
+  if (antes && antes.tipoOrigem === MUTIRAO_PIX_ORIGEM) return corrigirPixMutiraoUI(entregaId);
   const kgAntes = antes ? antes.quantidadeKg : null;
 
   const r = anularEntregaNatal(entregaId);
@@ -13531,6 +13584,101 @@ function corrigirEntregaMutiraoUI(entregaId) {
     const depois = document.getElementById('mut-kg');
     if (depois && atual) depois.value = atual;
   });
+}
+
+// ── PIX — tela do participante ───────────────────────────────────────────────
+function alternarPixMutiraoUI() {
+  mutiraoPixAberto = !mutiraoPixAberto;
+  const box = document.getElementById('mut-pix-box');
+  if (box) box.style.display = mutiraoPixAberto ? 'block' : 'none';
+}
+
+// Copia a chave. Celulares antigos (ou página sem HTTPS) não têm navigator.clipboard —
+// nesse caso usa o caminho antigo, por um campo invisível.
+function copiarChavePixMutiraoUI(gerKey) {
+  const ger = MUTIRAO_PIX_GERENCIAS[gerKey];
+  if (!ger) return;
+  const btn = document.getElementById('mut-pix-copiar-' + gerKey);
+  const avisar = (ok) => {
+    if (!btn) return;
+    btn.textContent = ok ? '✅ Código copiado' : 'Não foi possível copiar — selecione o código e copie';
+    setTimeout(() => { if (btn) btn.textContent = 'Copiar código PIX'; }, 2500);
+  };
+  const antigo = () => {
+    try {
+      const t = document.createElement('textarea');
+      t.value = ger.codigo; t.setAttribute('readonly', '');
+      t.style.position = 'fixed'; t.style.opacity = '0';
+      document.body.appendChild(t); t.select();
+      const ok = document.execCommand('copy');
+      t.remove(); avisar(ok);
+    } catch (_) { avisar(false); }
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(ger.codigo).then(() => avisar(true), antigo);
+  } else antigo();
+}
+
+function registrarPixMutiraoUI() {
+  const inp = document.getElementById('mut-pix');
+  const aviso = document.getElementById('mut-pix-aviso');
+  const btn = document.getElementById('mut-pix-btn');
+  if (!inp || !btn) return;
+
+  const valor = mutiraoNormalizarReais(inp.value);
+  if (valor === null) {
+    if (aviso) aviso.textContent = mutiraoAvisoReais(inp.value);
+    inp.focus();
+    return;
+  }
+
+  btn.disabled = true;
+  let r = registrarMeuPixNatal({ valorReais: valor });
+  // Mesma regra dos quilos: PIX igual no mesmo dia — a pessoa decide se é um novo.
+  if (!r.ok && r.motivo === 'duplicata_possivel') {
+    const seguir = confirm(
+      'Você já registrou um PIX de ' + mutiraoFmtReais(r.existente.valorReais) + ' em ' + mutiraoDataBr(r.existente.data) + '.\n\n' +
+      'Este é um PIX NOVO, além daquele?\n\n' +
+      'OK — sim, registrar mais ' + mutiraoFmtReais(valor) + '\n' +
+      'Cancelar — não registrar nada');
+    if (!seguir) {
+      btn.disabled = false;
+      if (aviso) aviso.textContent = 'Nada foi registrado. O PIX anterior continua no seu histórico.';
+      inp.value = '';
+      return;
+    }
+    r = registrarMeuPixNatal({ valorReais: valor, confirmarDuplicata: true });
+  }
+  btn.disabled = false;
+
+  if (!r.ok) {
+    if (aviso) aviso.textContent = (r.motivo === 'sem_grupo')
+      ? 'Não foi possível identificar o seu Pequeno Grupo.'
+      : 'Não foi possível registrar (' + (r.detalhe || r.motivo) + ').';
+    return;
+  }
+  inp.value = '';
+  mutiraoPixAberto = false;
+  renderMutirao('✅ PIX de ' + mutiraoFmtReais(valor) + ' registrado. Está certo?',
+                r.entrega && r.entrega.entregaId);
+  mutiraoSincronizarEDepois(mutiraoMeuPgNum(), () => renderMutirao());
+}
+
+// Anula o PIX (tombstone) e devolve o valor ao campo, com o quadro aberto.
+function corrigirPixMutiraoUI(entregaId) {
+  const antes = mutiraoLoadEntregas().find(x => x.entregaId === entregaId);
+  const r = anularEntregaNatal(entregaId);
+  if (!r.ok) {
+    renderMutirao(r.motivo === 'sem_autoridade'
+      ? '⚠️ Só quem registrou este PIX, ou o Coordenador do Pequeno Grupo, pode corrigi-lo.'
+      : '⚠️ Não foi possível corrigir (' + r.motivo + ').');
+    return;
+  }
+  mutiraoPixAberto = true;
+  renderMutirao('✏️ PIX cancelado. Digite abaixo o valor correto.');
+  const inp = document.getElementById('mut-pix');
+  if (inp && antes) { inp.value = String(antes.valorReais.toFixed(2)).replace('.', ','); inp.focus(); inp.select(); }
+  mutiraoSincronizarEDepois(mutiraoMeuPgNum(), () => renderMutirao());
 }
 
 
@@ -15331,6 +15479,94 @@ const MUTIRAO_ORIGEM = Object.freeze({ PARTICIPANTE: 'PARTICIPANTE_PG', EXTERNO:
 // kgMin e casas seguem provisórios (FASE 1 §7.1).
 const MUTIRAO_NATAL = Object.freeze({ edicao: '2026', kgMin: 0.1, kgMax: 200, casas: 2 });
 
+// ── PIX do Mutirão (decidido pelo usuário em 29/09/2026) ─────────────────────
+// Doação em dinheiro: o participante copia o código PIX, transfere pelo próprio banco e informa
+// o valor. O app NÃO confere a transferência — vale o valor declarado, como os quilos.
+//
+// UM CÓDIGO POR GERÊNCIA (29/09/2026). São códigos "copia e cola" do Santander, sem valor
+// definido, lidos dos QR Codes dos PDFs enviados pelo usuário. Por decisão dele o app mostra
+// SÓ o código por extenso, nunca o QR. ⚠️ Copiar só a CHAVE não serve: 10 gerências usam a
+// mesma chave (pix.has@…) e o que identifica a gerência no extrato é o texto DENTRO do código
+// (ex.: "NatalFinanceiro"). Contas institucionais — podem ficar no repositório público.
+const MUTIRAO_PIX = Object.freeze({ reaisMin: 0.01, reaisMax: 1000,
+  recebedor: 'INSTITUICAO ADVENTISTA ESTE BRAS. DE PRE' });   // como o banco mostra ao pagador
+const MUTIRAO_PIX_GERENCIAS = Object.freeze({
+  FIN:  { nome: 'Financeiro',                              codigo: '00020126670014br.gov.bcb.pix0126pix.has@hasilvestre.org.br0215NatalFinanceiro5204000053039865802BR5925INSTITUICAO ADVENTISTA ES6008BRASILIA62190515NatalFinanceiro6304BFD3' },
+  HOT:  { nome: 'Hotelaria e Nutrição',                    codigo: '00020126720014br.gov.bcb.pix0126pix.has@hasilvestre.org.br0220NatalHotelariaeNutri5204000053039865802BR5925INSTITUICAO ADVENTISTA ES6008BRASILIA62240520NatalHotelariaeNutri63041771' },
+  ENF:  { nome: 'Enfermagem e Planejamento Institucional', codigo: '00020126700014br.gov.bcb.pix0126pix.has@hasilvestre.org.br0218NatalEnfermagemePI5204000053039865802BR5925INSTITUICAO ADVENTISTA ES6008BRASILIA62220518NatalEnfermagemePI63044813' },
+  MED:  { nome: 'Gerência Médica',                         codigo: '00020126710014br.gov.bcb.pix0126pix.has@hasilvestre.org.br0219NatalGerenciaMedica5204000053039865802BR5925INSTITUICAO ADVENTISTA ES6008BRASILIA62230519NatalGerenciaMedica63042E26' },
+  DIA:  { nome: 'Diagnósticos',                            codigo: '00020126690014br.gov.bcb.pix0126pix.has@hasilvestre.org.br0217NatalDiagnosticos5204000053039865802BR5925INSTITUICAO ADVENTISTA ES6008BRASILIA62210517NatalDiagnosticos6304941C' },
+  SUP:  { nome: 'Suprimentos',                             codigo: '00020126680014br.gov.bcb.pix0126pix.has@hasilvestre.org.br0216NatalSuprimentos5204000053039865802BR5925INSTITUICAO ADVENTISTA ES6008BRASILIA62200516NatalSuprimentos6304B888' },
+  HAI:  { nome: 'HAI',                                     codigo: '00020126700014br.gov.bcb.pix0127adm.hasi@hasilvestre.org.br0217MutiraodeNatalHAI5204000053039865802BR5925INSTITUICAO ADVENTISTA ES6008BRASILIA62210517MutiraodeNatalHAI63040648' },
+  CMAB: { nome: 'CMAB',                                    codigo: '00020126800014br.gov.bcb.pix013692254ecb-4dab-443f-9951-49127074b6750218MutiraodeNatalCMAB5204000053039865802BR5925INSTITUICAO ADVENTISTA ES6008BRASILIA62220518MutiraodeNatalCMAB63045E7B' },
+  RHJ:  { nome: 'RH e Jurídico',                           codigo: '00020126680014br.gov.bcb.pix0126pix.has@hasilvestre.org.br0216NatalRHeJuridico5204000053039865802BR5925INSTITUICAO ADVENTISTA ES6008BRASILIA62200516NatalRHeJuridico6304A090' },
+  TIC:  { nome: 'TI e Comunicação',                        codigo: '00020126710014br.gov.bcb.pix0126pix.has@hasilvestre.org.br0219NatalTIeComunicacao5204000053039865802BR5925INSTITUICAO ADVENTISTA ES6008BRASILIA62230519NatalTIeComunicacao63045A40' },
+  DIR:  { nome: 'Diretoria',                               codigo: '00020126660014br.gov.bcb.pix0126pix.has@hasilvestre.org.br0214NatalDiretoria5204000053039865802BR5925INSTITUICAO ADVENTISTA ES6008BRASILIA62180514NatalDiretoria63046B1C' },
+  // Pacientes e Familiares: recebido, mas nenhum setor do app usa (29/09/2026).
+  PAC:  { nome: 'Pacientes e Familiares',                  codigo: '00020126730014br.gov.bcb.pix0126pix.has@hasilvestre.org.br0221NatalPacienteeFamilia5204000053039865802BR5925INSTITUICAO ADVENTISTA ES6008BRASILIA62250521NatalPacienteeFamilia6304A56A' },
+});
+// Setor → gerência, anotado pelo usuário na "Lista de Pequenos Grupos por Setor" de 28/09/2026.
+// A chave é o setorId (estável: renomear o setor não muda o id). Setor NOVO fica fora da
+// tabela e o PG dele vê um aviso em vez de um código — nunca um código de outra gerência.
+const MUTIRAO_PIX_SETOR_GERENCIA = Object.freeze({
+  '3252c095-c77a-4184-ac24-a0916d2ad1b0': 'CMAB', // Administrativo CMAB
+  'e91051b7-eec1-4dcf-bca7-55c2c90b5ee9': 'FIN',  // Assistência Social / Serviço Social HAS
+  '66c1112a-e831-4409-939c-1e4937dca60f': 'HOT',  // Atendimento / Recepção HAS
+  '73e29535-409b-460e-afa9-372b0982b8ae': 'FIN',  // Auditoria de Contas Médica / Auditoria HAS
+  '8dd3c857-91a1-4658-a08d-368c92165b43': 'FIN',  // Autorizações HAS
+  '1b05b459-6636-469b-ae98-6e3e95206594': 'DIR',  // Capelania HAS
+  'ba4fa93d-7390-4bab-85d8-d07d15075b25': 'CMAB', // Centro Cirúrgico / CC CMAB
+  '30175b0f-c81f-4cd6-bded-c1f8a83a4161': 'MED',  // Centro Cirúrgico / CC HAS
+  '36f42c16-2108-4814-a926-b093d3afd38d': 'TIC',  // Comunicação / Marketing HAS
+  '2db221f5-52ee-4d12-be65-2ae0d96c317e': 'FIN',  // Contabilidade HAS
+  '93a59920-239a-46b2-99e7-301afd13f5a3': 'FIN',  // Contas a Receber HAS
+  'a2bb8b33-94d1-4046-9b15-8dfa9b3e7a2b': 'CMAB', // Cuide-se Mais CMAB
+  'd1040d2c-72d1-40be-acad-bbcd01d63438': 'RHJ',  // Departamento Pessoal HAS
+  '2b4712e1-e3c8-4c86-a375-8dd646b719ef': 'DIA',  // Diagnóstico por Imagem / Imagem HAS
+  '47525733-0e52-4e6b-8d9d-29672e3efa7e': 'DIR',  // Diretoria HAS
+  'df0a27a7-4d45-4eb8-a436-d110b1a59153': 'HAI',  // Enfermagem HAI
+  '3a9d39a4-e55a-4a30-8364-1292049f7086': 'ENF',  // Equipe Multidisciplinar HAS
+  '71df1005-1173-4a09-aca2-bbb4e49b5fa7': 'HAI',  // Farmácia HAI
+  '3a48538d-0893-4faf-8e31-0a384846b214': 'SUP',  // Farmácia HAS
+  '36d22ba0-3555-4824-9884-4eb2b48e2469': 'FIN',  // Faturamento HAS
+  '2921623e-3d05-4e00-b10a-fc787886354e': 'ENF',  // Gerência Médica HAS
+  'b031189e-b529-494b-9185-433ddf36fed5': 'HOT',  // Higienização / Hotelaria HAS
+  '36a5ed8f-f85f-4568-a160-f38e0cda6568': 'CMAB', // Higienização CMAB
+  '7e221522-8c64-45c1-9bbf-561d57f5b9f5': 'RHJ',  // Jurídico HAS
+  '02513206-9038-4636-b8bd-23e021342ea4': 'HAI',  // Laboratório HAI
+  '0910362f-9a9c-4ba7-b944-4bfb2d98d783': 'DIA',  // Laboratório HAS
+  'ca62b7a6-6923-47ab-8cdb-6b73a8516c46': 'SUP',  // Logística / Almoxarifado HAS
+  '5f7ca8ec-29b5-46cd-a7ec-a2647dfede27': 'HOT',  // Manutenção HAS
+  '635452bb-3f33-4ead-addc-c208cac72ab8': 'MED',  // Médicos HAS
+  '22d93619-adb7-4023-89e3-88c9ed680d8b': 'ENF',  // Núcleo de Segurança HAS
+  '14eb8963-3e11-476b-906b-91aad98826a1': 'HAI',  // Nutrição HAI
+  'a077089d-f8e7-4139-9ddd-f1fd29483eca': 'CMAB', // Operadora CMAB
+  'a2b8cf0d-5025-4b0c-b4b0-de1ed39564fc': 'FIN',  // OPME HAS
+  '7b07d0bb-6bd0-46a3-be08-75aaeb066829': 'TIC',  // Ouvidoria HAS
+  '911aee08-e3a3-4056-a6a8-4ddd3f872026': 'ENF',  // Qualidade HAS
+  '48d83fba-607c-4ba0-ac13-654dbf8b48e7': 'RHJ',  // Recursos Humanos HAS
+  '4398b043-2409-40e6-a4dc-0216ae8dabc2': 'HAI',  // SADT / Diagnóstico por Imagem HAI
+  '03fa0895-03e2-4db6-be1a-8fec691637b7': 'ENF',  // Sciras HAS
+  'b0411a27-3e23-4eb4-8510-96c472e10097': 'HOT',  // Serviço de Nutrição e Dietética / Nutrição HAS
+  '24f9461e-3fc1-4a67-ad6c-9e86a9610c9a': 'HAI',  // Serviços Diversos / Faturamento, Hotelaria, Higienização e Manutenção HAI
+  '8153fcda-e866-4737-873c-630a4f6e2357': 'ENF',  // Supervisão de Enfermagem HAS
+  '8c5d98b7-8bfa-4ba0-a25b-14a13b5d4029': 'TIC',  // Tecnologia da Informação / TI HAS
+  'c9eb80e1-bbe4-480c-a3f8-ffc9ff8f5b4c': 'MED',  // Unidades de Terapia Intensiva / CTI Clínico HAS
+  '13e76754-4c06-4403-878f-9169ce870a92': 'HOT',  // Vigilância / Segurança HAS
+});
+// Registro de PIX vive na MESMA lista das entregas, com tipoOrigem próprio. Versões antigas do
+// app somam kg só de PARTICIPANTE_PG/EXTERNO — por isso ignoram o PIX em vez de misturá-lo.
+const MUTIRAO_PIX_ORIGEM = 'PIX';
+function mutiraoPixAtivo() { return Object.keys(MUTIRAO_PIX_GERENCIAS).length > 0; }
+
+// Gerências dos setores que o PG acompanha (g.setores). Em 29/09/2026 todo PG cai em UMA só;
+// se um dia cair em mais de uma, a tela mostra um código por gerência, cada um com o nome.
+function mutiraoPixGerenciasDoPG(pgNum) {
+  const g = (typeof PEQUENOS_GRUPOS !== 'undefined') ? PEQUENOS_GRUPOS.find(x => x.num === pgNum) : null;
+  const chaves = ((g && g.setores) || []).map(id => MUTIRAO_PIX_SETOR_GERENCIA[id]).filter(Boolean);
+  return Array.from(new Set(chaves));
+}
+
 function mutiraoLoadEntregas() {
   try { const v = JSON.parse(localStorage.getItem(MUTIRAO_KEY) || '[]'); return Array.isArray(v) ? v : []; }
   catch { return []; }
@@ -15421,7 +15657,9 @@ function mutiraoAssinatura(reg) {
     ? 'E:' + String((reg.externo && reg.externo.nome) || '').trim().toLowerCase()
     : 'P:' + ((reg.participante && (reg.participante.memberId ||
         String(reg.participante.nome || '').trim().toLowerCase())) || '');
-  return [reg.pgNum, reg.mutiraoNatal, quem, reg.quantidadeKg, reg.data].join('|');
+  // PIX e kg da mesma pessoa no mesmo dia nunca são "iguais": o PIX entra com prefixo próprio.
+  const qtd = (reg.tipoOrigem === MUTIRAO_PIX_ORIGEM) ? 'R$' + reg.valorReais : reg.quantidadeKg;
+  return [reg.pgNum, reg.mutiraoNatal, quem, qtd, reg.data].join('|');
 }
 
 // Devolve a entrega já existente com a mesma assinatura, ou null. Só olha entregas VIVAS —
@@ -15432,7 +15670,7 @@ function mutiraoEntregaDuplicada(candidato) {
 }
 
 function mutiraoPersistir(reg, confirmarDuplicata) {
-  const erro = validarEntregaNatal(reg);
+  const erro = (reg && reg.tipoOrigem === MUTIRAO_PIX_ORIGEM) ? validarPixNatal(reg) : validarEntregaNatal(reg);
   if (erro) { console.error('Mutirão: registro RECUSADO —', erro); return { ok: false, motivo: 'invalido', detalhe: erro }; }
   if (!confirmarDuplicata) {
     const existente = mutiraoEntregaDuplicada(reg);
@@ -15624,6 +15862,94 @@ function anularEntregaNatal(entregaId) {
   e.removedBy = { memberId: meuId, nome: ((typeof loadMeuGrupo === 'function' && loadMeuGrupo()) || {}).nome || '' };
   if (!mutiraoSaveEntregas(lista)) return { ok: false, motivo: 'falha_gravacao' };
   return { ok: true, entrega: e };
+}
+
+// ── PIX — camada de serviços ─────────────────────────────────────────────────
+// Aceita "50", "50,5", "1.234,56" e "1.000". Devolve número com 2 casas ou null.
+function mutiraoNormalizarReais(v) {
+  let s = String(v == null ? '' : v).replace(/R\$/i, '').replace(/\s/g, '');
+  if (s.indexOf(',') >= 0) s = s.replace(/\./g, '').replace(',', '.');
+  else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');   // "1.000" = mil, não um
+  const n = Number(s);
+  if (!s || !isFinite(n) || n <= 0) return null;
+  const r = Number(n.toFixed(2));
+  return (r < MUTIRAO_PIX.reaisMin || r > MUTIRAO_PIX.reaisMax) ? null : r;
+}
+
+function mutiraoAvisoReais(valorDigitado) {
+  const n = Number(String(valorDigitado == null ? '' : valorDigitado).replace(/[^\d,]/g, '').replace(',', '.'));
+  return (isFinite(n) && n > MUTIRAO_PIX.reaisMax)
+    ? 'O máximo por registro é ' + mutiraoFmtReais(MUTIRAO_PIX.reaisMax) + '. Registre a diferença em um novo lançamento.'
+    : 'Informe o valor do PIX (ex.: 50,00).';
+}
+
+// 1234.5 → "R$ 1.234,50"
+function mutiraoFmtReais(n) {
+  return 'R$ ' + Number(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function validarPixNatal(reg) {
+  if (!reg || typeof reg !== 'object') return 'registro ausente';
+  if (!reg.entregaId) return 'entregaId ausente';
+  if (reg.tipoOrigem !== MUTIRAO_PIX_ORIGEM) return 'tipoOrigem invalido';
+  if (reg.mutiraoNatal !== MUTIRAO_NATAL.edicao) return 'edicao invalida';
+  if (!Number.isInteger(reg.pgNum) || reg.pgNum < 1) return 'pgNum invalido';
+  if (mutiraoNormalizarReais(reg.valorReais) !== reg.valorReais) return 'valorReais invalido';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(reg.data || ''))) return 'data invalida';
+  if (!reg.participante || !reg.participante.nome) return 'participante sem nome';
+  return null;
+}
+
+// Mesma regra de identidade de registrarMinhaEntregaNatal: a pessoa vem do próprio aparelho.
+function registrarMeuPixNatal({ valorReais, confirmarDuplicata } = {}) {
+  const mg = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
+  if (!mg) return { ok: false, motivo: 'sem_grupo' };
+
+  const valor = mutiraoNormalizarReais(valorReais);
+  if (valor === null) return { ok: false, motivo: 'valor_invalido' };
+
+  const nome = mg.nome || (typeof ST !== 'undefined' && ST.userName) || '';
+  if (!nome) return { ok: false, motivo: 'sem_identidade' };
+  const meuId = (typeof getMyMemberId === 'function') ? getMyMemberId() : null;
+  const g = (typeof PEQUENOS_GRUPOS !== 'undefined') ? PEQUENOS_GRUPOS.find(x => x.num === mg.grupoNum) : null;
+
+  return mutiraoPersistir({
+    entregaId: uuid(),
+    mutiraoNatal: MUTIRAO_NATAL.edicao,
+    pgNum: mg.grupoNum,
+    pgId: (g && g.pgId) || null,
+    tipoOrigem: MUTIRAO_PIX_ORIGEM,
+    valorReais: valor,
+    // Para conferir com o extrato de cada gerência. Só quando o PG cai em UMA gerência —
+    // com mais de uma, o app não sabe qual código a pessoa usou e não inventa.
+    pixGerencia: (() => { const gs = mutiraoPixGerenciasDoPG(mg.grupoNum); return gs.length === 1 ? gs[0] : null; })(),
+    data: mutiraoHojeISO(),
+    ts: Date.now(),
+    registradoPor: { memberId: meuId, nome: nome,
+      papel: (typeof getMinhaFuncaoNoGrupo === 'function' && getMinhaFuncaoNoGrupo(mg.grupoNum)) || 'colaborador' },
+    participante: { memberId: meuId, nome: nome },
+    externo: null,
+    removed: false,
+  }, confirmarDuplicata);
+}
+
+function listarPixNatalDoPG(pgNum) {
+  return listarEntregasNatalDoPG(pgNum).filter(e => e.tipoOrigem === MUTIRAO_PIX_ORIGEM);
+}
+
+// Meus PIX — mesma tolerância de listarMinhasEntregasNatal (memberId OU nome).
+function listarMeusPixNatal(pgNum) {
+  const meuId = (typeof getMyMemberId === 'function') ? getMyMemberId() : null;
+  const meuNome = String(((typeof loadMeuGrupo === 'function' && loadMeuGrupo()) || {}).nome
+    || (typeof ST !== 'undefined' && ST.userName) || '').trim().toLowerCase();
+  return listarPixNatalDoPG(pgNum).filter(e => e.participante &&
+    ((meuId && e.participante.memberId === meuId) ||
+     (!!meuNome && String(e.participante.nome || '').trim().toLowerCase() === meuNome)));
+}
+
+function calcularTotalPixNatalDoPG(pgNum) {
+  const lista = listarPixNatalDoPG(pgNum);
+  return { total: Number(lista.reduce((a, e) => a + (e.valorReais || 0), 0).toFixed(2)), lancamentos: lista.length };
 }
 
 // ══════════════════════════════════════════════════════════════════════════
