@@ -118,7 +118,10 @@ function mesLabel(mk) {
   const [y, m] = mk.split('-');
   return MESES_PT[parseInt(m, 10) - 1] + '/' + y;
 }
-document.title = 'Embaixadores da Esperança — ' + mesLabel(mesAtual());
+// 2026-10-01 (pedido do Capelão): Embaixadores Digital de setembro ENCERRADO — só valem os
+// registros até 30/09; outubro será presencial. Enquanto true, a página mostra só o aviso.
+const ENCERRADO = true;
+document.title = 'Embaixadores da Esperança — ' + (ENCERRADO ? 'setembro/2026' : mesLabel(mesAtual()));
 function sanitize(s) {
   return String(s == null ? '' : s).replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
 }
@@ -679,7 +682,22 @@ function avancar() {
 function reverExperiencia() { ETAPA = 0; render(); window.scrollTo(0, 0); }
 function responderTemPg(temPg) { TEM_PG = temPg; render(); window.scrollTo(0, 0); }
 
+function encerradoHtml() {
+  return `
+    <div style="background:linear-gradient(160deg,var(--navy),var(--navy2));padding:2rem 1.25rem 1.75rem;text-align:center">
+      <div style="font-size:44px;line-height:1;margin-bottom:.6rem">🌟</div>
+      <div style="font-family:var(--ff-serif);font-size:28px;font-weight:500;color:#fff;line-height:1.25">Embaixadores Digital de setembro — encerrado</div>
+    </div>
+    <div style="padding:1.25rem 1rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card" style="border-left:3px solid var(--teal)">
+        <p class="body-text" style="margin:0 0 .9rem"><strong>Obrigado a todos que participaram!</strong></p>
+        <p class="body-text" style="margin:0">Em outubro o Embaixadores será presencial. Aguarde as orientações da Capelania.</p>
+      </div>
+    </div>`;
+}
+
 function render() {
+  if (ENCERRADO) { document.getElementById('tela').innerHTML = encerradoHtml(); return; }
   const telas = [aberturaHtml, tela1Html, tela2Html, tela3Html, tela4Html, tela5Html, tela6Html, tela7Html, tela8Html];
   const faixa = MODO_TESTE ? '<div class="faixa-teste">MODO DE TESTE · nada é gravado na nuvem</div>' : '';
   const conteudo = TEM_PG === null ? portaHtml()

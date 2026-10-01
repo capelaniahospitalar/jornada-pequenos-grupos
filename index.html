@@ -5504,8 +5504,8 @@ function embAgostoEntradaHtml() {
       <button onclick="abrirEmbaixadoresAgosto()" style="width:100%;display:flex;align-items:center;gap:10px;text-align:left;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);padding:.7rem .85rem;margin:.4rem 0;cursor:pointer;font-family:var(--ff-body)">
         <span style="font-size:22px;flex-shrink:0">🌟</span>
         <span style="flex:1;min-width:0">
-          <span style="display:block;font-size:15px;font-weight:700;line-height:1.25">Experiência digital de ${embMonthLabel(embMonthKey())}</span>
-          <span style="display:block;font-size:12.5px;color:rgba(255,255,255,0.6);margin-top:1px">${legenda}</span>
+          <span style="display:block;font-size:15px;font-weight:700;line-height:1.25">Experiência digital de ${EMB_DIGITAL_ENCERRADO ? 'setembro/2026' : embMonthLabel(embMonthKey())}</span>
+          <span style="display:block;font-size:12.5px;color:rgba(255,255,255,0.6);margin-top:1px">${EMB_DIGITAL_ENCERRADO ? 'Encerrada' : legenda}</span>
         </span>
         <span style="font-size:18px;color:rgba(255,255,255,0.5);flex-shrink:0">›</span>
       </button>`;
@@ -5520,7 +5520,35 @@ let EMB_AGO_ETAPA = 0;
 
 // NÃO grava nada — nem em localStorage, nem no Firebase. Nenhuma função de escrita
 // (saveGrupos/save/bumpPgProgress) é chamada por nenhuma tela desta experiência.
+// 2026-10-01 (pedido do Capelão): Embaixadores Digital de setembro ENCERRADO — só valem os
+// registros até 30/09; outubro será presencial. Enquanto true, o botão verde da Home e a
+// entrada dos Desafios abrem só o aviso abaixo, e a jornada (com o registro) fica inacessível.
+const EMB_DIGITAL_ENCERRADO = true;
+function embDigitalEncerradoHtml() {
+  return `
+    <div style="background:linear-gradient(160deg,var(--navy),var(--navy2));padding:2rem 1.25rem 1.75rem;text-align:center">
+      <div style="font-size:44px;line-height:1;margin-bottom:.6rem">🌟</div>
+      <div style="font-family:var(--ff-serif);font-size:28px;font-weight:500;color:#fff;line-height:1.25">Embaixadores Digital de setembro — encerrado</div>
+    </div>
+    <div style="padding:1.25rem 1rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card" style="border-left:3px solid var(--teal)">
+        <p class="body-text" style="margin:0 0 .9rem"><strong>Obrigado a todos que participaram!</strong></p>
+        <p class="body-text" style="margin:0">Em outubro o Embaixadores será presencial. Aguarde as orientações da Capelania.</p>
+      </div>
+    </div>`;
+}
+
 function abrirEmbaixadoresAgosto() {
+  if (EMB_DIGITAL_ENCERRADO) {
+    EMB_AGO_ETAPA = 0;  // a seta de voltar, na etapa 0, sai da tela
+    const hdr = document.getElementById('emb-ago-hdr-mes');
+    if (hdr) hdr.textContent = 'Experiência digital · setembro';
+    showScreen('embaixadores-ago');
+    const el = document.getElementById('embaixadores-ago-body');
+    if (el) el.innerHTML = embDigitalEncerradoHtml();
+    resetScroll();
+    return;
+  }
   // Quem já recebeu a missão deste mês, ao voltar, cai no retorno sobre ela (etapa 9) em
   // vez de recomeçar a experiência do zero. De lá dá para rever tudo desde o início.
   EMB_AGO_ETAPA = getForcaEmbAgosto() ? 9 : 0;
@@ -13316,7 +13344,7 @@ function renderGruposBtnHome() {
   // participação nos Embaixadores do mês, que antes ficava em Desafios do Discipulado. O mês
   // do texto muda sozinho. Para trazer o card de volta: MOSTRAR_CARD_GRUPO_HOME = true.
   const MOSTRAR_CARD_GRUPO_HOME = false;
-  const mesEmb = MESES_PT[new Date().getMonth()];
+  const mesEmb = EMB_DIGITAL_ENCERRADO ? 'setembro' : MESES_PT[new Date().getMonth()];
   const btnEmbHtml = mgHome ? `
     <button onclick="abrirEmbaixadoresAgosto()" style="width:100%;background:var(--teal);color:#fff;border:none;border-radius:var(--radius);padding:.9rem 1rem;font-size:21px;font-weight:800;line-height:1.15;cursor:pointer;font-family:var(--ff-body)">Embaixadores ${mesEmb}</button>` : '';
   div.innerHTML = (MOSTRAR_CARD_GRUPO_HOME && !MOSTRAR_PROGRESSO_PG_HOME && mgHome) ? htmlCardDoGrupo(mgHome, true) : btnEmbHtml;
