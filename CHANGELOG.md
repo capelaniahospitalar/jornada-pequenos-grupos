@@ -1,5 +1,29 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-10-08] — Relatório Mensal: "Participação por Setor (ADV-e)" com aviso de divergência
+
+**Pedido do Capelão:** o ADV-e presta contas mensalmente ao Planejamento/Auditoria do HAS e precisa
+saber que percentual dos colaboradores de cada setor participa de PG. O Relatório Mensal de cada PG
+passa a trazer essa informação.
+
+- **Relatório Mensal (`gerarRelatorioMensal`, `montarTextoRelatorioMensal`)**: bloco novo entre
+  "Frequência" e "Embaixadores", na tela e no texto do WhatsApp. Para cada setor que o PG acompanha:
+  colaboradores do setor, inscritos em PG somando **todos os PGs** ("X deste PG + Y em outros PGs") e
+  o percentual. Mostra "Situação em <data> às <hora>": o app não guarda histórico de quem estava em
+  cada PG, então o relatório deve ser gerado até o fim do mês.
+- **Divergência**: quando há mais inscritos classificados no setor do que colaboradores, o
+  percentual não aparece (não vai número errado para a Auditoria) e no lugar entra o aviso para
+  conferir o setor dos participantes em "Participantes e Missões" ou procurar a Capelania. O mesmo
+  aviso aparece em "📈 Indicadores por Setor", no Painel do PG.
+- Setor sem número de colaboradores (ex.: CMAB, Médicos) aparece sem percentual e sem aviso.
+- Cálculo novo em `calcularParticipacaoSetoresPg()`, que respeita o invariante de
+  `participanteContaParaSetor()` e conta só participantes ativos (removidos não contam).
+- Testes ADV-1 a ADV-6 na bateria B1 (55/55 passando em `?teste=1`).
+- **Dados (gravados na nuvem, fora do código):** totais de colaboradores atualizados pela planilha
+  "colaboradores por setor - ATUALIZADO setembro" (17 setores, com histórico) e 6 setores novos do HAI
+  (Atendimento/Recepção, Emergência, Unidade de Internação, UTI, Centro Cirúrgico, Ambulatório), para
+  os coordenadores do HAI poderem reclassificar quem estava em "Serviços Diversos".
+
 ## [2026-09-24] — Home: botão verde "Embaixadores <mês>" no lugar do card do grupo
 
 **Pedido do Capelão:** a participação mensal nos Embaixadores saiu de Desafios do Discipulado e foi

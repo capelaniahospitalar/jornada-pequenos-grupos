@@ -3899,6 +3899,7 @@ function gerarRelatorioMensal(nome, grupoNumParam, monthKeyParam) {
       <div class="panel-title">Frequência do Pequeno Grupo</div>
       ${freqSection}
     </div>
+    ${renderParticipacaoSetoresHtml(g)}
     <div class="panel-section">
       <div class="panel-title">Embaixadores da Esperança (${embMonthLabel(monthKey)})</div>
       <div class="panel-stat"><span>Participantes</span><strong>${total}</strong></div>
@@ -3938,6 +3939,7 @@ function montarTextoRelatorioMensal(grupoNum, monthKey) {
     + `*Frequência do Pequeno Grupo*\n`
     + `Presença no mês: ${pctPresenca != null ? pctPresenca + '%' : 'Não informado'} (${encontros.length} encontro(s) registrado(s))\n`
     + (regularidade ? `Reuniões realizadas: ${regularidade.realizadas} de ${regularidade.esperadas} esperada(s) — ${regularidade.pct}%\n\n` : `\n`)
+    + textoParticipacaoSetores(g)
     + `*Embaixadores da Esperança*\n`
     + `Participantes: ${total}\n`
     + `Participaram: ${participaram}\n`
@@ -4529,6 +4531,77 @@ function calcularCoberturaSetorial(grupoNum) {
   }).filter(Boolean);
 }
 
+// ADV-e (pedido do usuário, 08/10/2026): o Relatório Mensal de cada PG mostra, para cada setor
+// que o PG acompanha, quantos colaboradores do setor estão inscritos em PG. Soma TODOS os PGs
+// (o ADV-e presta contas do setor, não do grupo) — calcularCoberturaSetorial só conta este PG.
+// Mais inscritos classificados no setor do que colaboradores = divergência: o percentual não é
+// mostrado (iria um número errado para a Auditoria) e o PG recebe o aviso para corrigir.
+// Total 0 = número de colaboradores não informado (ex.: CMAB, Médicos) — sem % e sem aviso.
+const AVISO_DIVERGENCIA_SETOR = 'Há mais participantes classificados neste setor do que colaboradores. Confira o setor de cada participante em "Participantes e Missões" e corrija se houver erro. Se o número de colaboradores estiver errado, entre em contato com a Capelania.';
+
+function calcularParticipacaoSetoresPg(g) {
+  if (!g) return [];
+  const semDup = pg => participantesAtivos(pg).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
+  return (g.setores || []).map(setorId => {
+    const mestre = SETORES_MESTRE.find(sm => sm.setorId === setorId);
+    if (!mestre) return null; // referência órfã — não quebra a tela
+    const efetivo = SETORES_EFETIVO.find(e => e.setorId === setorId);
+    const totalColaboradores = efetivo ? (efetivo.totalColaboradores || 0) : 0;
+    let inscritos = 0, desteGrupo = 0;
+    PEQUENOS_GRUPOS.forEach(pg => {
+      if (!(pg.setores || []).includes(setorId)) return;
+      const n = semDup(pg).filter(p => participanteContaParaSetor(pg, p, setorId)).length;
+      inscritos += n;
+      if (pg.num === g.num) desteGrupo = n;
+    });
+    const divergente = totalColaboradores > 0 && inscritos > totalColaboradores;
+    const pct = totalColaboradores > 0 && !divergente ? Math.round(inscritos / totalColaboradores * 100) : null;
+    return { setorId, nome: mestre.nome, totalColaboradores, inscritos, desteGrupo, divergente, pct };
+  }).filter(Boolean);
+}
+
+// "Situação em 08/10/2026 às 14:30" — o app não guarda histórico de quem estava em cada PG
+// (ver nota da RC3.6 em SETORES_EFETIVO), então o relatório diz de quando é a fotografia.
+function carimboSituacaoAgora() {
+  const d = new Date(), z = n => String(n).padStart(2, '0');
+  return `${z(d.getDate())}/${z(d.getMonth() + 1)}/${d.getFullYear()} às ${z(d.getHours())}:${z(d.getMinutes())}`;
+}
+
+function textoInscritosSetor(s) {
+  const outros = s.inscritos - s.desteGrupo;
+  return `${s.inscritos}${outros > 0 ? ` (${s.desteGrupo} deste PG + ${outros} em outros PGs)` : ''}`;
+}
+
+function renderParticipacaoSetoresHtml(g) {
+  const setores = calcularParticipacaoSetoresPg(g);
+  const linhas = setores.length ? setores.map(s => `
+      <div style="padding:.55rem 0;border-bottom:0.5px solid var(--border)">
+        <div style="font-size:15px;font-weight:700;color:var(--text);font-family:var(--ff-body)">${sanitize(s.nome)}</div>
+        <div style="font-size:13.5px;color:var(--text2);margin-top:2px;font-family:var(--ff-body)">${s.totalColaboradores ? `${s.totalColaboradores} colaboradores` : 'Número de colaboradores não informado'}</div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:13.5px;color:var(--text2);font-family:var(--ff-body)">
+          <span>Inscritos em PG: <strong>${textoInscritosSetor(s)}</strong></span>
+          <span style="font-weight:700">${s.divergente ? '⚠️' : s.pct != null ? s.pct + '%' : ''}</span>
+        </div>
+        ${s.divergente ? `<div style="margin-top:.35rem;background:#FDECEA;border:0.5px solid #F3B8B4;border-radius:var(--radius-sm);padding:.5rem .65rem;font-size:13px;color:#8A2B20;line-height:1.4;font-family:var(--ff-body)"><strong>Divergência:</strong> ${AVISO_DIVERGENCIA_SETOR}</div>` : ''}
+      </div>`).join('')
+    : `<p class="body-text" style="margin:0;color:var(--text3)">Nenhum setor cadastrado neste Pequeno Grupo. Cadastre em "📈 Indicadores por Setor", no Painel do PG.</p>`;
+  return `
+    <div class="panel-section">
+      <div class="panel-title">🏥 Participação por Setor (ADV-e)</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:.3rem;font-family:var(--ff-body)">Situação em ${carimboSituacaoAgora()}</div>
+      ${linhas}
+    </div>`;
+}
+
+function textoParticipacaoSetores(g) {
+  const setores = calcularParticipacaoSetoresPg(g);
+  const corpo = setores.length ? setores.map(s =>
+    `${s.nome}: ${s.totalColaboradores ? s.totalColaboradores + ' colaboradores' : 'nº de colaboradores não informado'} · inscritos em PG: ${textoInscritosSetor(s)}`
+    + (s.divergente ? `\n⚠️ Divergência: ${AVISO_DIVERGENCIA_SETOR}` : s.pct != null ? ` · ${s.pct}%` : '')
+  ).join('\n') : 'Nenhum setor cadastrado neste Pequeno Grupo.';
+  return `*Participação por Setor (ADV-e)*\nSituação em ${carimboSituacaoAgora()}\n${corpo}\n\n`;
+}
+
 // Barra de progresso reaproveitando o visual do renderMeterHtml (medidor meta x realizado)
 // já usado para frequência de encontros — só parametrizando meta e cor por status.
 function renderBarraIndicador(pct, metaPct, status) {
@@ -4549,6 +4622,7 @@ function renderPainelIndicadoresPorSetor(g, grupoNum, nome) {
   const cobertura = calcularCoberturaSetorial(grupoNum);
   const monthKey = embMonthKey();
   const embaixadores = calcularEmbaixadoresPorSetor(monthKey);
+  const participacao = calcularParticipacaoSetoresPg(g);   // ADV-e: divergência soma todos os PGs
   const nomeEsc = nome.replace(/'/g,"\\'");
   const setores = g.setores || [];
 
@@ -4575,6 +4649,7 @@ function renderPainelIndicadoresPorSetor(g, grupoNum, nome) {
               <span style="font-weight:700">${cob.coberturaPct}% ${cob.status}</span>
             </div>
             ${renderBarraIndicador(cob.coberturaPct, cob.metaPct, cob.status)}
+            ${(participacao.find(s => s.setorId === setorId) || {}).divergente ? `<div style="margin-top:.35rem;background:#FDECEA;border:0.5px solid #F3B8B4;border-radius:var(--radius-sm);padding:.5rem .65rem;font-size:13px;color:#8A2B20;line-height:1.4;font-family:var(--ff-body)"><strong>⚠️ Divergência:</strong> ${textoInscritosSetor(participacao.find(s => s.setorId === setorId))} inscritos em PG para ${cob.totalColaboradores} colaboradores. ${AVISO_DIVERGENCIA_SETOR}</div>` : ''}
           </div>
 
           <div style="margin-top:.6rem">
@@ -10353,6 +10428,46 @@ async function autoTesteB1() {
     ok('B1-32 e o percentual sai correto',
        txtRel.indexOf('Percentual: 50%') > -1,
        (txtRel.match(/Percentual: \d+%/) || ['(não encontrado)'])[0] + ' — antes do fix daria 67%');
+
+    // ── ADV-e (08/10/2026): participação por setor no Relatório Mensal ─────
+    // Setor A: 3 colaboradores, 2 inscritos aqui + 2 em outro PG = divergência (4 > 3).
+    // Setor B: 10 colaboradores, 1 inscrito ativo + 1 removido = 10%. Setor C: total não informado.
+    const guardaMestre = SETORES_MESTRE.slice(), guardaEfetivo = SETORES_EFETIVO.slice();
+    try {
+      SETORES_MESTRE.push({ setorId: 'QA-SET-A', nome: 'Setor A QA', ativo: true }, { setorId: 'QA-SET-B', nome: 'Setor B QA', ativo: true }, { setorId: 'QA-SET-C', nome: 'Setor C QA', ativo: true });
+      SETORES_EFETIVO.push({ setorId: 'QA-SET-A', totalColaboradores: 3 }, { setorId: 'QA-SET-B', totalColaboradores: 10 }, { setorId: 'QA-SET-C', totalColaboradores: 0 });
+      saveSetoresMestreLocal(); saveSetoresEfetivoLocal();
+      const OUTRO = SLOT - 1;
+      applyGruposData([
+        { num: SLOT, nome: 'PG SETOR QA', tutor: 'Tutor QA', coordenador: 'Coord QA', gratidoes: [], reunioesMes: {},
+          setores: ['QA-SET-A', 'QA-SET-B', 'QA-SET-C'], participantes: [
+            { nome: 'A Um', tipo: 'colaborador', ts: T0 - 9e5, memberId: 'QA-S-1', setorId: 'QA-SET-A' },
+            { nome: 'A Dois', tipo: 'colaborador', ts: T0 - 8e5, memberId: 'QA-S-2', setorId: 'QA-SET-A' },
+            { nome: 'B Um', tipo: 'colaborador', ts: T0 - 7e5, memberId: 'QA-S-3', setorId: 'QA-SET-B' },
+            { nome: 'B Removido', tipo: 'colaborador', ts: T0 - 6e5, memberId: 'QA-S-4', setorId: 'QA-SET-B', removed: true, updatedAt: T0 } ] },
+        { num: OUTRO, nome: 'PG SETOR QA 2', tutor: 'Tutor QA', coordenador: 'Coord QA 2', gratidoes: [], reunioesMes: {},
+          setores: ['QA-SET-A'], participantes: [
+            { nome: 'A Tres', tipo: 'colaborador', ts: T0 - 5e5, memberId: 'QA-S-5', setorId: 'QA-SET-A' },
+            { nome: 'A Quatro', tipo: 'colaborador', ts: T0 - 4e5, memberId: 'QA-S-6', setorId: 'QA-SET-A' },
+            // setor B não é acompanhado por este PG: pelo invariante, não conta para B
+            { nome: 'B Fora', tipo: 'colaborador', ts: T0 - 3e5, memberId: 'QA-S-7', setorId: 'QA-SET-B' } ] }]);
+      saveGruposLocal();
+      const part = calcularParticipacaoSetoresPg(PEQUENOS_GRUPOS.find(x => x.num === SLOT));
+      const sA = part.find(s => s.setorId === 'QA-SET-A') || {}, sB = part.find(s => s.setorId === 'QA-SET-B') || {}, sC = part.find(s => s.setorId === 'QA-SET-C') || {};
+      ok('ADV-1 soma inscritos de TODOS os PGs do setor', sA.inscritos === 4 && sA.desteGrupo === 2, JSON.stringify(sA));
+      ok('ADV-2 mais inscritos que colaboradores = divergência, sem %', sA.divergente === true && sA.pct === null, JSON.stringify(sA));
+      ok('ADV-3 removido e PG que não acompanha o setor não contam', sB.inscritos === 1 && sB.pct === 10 && !sB.divergente, JSON.stringify(sB));
+      ok('ADV-4 total não informado: sem % e sem divergência', sC.pct === null && !sC.divergente, JSON.stringify(sC));
+      const txtSet = montarTextoRelatorioMensal(SLOT, MES_QA);
+      ok('ADV-5 texto do WhatsApp traz o bloco e o aviso',
+         txtSet.indexOf('Participação por Setor (ADV-e)') > -1 && txtSet.indexOf('Divergência') > -1 && txtSet.indexOf('Setor B QA: 10 colaboradores · inscritos em PG: 1 · 10%') > -1,
+         txtSet.slice(txtSet.indexOf('*Participação'), txtSet.indexOf('*Embaixadores')));
+      ok('ADV-6 texto mostra quantos são deste PG e de outros', txtSet.indexOf('4 (2 deste PG + 2 em outros PGs)') > -1, '');
+    } finally {
+      SETORES_MESTRE.length = 0; guardaMestre.forEach(x => SETORES_MESTRE.push(x));
+      SETORES_EFETIVO.length = 0; guardaEfetivo.forEach(x => SETORES_EFETIVO.push(x));
+      saveSetoresMestreLocal(); saveSetoresEfetivoLocal();
+    }
 
   } catch (e) {
     ok('B1 — execução da bateria', false, 'exceção: ' + (e && e.message));
