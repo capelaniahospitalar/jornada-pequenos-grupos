@@ -1,0 +1,782 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Embaixadores da Esperança</title>
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Identidade visual copiada do app dos Pequenos Grupos (index.html) — mesmas variáveis,
+   mesmos componentes (.content-card, .body-text, .opt-btn, .start-btn, .phase-tag).
+   Só o necessário para esta experiência foi trazido. */
+:root {
+  --navy: #0D2137;
+  --navy2: #1A3A56;
+  --blue: #1E5F8C;
+  --blue-mid: #2E7BB5;
+  --blue-light: #D6EAF8;
+  --blue-pale: #EBF5FB;
+  --gold: #B8860B;
+  --gold-mid: #D4A017;
+  --teal: #0E7B6C;
+  --teal-light: #D5EDE9;
+  --purple: #5C3D8F;
+  --coral: #C0392B;
+  --coral-light: #FDECEA;
+  --text: #0D0D1A;
+  --text2: #20293A;
+  --text3: #4A5868;
+  --border: rgba(0,0,0,0.09);
+  --bg: #F7F5F0;
+  --card: #FFFFFF;
+  --radius: 14px;
+  --radius-sm: 9px;
+  --ff-body: 'Source Sans 3', sans-serif;
+  --ff-serif: 'Lora', serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:var(--ff-body);background:var(--bg);color:var(--text);min-height:100vh}
+#app{max-width:420px;margin:0 auto;min-height:100vh;background:var(--bg);padding-bottom:24px}
+
+.phase-dots{display:flex;gap:5px;align-items:center;justify-content:center;padding:.9rem 0 .2rem}
+.pdot{width:6px;height:6px;border-radius:50%;background:var(--border);transition:all .25s}
+.pdot.done{background:var(--teal)}
+.pdot.active{background:var(--blue-mid);width:22px;border-radius:3px}
+
+@keyframes embAgoIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.emb-ago-in{animation:embAgoIn .5s ease both}
+.emb-ago-btn:disabled{background:var(--border);color:var(--text3);cursor:default}
+@media (prefers-reduced-motion:reduce){.emb-ago-in{animation:none}}
+
+.phase-tag{font-size:14px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:.4rem;font-family:var(--ff-body)}
+.tag-question{color:var(--purple)}.tag-content{color:var(--blue)}.tag-apply{color:var(--gold)}
+.tag-insight{color:var(--coral)}.tag-decision{color:var(--navy2)}.tag-close{color:var(--teal)}
+.content-card{background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.15rem 1rem}
+.body-text{font-size:21px;line-height:1.7;color:var(--text);font-family:var(--ff-body)}
+.body-text strong{font-weight:600;color:var(--navy)}
+.opt-btn{width:100%;background:var(--bg);border:0.5px solid rgba(0,0,0,0.13);border-radius:var(--radius-sm);padding:.75rem .9rem;text-align:left;font-size:20px;color:var(--text);cursor:pointer;transition:all .15s;line-height:1.45;font-family:var(--ff-body)}
+.opt-btn:hover:not(:disabled){background:var(--blue-pale);border-color:var(--blue-light);color:var(--navy)}
+.opt-btn.chosen{background:var(--teal-light);border-color:var(--teal);color:#04342C}
+.start-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);padding:.75rem;font-size:20px;font-weight:500;cursor:pointer;font-family:var(--ff-body);transition:background .15s;letter-spacing:.2px}
+.start-btn:hover:not(:disabled){background:var(--navy2)}
+
+.campo{width:100%;background:var(--card);border:0.5px solid rgba(0,0,0,0.16);border-radius:var(--radius-sm);padding:.7rem .8rem;font-size:19px;color:var(--text);font-family:var(--ff-body)}
+.campo:focus{outline:none;border-color:var(--blue-mid)}
+.rotulo-campo{display:block;font-size:15px;font-weight:600;color:var(--text3);margin-bottom:.35rem;font-family:var(--ff-body)}
+.faixa-teste{background:#4A1B0C;color:#F5C4B3;font-size:13px;text-align:center;padding:6px 10px;font-family:var(--ff-body)}
+.aviso-erro{background:var(--coral-light);border:0.5px solid #F3B8B4;border-radius:var(--radius-sm);padding:.7rem .8rem;font-size:15px;color:#8A2B20;line-height:1.45;font-family:var(--ff-body)}
+</style>
+</head>
+<body>
+<div id="app"><div id="tela"></div></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// EMBAIXADORES DA ESPERANÇA · versão para colaboradores SEM Pequeno Grupo
+//
+// App independente do index.html (app dos Pequenos Grupos). Roda no mesmo endereço,
+// então compartilha o localStorage do navegador — por isso TODA chave daqui usa o
+// prefixo "embx_" e este arquivo NUNCA lê nem escreve chaves "jdpg_*" nem o cookie
+// "amj3" do outro app.
+//
+// GRAVAÇÃO: cria um documento próprio na coleção "embaixadoresExternos". NÃO toca no
+// documento jdpg/grupos, que guarda os 50 Pequenos Grupos. Um documento por pessoa,
+// criado com POST — não existe leitura nem reescrita, então duas pessoas registrando
+// ao mesmo tempo nunca se sobrescrevem.
+// ══════════════════════════════════════════════════════════════════════════════
+
+const FB = {
+  projectId: 'jornada-pequenos-grupos',
+  apiKey: 'AIzaSyDPuoP221leqvON_d-K3auyANOoH7eal9U',
+  colecao: 'embaixadoresExternos'
+};
+
+// Modo de teste isolado, mesmo padrão do app dos PGs (Etapa 0): com ?teste=1 na URL,
+// nada é enviado para a nuvem — a tela se comporta igual, mas a gravação é simulada.
+const MODO_TESTE = (function () {
+  try {
+    const ativo = new URLSearchParams(location.search).get('teste') === '1'
+      || sessionStorage.getItem('embx_modo_teste') === '1';
+    if (ativo) sessionStorage.setItem('embx_modo_teste', '1');
+    return ativo;
+  } catch (_) { return false; }
+})();
+
+const CHAVE_ESCOLHAS = 'embx_ago_escolhas_v1';
+const CHAVE_REGISTRO = 'embx_ago_registro_v1';
+
+function mesAtual() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+const MESES_PT = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+// O selo do período usa este cálculo (mesmo princípio do embMonthLabel do app dos PGs) em vez
+// de um mês fixo no texto — o selo "AGOSTO" ficou preso mesmo depois que setembro começou,
+// porque a tela de acolhimento e a porta de entrada tinham o mês escrito à mão.
+function mesLabel(mk) {
+  const [y, m] = mk.split('-');
+  return MESES_PT[parseInt(m, 10) - 1] + '/' + y;
+}
+// 2026-10-01 (pedido do Capelão): Embaixadores Digital de setembro ENCERRADO — só valem os
+// registros até 30/09; outubro será presencial. Enquanto true, a página mostra só o aviso.
+// 2026-10-20 (pedido do Capelão): REABERTO para outubro com o Genially abaixo; a jornada de
+// setembro ("Construindo pontes") foi retirada do caminho (funções seguem no arquivo).
+// Encerramento PROGRAMADO (pedido do Capelão, 20/10): vale até 31/10/2026 inclusive; a partir
+// de 01/11/2026 00:00 (relógio do aparelho) a página mostra só o aviso de encerrado.
+const ENCERRADO = new Date() >= new Date(2026, 10, 1);
+const MES_ENCERRADO = 'outubro';
+const GENIALLY_URL = 'https://view.genially.com/6ad7b168a64fca9aa90fa312';
+const TEMA_MES = 'Como serão seus próximos cinco anos?';
+const ROTULO_REGISTRAR = '✅ Li o conteúdo e assisti ao pequeno vídeo<span style="display:block;font-size:15px;font-weight:600;font-style:italic;margin-top:4px">Acreditamos em sua palavra.</span>';
+document.title = 'Embaixadores da Esperança — ' + (ENCERRADO ? MES_ENCERRADO + '/2026' : mesLabel(mesAtual()));
+function sanitize(s) {
+  return String(s == null ? '' : s).replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
+}
+function carregar(chave) {
+  try { const s = localStorage.getItem(chave); return s ? JSON.parse(s) : null; } catch (_) { return null; }
+}
+function guardar(chave, valor) {
+  try { localStorage.setItem(chave, JSON.stringify(valor)); } catch (_) {}
+}
+
+// Escolhas da pessoa (dificuldade, dimensão, força). Só neste aparelho, nunca na nuvem —
+// o que vai para a nuvem é apenas nome + setor, na tela final.
+let ESCOLHAS = carregar(CHAVE_ESCOLHAS) || {};
+if (ESCOLHAS.monthKey !== mesAtual()) ESCOLHAS = { monthKey: mesAtual() };
+function salvarEscolhas() { guardar(CHAVE_ESCOLHAS, ESCOLHAS); }
+
+let ETAPA = 0;   // 0 = acolhimento · 1..8 = telas da jornada (diferença, ponte, espelho,
+                 // entrega, força, missão, desafio, participação)
+
+// PORTA DE ENTRADA — este app é só para quem NÃO participa de Pequeno Grupo. Quem já está
+// em um PG precisa registrar pelo app da Jornada, senão a participação não conta para o
+// grupo dele. A pergunta vem ANTES do acolhimento, para ninguém fazer as 7 telas à toa.
+//
+// É uma pergunta de honra, não uma trava técnica: não há login, então quem responder "sim"
+// pode recarregar e responder outra coisa. Resolve o erro por desinformação, que é o caso real.
+// De propósito NÃO fica guardada no localStorage — um toque errado não pode virar bloqueio
+// permanente, e reperguntar a cada visita não custa nada.
+let TEM_PG = null;   // null = ainda não respondeu · true = já está em PG · false = pode seguir
+
+// ── SETORES ───────────────────────────────────────────────────────────────────
+// Lista construída a partir do mapeamento institucional de 13/08/2026. Quem não se
+// encontrar aqui usa "Outro setor" e escreve o nome.
+const SETORES = [
+  'Almoxarifado','Auditoria','Autorização','Capelania','CC','CC HAI','CMAB',
+  'Contabilidade','Contas a Receber','CTI Clínico','Equipe Multi','Farmácia',
+  'Faturamento','Faturamento - HAI','HAI','Higienização','Higienização HAI',
+  'Hotelaria','Imagem','Laboratório','Laboratório HAI','Manutenção',
+  'Marketing/Ouvidoria','Médicos','Nutrição','OPME','Recepção','RH - DP - Jurídico',
+  'Segurança','Serviço Social','TI'
+];
+
+// ── TELAS ─────────────────────────────────────────────────────────────────────
+function dotsHtml() {
+  if (ETAPA < 1 || ETAPA > 8) return '';
+  return '<div class="phase-dots">' + [1,2,3,4,5,6,7,8].map(n =>
+    `<span class="pdot ${n < ETAPA ? 'done' : n === ETAPA ? 'active' : ''}"></span>`).join('') + '</div>';
+}
+function botaoHtml(rotulo, atraso) {
+  return `<button class="start-btn emb-ago-in" style="letter-spacing:1.5px;font-weight:700;animation-delay:${atraso}s" onclick="avancar()">${rotulo}</button>`;
+}
+
+// PORTA 1 — A PERGUNTA. Os dois botões têm o mesmo peso visual de propósito: destacar um
+// deles induziria a resposta, e o que se quer aqui é a resposta verdadeira.
+function portaHtml() {
+  const selo = mesLabel(mesAtual()).split('/')[0].toUpperCase();
+  return `
+    <div style="background:linear-gradient(160deg,var(--navy),var(--navy2));padding:2rem 1.25rem 1.75rem;text-align:center">
+      <div style="font-size:44px;line-height:1;margin-bottom:.6rem">🌟</div>
+      <div style="display:inline-block;font-size:12px;font-weight:700;letter-spacing:2.5px;color:var(--gold-mid);border:1px solid rgba(212,160,23,.45);border-radius:99px;padding:3px 12px;margin-bottom:.7rem">${selo}</div>
+      <div style="font-family:var(--ff-serif);font-size:30px;font-weight:500;color:#fff;line-height:1.25">Embaixadores da Esperança</div>
+    </div>
+    <div style="padding:1.25rem 1rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card">
+        <div class="phase-tag tag-close">Antes de começar</div>
+        <p class="body-text" style="margin:0 0 .9rem">Esta experiência é para os colaboradores do Silvestre que <strong>ainda não participam</strong> de um Pequeno Grupo.</p>
+        <p class="body-text" style="margin:0"><strong>Você já faz parte de um Pequeno Grupo do Silvestre?</strong></p>
+      </div>
+      <button class="start-btn" style="background:var(--card);color:var(--blue);border:0.5px solid var(--border)" onclick="responderTemPg(true)">SIM, JÁ PARTICIPO</button>
+      <button class="start-btn" style="background:var(--card);color:var(--blue);border:0.5px solid var(--border)" onclick="responderTemPg(false)">NÃO PARTICIPO</button>
+    </div>`;
+}
+
+// PORTA 2 — O AVISO para quem já está em PG. Por decisão do usuário (19/08) NÃO há link nem
+// redirecionamento: a pessoa abre o app dos PGs por conta própria, pelo caminho que ela já usa.
+function avisoTemPgHtml() {
+  return `
+    <div style="background:linear-gradient(160deg,var(--navy),var(--navy2));padding:2rem 1.25rem 1.75rem;text-align:center">
+      <div style="font-size:44px;line-height:1;margin-bottom:.6rem">🌟</div>
+      <div style="font-family:var(--ff-serif);font-size:26px;font-weight:500;color:#fff;line-height:1.3">O seu lugar é no seu<br>Pequeno Grupo</div>
+    </div>
+    <div style="padding:1.25rem 1rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card" style="border-left:3px solid var(--teal)">
+        <p class="body-text" style="margin:0 0 .9rem">Que bom que você já faz parte de um Pequeno Grupo do Silvestre!</p>
+        <p class="body-text" style="margin:0 0 .9rem">Esta versão do Embaixadores da Esperança é só para quem ainda não está em nenhum grupo. <strong>A sua está no app da Jornada Discipular em Pequenos Grupos</strong> — o mesmo que você já usa com o seu grupo.</p>
+        <p class="body-text" style="margin:0">É importante que seja por lá: assim a sua participação é somada ao seu Pequeno Grupo. Se você registrar por aqui, ela não aparece no seu grupo.</p>
+      </div>
+      <div class="content-card">
+        <div class="phase-tag tag-apply">Como fazer</div>
+        <p class="body-text" style="margin:0">Abra o app da Jornada em Pequenos Grupos, do jeito que você já entra nele, e toque no cartão <strong>🌟 Embaixadores da Esperança</strong> na sua tela de missões.</p>
+      </div>
+      <button class="start-btn" style="background:transparent;color:var(--text3);border:none;font-size:15px" onclick="responderTemPg(null)">Respondi por engano</button>
+    </div>`;
+}
+
+function aberturaHtml() {
+  const selo = mesLabel(mesAtual()).split('/')[0].toUpperCase();
+  return `
+    <div style="background:linear-gradient(160deg,var(--navy),var(--navy2));padding:2rem 1.25rem 1.75rem;text-align:center">
+      <div style="font-size:44px;line-height:1;margin-bottom:.6rem">🌟</div>
+      <div style="display:inline-block;font-size:12px;font-weight:700;letter-spacing:2.5px;color:var(--gold-mid);border:1px solid rgba(212,160,23,.45);border-radius:99px;padding:3px 12px;margin-bottom:.7rem">${selo}</div>
+      <div style="font-family:var(--ff-serif);font-size:30px;font-weight:500;color:#fff;line-height:1.25">Embaixadores da Esperança</div>
+      <div style="font-family:var(--ff-serif);font-style:italic;font-size:20px;color:var(--gold-mid);margin-top:.55rem">Construindo pontes</div>
+    </div>
+    <div style="padding:1.25rem 1rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card">
+        <p class="body-text" style="margin:0 0 .9rem"><strong>Você não precisa mudar o mundo inteiro.</strong></p>
+        <p class="body-text" style="margin:0 0 .9rem">Às vezes, a esperança começa quando duas pessoas que pensam diferente conseguem permanecer na mesma conversa.</p>
+        <p class="body-text" style="margin:0">Começa quando você escolhe ouvir em vez de atacar. Quando decide compreender antes de julgar. Quando enxerga alguém que todos ignoraram.</p>
+      </div>
+      <div class="content-card" style="border-left:3px solid var(--teal)">
+        <p class="body-text" style="margin:0"><strong>A próxima ponte pode começar com você.</strong></p>
+      </div>
+      <button class="start-btn" style="letter-spacing:1.5px;font-weight:700" onclick="avancar()">COMEÇAR A JORNADA</button>
+    </div>`;
+}
+
+// TELA 1 — A DIFERENÇA. Texto de setembro/2026 ("Construindo pontes").
+function tela1Html() {
+  const diferencas = ['Pensamos diferente.','Acreditamos diferente.','Temos histórias diferentes.','Viemos de lugares diferentes.','Pertencemos a grupos diferentes.'];
+  const linhas = diferencas.map((d, i) =>
+    `<div class="emb-ago-in" style="animation-delay:${(0.35 + i * 0.22).toFixed(2)}s;font-size:19px;line-height:1.6;color:var(--text2)">${d}</div>`).join('');
+  const atrasoLados = 0.35 + diferencas.length * 0.22 + 0.25;
+  const atrasoCard2 = atrasoLados + 0.8;
+  const atrasoCard3 = atrasoCard2 + 0.4;
+  return `
+    ${dotsHtml()}
+    <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card">
+        <div class="phase-tag tag-content">A diferença</div>
+        <p class="body-text emb-ago-in" style="margin:0 0 1rem">Vivemos cercados por diferenças.</p>
+        <div style="display:flex;flex-direction:column;gap:.35rem;padding-left:.85rem;border-left:3px solid var(--blue-light)">${linhas}</div>
+        <p class="body-text emb-ago-in" style="margin:1.1rem 0 0;animation-delay:${atrasoLados.toFixed(2)}s">E quanto mais diferentes nos sentimos, mais facilmente criamos dois lados: <strong>"Nós" e "eles".</strong></p>
+      </div>
+      <div class="content-card emb-ago-in" style="animation-delay:${atrasoCard2.toFixed(2)}s">
+        <p class="body-text" style="margin:0 0 .8rem">Mas existe algo que não podemos esquecer: antes de pertencer a qualquer grupo, cada pessoa é uma pessoa.</p>
+        <p class="body-text" style="margin:0"><strong>Tem uma história. Tem medos. Tem sonhos. Tem feridas que talvez ninguém conheça.</strong></p>
+      </div>
+      <div class="content-card emb-ago-in" style="animation-delay:${atrasoCard3.toFixed(2)}s;border-left:3px solid var(--teal)">
+        <p class="body-text" style="margin:0">A diferença não precisa desaparecer para que exista respeito. <strong>Podemos discordar sem desumanizar.</strong></p>
+      </div>
+      ${botaoHtml('CONTINUAR', (atrasoCard3 + 0.4).toFixed(2))}
+    </div>`;
+}
+
+// TELA 2 — A PONTE. Substitui a antiga "O problema" (rótulos revelados em 3 etapas via SUB,
+// removido — esta tela não precisa de revelação em partes).
+function tela2Html() {
+  const trocas = [
+    { antes: '"Eu sei como ele é."',        depois: '"O que eu ainda não sei sobre ele?"' },
+    { antes: '"Ela está errada."',           depois: '"O que posso compreender antes de responder?"' },
+    { antes: '"Ele é diferente de mim."',    depois: '"Mesmo diferente de mim, ele continua tendo valor."' },
+  ];
+  const cartoesTroca = trocas.map((t, i) => `
+      <div class="content-card emb-ago-in" style="animation-delay:${(0.9 + i * 0.3).toFixed(2)}s">
+        <p class="body-text" style="margin:0 0 .3rem;color:var(--text3)">${t.antes}</p>
+        <p class="body-text" style="margin:0">por: <strong>${t.depois}</strong></p>
+      </div>`).join('');
+  return `
+    ${dotsHtml()}
+    <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card">
+        <div class="phase-tag tag-insight">A ponte</div>
+        <p class="body-text emb-ago-in" style="margin:0 0 .8rem">Na jornada anterior, você descobriu como os rótulos podem nos impedir de enxergar pessoas.</p>
+        <p class="body-text emb-ago-in" style="margin:0 0 .8rem;animation-delay:.4s">Mas existe um passo além. Não basta apenas evitar julgar.</p>
+        <p class="body-text emb-ago-in" style="margin:0;animation-delay:.7s"><strong>Precisamos aprender a construir pontes.</strong></p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.45rem">${cartoesTroca}</div>
+      <div class="content-card emb-ago-in" style="animation-delay:2.1s;border-left:3px solid var(--teal)">
+        <p class="body-text" style="margin:0">Construir pontes não significa concordar com tudo. <strong>Significa escolher compreender antes de rejeitar.</strong></p>
+      </div>
+      ${botaoHtml('E VOCÊ?', '2.5')}
+    </div>`;
+}
+
+// TELA 3 — O ESPELHO. Texto de setembro/2026 reformulado ("pontos cegos" em vez de
+// "rótulos"); mecânica de escolha única igual, agora com 9 alternativas.
+function tela3Html() {
+  const e = ESCOLHAS.dificuldade;
+  const opcoes = ESPELHO.map((o, i) => `
+        <button class="opt-btn${e && e.id === o.id ? ' chosen' : ''} emb-ago-in" data-opcao="${o.id}"
+                style="animation-delay:${(1.55 + i * 0.06).toFixed(2)}s" onclick="escolherEspelho('${o.id}')">${o.texto}</button>`).join('');
+  return `
+    ${dotsHtml()}
+    <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card">
+        <div class="phase-tag tag-decision">O espelho</div>
+        <p class="body-text emb-ago-in" style="margin:0 0 .8rem">Talvez você não se considere uma pessoa preconceituosa. <strong>Mas todos nós temos pontos cegos.</strong></p>
+        <div class="emb-ago-in" style="animation-delay:.5s;display:flex;flex-direction:column;gap:.35rem;padding-left:.85rem;border-left:3px solid var(--blue-light);font-size:16px;line-height:1.55;color:var(--text2)">
+          <div>Às vezes ouvimos apenas para responder.</div>
+          <div>Às vezes precisamos estar certos.</div>
+          <div>Às vezes conversamos somente com quem concorda conosco.</div>
+          <div>Às vezes somos rápidos para exigir compreensão e lentos para oferecer compreensão.</div>
+        </div>
+      </div>
+      <div class="content-card emb-ago-in" style="animation-delay:1.4s">
+        <p class="body-text" style="margin:0 0 .85rem">Quando encontro alguém muito diferente de mim, qual é meu maior desafio?</p>
+        <div id="espelho-opcoes" style="display:flex;flex-direction:column;gap:.45rem">${opcoes}</div>
+      </div>
+      <div id="espelho-dica" style="${e ? 'display:none;' : ''}text-align:center;font-size:14px;color:var(--text3)">Escolha uma opção para continuar.</div>
+      <button id="espelho-continuar" class="start-btn emb-ago-btn" style="letter-spacing:1.5px;font-weight:700" ${e ? '' : 'disabled'} onclick="avancar()">CONTINUAR</button>
+    </div>`;
+}
+
+// Alternativas do espelho (usadas pela tela 3, acima).
+const ESPELHO = [
+  { id:'ouvir_preparar', texto:'Ouvir sem preparar minha resposta' },
+  { id:'admitir_erro',   texto:'Admitir que posso estar errado' },
+  { id:'respeitar',      texto:'Respeitar alguém de quem discordo' },
+  { id:'empatia',        texto:'Ter empatia por alguém de quem não gosto' },
+  { id:'reacoes',        texto:'Controlar minhas reações' },
+  { id:'pedir_perdao',   texto:'Pedir perdão quando eu erro' },
+  { id:'perdoar_seguir', texto:'Perdoar e seguir em frente' },
+  { id:'aproximar',      texto:'Aproximar-me de quem costuma ser ignorado' },
+  { id:'refletir',       texto:'Não sei — preciso refletir sobre isso' }
+];
+function escolherEspelho(id) {
+  const o = ESPELHO.find(x => x.id === id);
+  if (!o) return;
+  ESCOLHAS.dificuldade = { id: o.id, texto: o.texto };
+  salvarEscolhas();
+  document.querySelectorAll('#espelho-opcoes .opt-btn').forEach(b => b.classList.toggle('chosen', b.dataset.opcao === id));
+  const btn = document.getElementById('espelho-continuar'); if (btn) btn.disabled = false;
+  const dica = document.getElementById('espelho-dica'); if (dica) dica.style.display = 'none';
+}
+// TELA 4 — A ENTREGA. Chega depois do diagnóstico do espelho: a entrega se refere à
+// dificuldade que a pessoa acabou de reconhecer.
+function tela4Html() {
+  const talvez = ['aprender a ouvir','abandonar um preconceito','pedir perdão','perdoar','simplesmente voltar a enxergar alguém como pessoa'];
+  const linhasTalvez = talvez.map((t, i) =>
+    `<div class="emb-ago-in" style="animation-delay:${(0.9 + i * 0.18).toFixed(2)}s;font-size:17px;line-height:1.6;color:var(--text2)">Talvez precise ${t}.</div>`).join('');
+  const atrasoMudanca = 0.9 + talvez.length * 0.18 + 0.3;
+  return `
+    ${dotsHtml()}
+    <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card">
+        <div class="phase-tag tag-question">A entrega</div>
+        <p class="body-text emb-ago-in" style="margin:0 0 .5rem">Reconhecer uma dificuldade não é fracasso.</p>
+        <p class="body-text emb-ago-in" style="margin:0 0 1rem;animation-delay:.4s"><strong>É o começo da transformação.</strong></p>
+        <div style="display:flex;flex-direction:column;gap:.3rem;padding-left:.85rem;border-left:3px solid var(--blue-light)">${linhasTalvez}</div>
+        <p class="body-text emb-ago-in" style="margin:1.1rem 0 0;animation-delay:${atrasoMudanca.toFixed(2)}s">A mudança começa quando paramos de tentar transformar primeiro o outro... <strong>e permitimos que Deus transforme primeiro a nós.</strong></p>
+      </div>
+      <div class="emb-ago-in" style="animation-delay:${(atrasoMudanca + 0.6).toFixed(2)}s;background:linear-gradient(160deg,var(--navy),var(--navy2));border-radius:var(--radius);padding:1.35rem 1.15rem;text-align:center">
+        <div style="font-size:26px;line-height:1;margin-bottom:.6rem">🙏</div>
+        <p style="font-family:var(--ff-serif);font-size:22px;line-height:1.5;color:#fff;margin:0">O que preciso entregar a Deus para me tornar uma presença de esperança na vida de outras pessoas?</p>
+      </div>
+      ${botaoHtml('ENTREGAR A DEUS', (atrasoMudanca + 1.2).toFixed(2))}
+    </div>`;
+}
+
+// TELA 5 — VIRTUDES E FORÇAS DE CARÁTER.
+const VIRTUDES = [
+  { id:'sabedoria', nome:'SABEDORIA', icone:'💡', forcas:['Criatividade','Curiosidade','Amor ao aprendizado','Mente aberta','Perspectiva'] },
+  { id:'humanidade', nome:'HUMANIDADE', icone:'🤝', forcas:['Generosidade','Amor','Inteligência emocional'] },
+  { id:'justica', nome:'JUSTIÇA', icone:'⚖️', forcas:['Justiça','Liderança','Trabalho em equipe'] },
+  { id:'moderacao', nome:'MODERAÇÃO', icone:'🕊️', forcas:['Perdão','Humildade','Prudência','Autocontrole'] },
+  { id:'coragem', nome:'CORAGEM', icone:'🦁', forcas:['Bravura','Integridade','Perseverança','Vitalidade'] },
+  { id:'transcendencia', nome:'TRANSCENDÊNCIA', icone:'✨', forcas:['Admiração da beleza e excelência','Gratidão','Esperança','Humor','Espiritualidade'] }
+];
+function escolherVirtude(id) {
+  const v = VIRTUDES.find(x => x.id === id);
+  if (!v) return;
+  ESCOLHAS.virtude = { id: v.id, nome: v.nome };
+  delete ESCOLHAS.forca;
+  salvarEscolhas();
+  render();
+}
+function trocarVirtude() { delete ESCOLHAS.virtude; delete ESCOLHAS.forca; salvarEscolhas(); render(); }
+function escolherForca(id) {
+  const v = ESCOLHAS.virtude ? VIRTUDES.find(x => x.id === ESCOLHAS.virtude.id) : null;
+  if (!v) return;
+  const nome = v.forcas[parseInt(String(id).split('_').pop(), 10)];
+  if (!nome) return;
+  ESCOLHAS.forca = { id, nome };
+  salvarEscolhas();
+  document.querySelectorAll('#forcas-opcoes .opt-btn').forEach(b => b.classList.toggle('chosen', b.dataset.opcao === id));
+  const btn = document.getElementById('forcas-continuar'); if (btn) btn.disabled = false;
+  const dica = document.getElementById('forcas-dica'); if (dica) dica.style.display = 'none';
+}
+function tela5Html() { return ESCOLHAS.virtude ? forcasHtml() : virtudesHtml(); }
+function virtudesHtml() {
+  const cartoes = VIRTUDES.map((v, i) => `
+        <button class="opt-btn emb-ago-in" style="animation-delay:${(0.45 + i * 0.09).toFixed(2)}s;display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700;letter-spacing:.5px"
+                onclick="escolherVirtude('${v.id}')"><span style="font-size:22px;flex-shrink:0">${v.icone}</span><span>${v.nome}</span></button>`).join('');
+  return `
+    ${dotsHtml()}
+    <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card">
+        <div class="phase-tag tag-apply">Uma força para construir pontes</div>
+        <p class="body-text emb-ago-in" style="margin:0 0 .9rem">Todos podemos desenvolver forças que nos ajudam a viver melhor e servir melhor.</p>
+        <p class="body-text emb-ago-in" style="margin:0;animation-delay:.35s"><strong>Qual dimensão você gostaria de fortalecer hoje?</strong></p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.45rem">${cartoes}</div>
+    </div>`;
+}
+function forcasHtml() {
+  const def = VIRTUDES.find(x => x.id === ESCOLHAS.virtude.id);
+  if (!def) return virtudesHtml();
+  const escolha = ESCOLHAS.forca;
+  const opcoes = def.forcas.map((f, i) => {
+    const id = `${def.id}_${i}`;
+    return `
+        <button class="opt-btn${escolha && escolha.id === id ? ' chosen' : ''} emb-ago-in" data-opcao="${id}"
+                style="animation-delay:${(0.35 + i * 0.08).toFixed(2)}s" onclick="escolherForca('${id}')">${f}</button>`;
+  }).join('');
+  return `
+    ${dotsHtml()}
+    <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card">
+        <div class="phase-tag tag-apply">Uma força para construir pontes</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:.85rem">
+          <span style="font-size:26px">${def.icone}</span>
+          <span style="font-size:19px;font-weight:700;letter-spacing:.5px;color:var(--navy)">${def.nome}</span>
+        </div>
+        <p class="body-text" style="margin:0 0 .85rem">Qual força você gostaria de praticar hoje?</p>
+        <div id="forcas-opcoes" style="display:flex;flex-direction:column;gap:.45rem">${opcoes}</div>
+        <button onclick="trocarVirtude()" style="margin-top:.85rem;background:none;border:none;padding:0;color:var(--blue);font-size:14px;font-weight:600;cursor:pointer;font-family:var(--ff-body)">‹ Escolher outra dimensão</button>
+      </div>
+      <div id="forcas-dica" style="${escolha ? 'display:none;' : ''}text-align:center;font-size:14px;color:var(--text3)">Escolha uma força para continuar.</div>
+      <button id="forcas-continuar" class="start-btn emb-ago-btn" style="letter-spacing:1.5px;font-weight:700" ${escolha ? '' : 'disabled'} onclick="avancar()">ESCOLHER UMA FORÇA</button>
+    </div>`;
+}
+
+// TELA 6 — A MISSÃO. Derivada da força escolhida; nunca é requisito de participação.
+const MISSOES = {
+  'Criatividade':'Faça hoje algo inesperado para tornar o dia de alguém mais leve.',
+  'Curiosidade':'Pergunte a alguém sobre uma parte da vida dela que você ainda não conhece — e escute a resposta inteira.',
+  'Amor ao aprendizado':'Aprenda algo com alguém que faz alguma coisa bem.',
+  'Mente aberta':'Converse com alguém que pensa diferente. Faça uma pergunta para compreender, não para convencer.',
+  'Perspectiva':'Antes de julgar uma atitude difícil, pergunte: "O que eu não estou vendo nessa situação?"',
+  'Generosidade':'Ofereça seu tempo, ajuda ou atenção sem esperar retorno.',
+  'Amor':'Faça algo concreto que comunique a alguém: "Você importa."',
+  'Inteligência emocional':'Perceba alguém que normalmente passa despercebido e demonstre interesse genuíno por essa pessoa.',
+  'Justiça':'Se alguém for tratado injustamente, encontre uma maneira respeitosa de defender sua dignidade.',
+  'Liderança':'Inclua em uma conversa ou decisão alguém que normalmente fica de fora.',
+  'Trabalho em equipe':'Ajude hoje alguém que não pode oferecer nenhuma vantagem a você.',
+  'Perdão':'Pense em alguém que você precisa perdoar e dê hoje um pequeno passo nessa direção.',
+  'Humildade':'Em uma conversa, faça duas perguntas antes de apresentar sua própria opinião.',
+  'Prudência':'Antes de falar sobre alguém, pergunte: É verdadeiro? É necessário? É construtivo?',
+  'Autocontrole':'Quando surgir uma provocação, faça uma pausa antes de responder.',
+  'Bravura':'Defenda respeitosamente alguém que está sendo humilhado ou injustiçado.',
+  'Integridade':'Cumpra hoje exatamente o que você prometeu, mesmo que ninguém esteja cobrando.',
+  'Perseverança':'Retome o cuidado com alguém de quem você já havia desistido.',
+  'Vitalidade':'Leve sua melhor energia para um ambiente onde as pessoas costumam chegar cansadas.',
+  'Admiração da beleza e excelência':'Reconheça algo bem-feito por alguém e diga exatamente o que você admirou.',
+  'Gratidão':'Agradeça alguém cuja presença ou cuidado você costuma considerar garantido.',
+  'Esperança':'Procure alguém desanimado. Primeiro escute. Depois ofereça uma palavra verdadeira de encorajamento.',
+  'Humor':'Faça alguém sorrir sem transformar ninguém em alvo de piada.',
+  'Espiritualidade':'Ore hoje por alguém. Se houver abertura, pergunte: "Posso orar com você?"'
+};
+function minhaMissao() { return ESCOLHAS.forca ? (MISSOES[ESCOLHAS.forca.nome] || null) : null; }
+function tela6Html() {
+  const missao = minhaMissao();
+  if (!ESCOLHAS.forca || !missao) return tela5Html();
+  return `
+    ${dotsHtml()}
+    <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card">
+        <div class="phase-tag tag-apply">A missão</div>
+        <p class="body-text emb-ago-in" style="margin:0 0 .9rem">Uma força só se torna parte de nós quando passa da intenção para a prática.</p>
+        <p class="body-text emb-ago-in" style="margin:0;animation-delay:.5s">Escolha uma pequena missão. Você não precisa realizá-la imediatamente — quando surgir a oportunidade, pratique.</p>
+      </div>
+      <div class="emb-ago-in" style="animation-delay:1.1s;background:linear-gradient(160deg,var(--navy),var(--navy2));border-radius:var(--radius);padding:1.35rem 1.15rem">
+        <div style="font-size:12.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold-mid);margin-bottom:.6rem">${sanitize(ESCOLHAS.forca.nome)}</div>
+        <p style="font-family:var(--ff-serif);font-size:21px;line-height:1.55;color:#fff;margin:0">${missao}</p>
+      </div>
+      ${botaoHtml('CONTINUAR', '1.7')}
+    </div>`;
+}
+
+// TELA 7 — O DESAFIO (nova em setembro/2026). Fica entre a missão e o registro de
+// participação: fecha a reflexão da campanha ("Construindo pontes") antes do registro.
+function tela7Html() {
+  return `
+    ${dotsHtml()}
+    <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card">
+        <div class="phase-tag tag-question">O desafio</div>
+        <p class="body-text emb-ago-in" style="margin:0 0 .8rem">Existe uma diferença entre tolerar e valorizar.</p>
+        <p class="body-text emb-ago-in" style="margin:0 0 .3rem;animation-delay:.4s;color:var(--text3)">Tolerar pode significar:</p>
+        <p class="body-text emb-ago-in" style="margin:0 0 .8rem;animation-delay:.6s">"Eu não gosto de você, mas aceito que esteja aqui."</p>
+        <p class="body-text emb-ago-in" style="margin:0 0 .3rem;animation-delay:1s;color:var(--text3)">Valorizar significa:</p>
+        <p class="body-text emb-ago-in" style="margin:0;animation-delay:1.2s"><strong>"Mesmo sendo diferente de mim, reconheço que sua vida tem dignidade e valor."</strong></p>
+      </div>
+      <div class="content-card emb-ago-in" style="animation-delay:1.7s">
+        <p class="body-text" style="margin:0 0 .7rem">Um Embaixador da Esperança não precisa concordar com todos. Mas procura:</p>
+        <div style="display:flex;flex-direction:column;gap:.35rem;padding-left:.85rem;border-left:3px solid var(--blue-light);font-size:17px;line-height:1.55;color:var(--text2)">
+          <div>ouvir antes de responder;</div>
+          <div>compreender antes de julgar;</div>
+          <div>incluir antes de excluir;</div>
+          <div>perdoar antes de desistir.</div>
+        </div>
+      </div>
+      <div class="emb-ago-in" style="animation-delay:2.3s;background:linear-gradient(160deg,var(--navy),var(--navy2));border-radius:var(--radius);padding:1.35rem 1.15rem;text-align:center">
+        <p style="font-family:var(--ff-serif);font-size:19px;line-height:1.5;color:#fff;margin:0 0 .5rem">A próxima vez que encontrar alguém muito diferente de você, experimente fazer uma pergunta:</p>
+        <p style="font-family:var(--ff-serif);font-style:italic;font-size:21px;color:var(--gold-mid);margin:0">"O que eu ainda não sei sobre você?"</p>
+      </div>
+      ${botaoHtml('ACEITAR O DESAFIO', '2.8')}
+    </div>`;
+}
+
+// TELA 8 — IDENTIFICAÇÃO E REGISTRO DE PARTICIPAÇÃO. Era a tela 7; passou a ser a 8 quando
+// "O desafio" entrou na sequência em setembro/2026.
+// Aqui está a única diferença em relação ao app dos Pequenos Grupos: quem não pertence a
+// um PG não tem cadastro de participante, então informa nome e setor.
+function tela8Html() {
+  const registro = carregar(CHAVE_REGISTRO);
+  if (registro && registro.monthKey === mesAtual()) {
+    return `
+    ${dotsHtml()}
+    <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
+      <div style="background:var(--teal-light);border:0.5px solid var(--teal);border-radius:var(--radius);padding:1.35rem 1.15rem;text-align:center">
+        <div style="font-size:40px;line-height:1;margin-bottom:.5rem">✅</div>
+        <div style="font-size:19px;font-weight:700;color:#04342C;line-height:1.35">Participação registrada</div>
+        <div style="font-size:16px;color:#04342C;margin-top:.35rem">Embaixadores da Esperança — ${mesLabel(mesAtual())}</div>
+        <div style="font-size:14px;color:var(--text3);margin-top:.5rem">${sanitize(registro.nome)} · ${sanitize(registro.setor)}</div>
+        <div style="font-size:14px;color:var(--text3);margin-top:.2rem">Registrada em ${sanitize(registro.data)}</div>
+      </div>
+      ${resumoHtml()}
+      ${envioHtml()}
+      <button class="start-btn" style="background:var(--card);color:var(--blue);border:0.5px solid var(--border)" onclick="reverExperiencia()">Rever a experiência desde o início</button>
+    </div>`;
+  }
+  const opcoes = SETORES.map(s => `<option value="${sanitize(s)}">${sanitize(s)}</option>`).join('');
+  return `
+    ${dotsHtml()}
+    <div style="padding:.5rem 1rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card">
+        <div class="phase-tag tag-close">Participação</div>
+        <p class="body-text emb-ago-in" style="margin:0 0 .9rem"><strong>Sua participação termina aqui.</strong></p>
+        <p class="body-text emb-ago-in" style="margin:0;animation-delay:.4s">Registre sua participação para que a Capelania saiba que <strong>o seu setor</strong> esteve presente nos Embaixadores da Esperança de ${mesLabel(mesAtual())}.</p>
+      </div>
+      ${resumoHtml()}
+      <div class="content-card">
+        <div style="margin-bottom:.9rem">
+          <label class="rotulo-campo" for="campo-nome">Seu nome</label>
+          <input id="campo-nome" class="campo" type="text" maxlength="70" autocomplete="name" placeholder="Nome e sobrenome">
+        </div>
+        <div>
+          <label class="rotulo-campo" for="campo-setor">Setor onde você trabalha</label>
+          <select id="campo-setor" class="campo" onchange="aoTrocarSetor()">
+            <option value="">Selecione o seu setor…</option>
+            ${opcoes}
+            <option value="__outro__">Outro setor…</option>
+          </select>
+          <input id="campo-setor-outro" class="campo" type="text" maxlength="70" placeholder="Escreva o nome do seu setor" style="display:none;margin-top:.5rem">
+        </div>
+      </div>
+      <div id="registro-erro" style="display:none"></div>
+      <button id="btn-registrar" class="start-btn" style="letter-spacing:1.5px;font-weight:700" onclick="registrarParticipacao()">✅ REGISTRAR MINHA PARTICIPAÇÃO</button>
+    </div>`;
+}
+
+// BLOCO DO ENVIO — fecho do arco que abre na tela de acolhimento com "A próxima ponte pode
+// começar com você" e termina aqui em "e escolho construir uma ponte." Só aparece depois do
+// registro: quem ainda está diante do formulário pode registrar, e o fecho ali seria um
+// encerramento que a pessoa não pediu. Mesma regra e mesmo texto do app dos PGs.
+function envioHtml() {
+  return `
+      <div class="content-card" style="border-left:3px solid var(--teal)">
+        <div class="phase-tag tag-apply">O envio</div>
+        <p class="body-text" style="margin:0 0 .9rem">Mas a jornada não termina aqui.</p>
+        <p class="body-text" style="margin:0 0 .9rem">Talvez você não consiga mudar uma opinião. Talvez não consiga resolver um conflito. Talvez uma relação não seja reconstruída em um único encontro.</p>
+        <p class="body-text" style="margin:0 0 .9rem"><strong>Mas você pode escolher como estará diante do outro.</strong></p>
+        <p class="body-text" style="margin:0 0 .9rem">Permita que Deus transforme seu olhar, fortaleça sua fé e faça de você uma presença de esperança.</p>
+        <p class="body-text" style="margin:0"><strong>Você não precisa mudar o mundo inteiro.</strong> Comece pela próxima pessoa que Deus colocar no seu caminho.</p>
+      </div>
+      <div style="background:linear-gradient(160deg,var(--navy),var(--navy2));border-radius:var(--radius);padding:1.35rem 1.15rem;text-align:center">
+        <p style="font-family:var(--ff-serif);font-style:italic;font-size:21px;line-height:1.5;color:var(--gold-mid);margin:0">A esperança começa quando eu enxergo o outro — e escolho construir uma ponte.</p>
+      </div>`;
+}
+
+function resumoHtml() {
+  if (!ESCOLHAS.dificuldade && !ESCOLHAS.virtude && !ESCOLHAS.forca) return '';
+  const linha = (rot, val) => val ? `<div style="margin-top:3px">${rot}: <strong>${sanitize(val)}</strong></div>` : '';
+  const missao = minhaMissao();
+  return `
+      <div style="background:var(--blue-pale);border:0.5px solid var(--blue-light);border-radius:var(--radius-sm);padding:.8rem .9rem;font-size:15px;line-height:1.55;color:var(--navy2)">
+        <div style="font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text3)">Suas escolhas de hoje</div>
+        ${linha('Maior dificuldade', ESCOLHAS.dificuldade && ESCOLHAS.dificuldade.texto)}
+        ${linha('Dimensão', ESCOLHAS.virtude && ESCOLHAS.virtude.nome)}
+        ${linha('Força para praticar', ESCOLHAS.forca && ESCOLHAS.forca.nome)}
+        ${missao ? `<div style="margin-top:.5rem;font-style:italic;color:var(--text2)">"${missao}"</div>` : ''}
+      </div>`;
+}
+
+function aoTrocarSetor() {
+  const sel = document.getElementById('campo-setor');
+  const outro = document.getElementById('campo-setor-outro');
+  if (!sel || !outro) return;
+  outro.style.display = sel.value === '__outro__' ? 'block' : 'none';
+  if (sel.value === '__outro__') outro.focus();
+}
+
+function mostrarErro(texto, detalhe) {
+  const el = document.getElementById('registro-erro');
+  if (!el) return;
+  el.style.display = 'block';
+  el.innerHTML = `<div class="aviso-erro"><strong>${sanitize(texto)}</strong>${detalhe ? `<div style="margin-top:.35rem;font-size:13px;opacity:.85">Detalhe técnico: ${sanitize(detalhe)}</div>` : ''}</div>`;
+}
+
+// Envia UM documento novo para a coleção "embaixadoresExternos". Não lê nem reescreve
+// nada — por isso registros simultâneos nunca se atropelam.
+async function registrarParticipacao() {
+  const nome = (document.getElementById('campo-nome') || {}).value || '';
+  const sel = (document.getElementById('campo-setor') || {}).value || '';
+  const outro = (document.getElementById('campo-setor-outro') || {}).value || '';
+  const setor = sel === '__outro__' ? outro.trim() : sel.trim();
+  const erroEl = document.getElementById('registro-erro');
+  if (erroEl) erroEl.style.display = 'none';
+
+  if (nome.trim().length < 3) return mostrarErro('Escreva seu nome para registrar a participação.');
+  if (!setor) return mostrarErro('Selecione (ou escreva) o setor onde você trabalha.');
+
+  const btn = document.getElementById('btn-registrar');
+  if (btn) { btn.disabled = true; btn.textContent = 'Registrando…'; }
+
+  const agora = new Date();
+  const corpo = {
+    fields: {
+      nome:     { stringValue: nome.trim() },
+      setor:    { stringValue: setor },
+      monthKey: { stringValue: mesAtual() },
+      criadoEm: { stringValue: agora.toISOString() }
+    }
+  };
+
+  try {
+    if (MODO_TESTE) {
+      console.log('[MODO TESTE] gravação simulada, nada foi enviado:', corpo);
+    } else {
+      const url = `https://firestore.googleapis.com/v1/projects/${FB.projectId}/databases/(default)/documents/${FB.colecao}?key=${FB.apiKey}`;
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(corpo)
+      });
+      if (!resp.ok) {
+        let detalhe = 'HTTP ' + resp.status;
+        try { const j = await resp.json(); if (j && j.error && j.error.message) detalhe = j.error.message; } catch (_) {}
+        throw new Error(detalhe);
+      }
+    }
+    guardar(CHAVE_REGISTRO, {
+      nome: nome.trim(), setor, monthKey: mesAtual(),
+      data: agora.toLocaleDateString('pt-BR'), teste: MODO_TESTE || undefined
+    });
+    render();
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.innerHTML = ROTULO_REGISTRAR; }
+    mostrarErro('Não foi possível registrar agora. Verifique sua conexão e tente novamente.', e && e.message);
+  }
+}
+
+// ── NAVEGAÇÃO ─────────────────────────────────────────────────────────────────
+function avancar() {
+  if (ETAPA < 8) { ETAPA++; render(); window.scrollTo(0, 0); }
+}
+function reverExperiencia() { ETAPA = 0; render(); window.scrollTo(0, 0); }
+function responderTemPg(temPg) { TEM_PG = temPg; render(); window.scrollTo(0, 0); }
+
+function encerradoHtml() {
+  return `
+    <div style="background:linear-gradient(160deg,var(--navy),var(--navy2));padding:2rem 1.25rem 1.75rem;text-align:center">
+      <div style="font-size:44px;line-height:1;margin-bottom:.6rem">🌟</div>
+      <div style="font-family:var(--ff-serif);font-size:28px;font-weight:500;color:#fff;line-height:1.25">Embaixadores Digital de ${MES_ENCERRADO} — encerrado</div>
+    </div>
+    <div style="padding:1.25rem 1rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="content-card" style="border-left:3px solid var(--teal)">
+        <p class="body-text" style="margin:0 0 .9rem"><strong>Obrigado a todos que participaram!</strong></p>
+        <p class="body-text" style="margin:0">Aguarde as orientações da Capelania para o próximo mês.</p>
+      </div>
+    </div>`;
+}
+
+// OUTUBRO/2026 — o Genially (páginas curtas + vídeo de ~5 min) e, abaixo dele, nome, setor e
+// o botão de confirmação. A página não enxerga o que acontece dentro do Genially (outro site):
+// a participação é a confirmação da própria pessoa (opção B, escolhida pelo Capelão).
+// O registro usa o mesmo registrarParticipacao() de sempre.
+function outubroHtml() {
+  const registro = carregar(CHAVE_REGISTRO);
+  const selo = mesLabel(mesAtual()).split('/')[0].toUpperCase();
+  const topo = `
+    <div style="background:linear-gradient(160deg,var(--navy),var(--navy2));padding:1.6rem 1.25rem 1.4rem;text-align:center">
+      <div style="display:inline-block;font-size:12px;font-weight:700;letter-spacing:2.5px;color:var(--gold-mid);border:1px solid rgba(212,160,23,.45);border-radius:99px;padding:3px 12px;margin-bottom:.7rem">${selo}</div>
+      <div style="font-family:var(--ff-serif);font-size:28px;font-weight:500;color:#fff;line-height:1.25">Embaixadores da Esperança</div>
+      <div style="font-family:var(--ff-serif);font-style:italic;font-size:20px;color:var(--gold-mid);margin-top:.55rem">${TEMA_MES}</div>
+    </div>`;
+  const genially = `
+      <div style="position:relative;width:100%;padding-bottom:75%;border-radius:var(--radius-sm);overflow:hidden;background:#000">
+        <iframe src="${GENIALLY_URL}" title="${TEMA_MES}" allowfullscreen allow="autoplay; fullscreen" style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>
+      </div>
+      <a href="${GENIALLY_URL}" target="_blank" rel="noopener" style="display:block;text-align:center;background:var(--blue);color:#fff;text-decoration:none;border-radius:var(--radius-sm);padding:1.5rem 1rem;font-size:32px;font-weight:800;line-height:1.15">⛶ ABRIR EM TELA CHEIA</a>`;
+  if (registro && registro.monthKey === mesAtual()) {
+    return topo + `
+    <div style="padding:1rem;display:flex;flex-direction:column;gap:1rem">
+      <div style="background:var(--teal-light);border:0.5px solid var(--teal);border-radius:var(--radius);padding:1.35rem 1.15rem;text-align:center">
+        <div style="font-size:40px;line-height:1;margin-bottom:.5rem">✅</div>
+        <div style="font-size:19px;font-weight:700;color:#04342C;line-height:1.35">Participação registrada</div>
+        <div style="font-size:16px;color:#04342C;margin-top:.35rem">Embaixadores da Esperança — ${mesLabel(mesAtual())}</div>
+        <div style="font-size:14px;color:var(--text3);margin-top:.5rem">${sanitize(registro.nome)} · ${sanitize(registro.setor)}</div>
+        <div style="font-size:14px;color:var(--text3);margin-top:.2rem">Registrada em ${sanitize(registro.data)}</div>
+      </div>
+      ${genially}
+    </div>`;
+  }
+  const opcoes = SETORES.map(s => `<option value="${sanitize(s)}">${sanitize(s)}</option>`).join('');
+  return topo + `
+    <div style="padding:1rem;display:flex;flex-direction:column;gap:1rem">
+      ${genially}
+      <p style="margin:0;text-align:center;font-size:15px;color:var(--text2);line-height:1.5">Passe por todas as páginas e assista ao vídeo do final. Depois, preencha e confirme abaixo.</p>
+      <div class="content-card">
+        <div style="margin-bottom:.9rem">
+          <label class="rotulo-campo" for="campo-nome">Seu nome</label>
+          <input id="campo-nome" class="campo" type="text" maxlength="70" autocomplete="name" placeholder="Nome e sobrenome">
+        </div>
+        <div>
+          <label class="rotulo-campo" for="campo-setor">Setor onde você trabalha</label>
+          <select id="campo-setor" class="campo" onchange="aoTrocarSetor()">
+            <option value="">Selecione o seu setor…</option>
+            ${opcoes}
+            <option value="__outro__">Outro setor…</option>
+          </select>
+          <input id="campo-setor-outro" class="campo" type="text" maxlength="70" placeholder="Escreva o nome do seu setor" style="display:none;margin-top:.5rem">
+        </div>
+      </div>
+      <div id="registro-erro" style="display:none"></div>
+      <button id="btn-registrar" class="start-btn" style="background:var(--coral);font-weight:700;line-height:1.3;font-size:15px;padding:.55rem .9rem;flex-direction:column;align-items:center;text-align:center" onclick="registrarParticipacao()">${ROTULO_REGISTRAR}</button>
+    </div>`;
+}
+
+function render() {
+  if (ENCERRADO) { document.getElementById('tela').innerHTML = encerradoHtml(); return; }
+  const faixa = MODO_TESTE ? '<div class="faixa-teste">MODO DE TESTE · nada é gravado na nuvem</div>' : '';
+  const conteudo = TEM_PG === null ? portaHtml()
+                 : TEM_PG === true ? avisoTemPgHtml()
+                 : outubroHtml();
+  document.getElementById('tela').innerHTML = faixa + conteudo;
+}
+
+// Quem já registrou neste mês cai direto na tela de confirmação, em vez de refazer tudo.
+(function iniciar() {
+  const registro = carregar(CHAVE_REGISTRO);
+  // Quem já registrou obviamente já respondeu a porta — repetir a pergunta deixaria a tela
+  // de confirmação inalcançável.
+  if (registro && registro.monthKey === mesAtual()) { TEM_PG = false; ETAPA = 8; }
+  render();
+})();
+</script>
+</body>
+</html>
