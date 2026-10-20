@@ -128,7 +128,7 @@ const ENCERRADO = new Date() >= new Date(2026, 10, 1);
 const MES_ENCERRADO = 'outubro';
 const GENIALLY_URL = 'https://view.genially.com/6ad7b168a64fca9aa90fa312';
 const TEMA_MES = 'Como serão seus próximos cinco anos?';
-const ROTULO_REGISTRAR = '✅ Li o conteúdo e assisti ao pequeno vídeo';
+const ROTULO_REGISTRAR = '✅ Li o conteúdo e assisti ao pequeno vídeo<span style="display:block;font-size:12.5px;font-weight:400;font-style:italic;opacity:.9;margin-top:2px">Acreditamos em sua palavra.</span>';
 document.title = 'Embaixadores da Esperança — ' + (ENCERRADO ? MES_ENCERRADO + '/2026' : mesLabel(mesAtual()));
 function sanitize(s) {
   return String(s == null ? '' : s).replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
@@ -678,7 +678,7 @@ async function registrarParticipacao() {
     });
     render();
   } catch (e) {
-    if (btn) { btn.disabled = false; btn.textContent = ROTULO_REGISTRAR; }
+    if (btn) { btn.disabled = false; btn.innerHTML = ROTULO_REGISTRAR; }
     mostrarErro('Não foi possível registrar agora. Verifique sua conexão e tente novamente.', e && e.message);
   }
 }
@@ -721,7 +721,7 @@ function outubroHtml() {
       <div style="position:relative;width:100%;padding-bottom:75%;border-radius:var(--radius-sm);overflow:hidden;background:#000">
         <iframe src="${GENIALLY_URL}" title="${TEMA_MES}" allowfullscreen allow="autoplay; fullscreen" style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>
       </div>
-      <a href="${GENIALLY_URL}" target="_blank" rel="noopener" style="text-align:center;font-size:15px;color:var(--blue)">Abrir em tela cheia ↗</a>`;
+      <a href="${GENIALLY_URL}" target="_blank" rel="noopener" style="display:block;text-align:center;background:var(--blue);color:#fff;text-decoration:none;border-radius:var(--radius-sm);padding:1rem;font-size:22px;font-weight:800;line-height:1.2">⛶ Abrir em tela cheia</a>`;
   if (registro && registro.monthKey === mesAtual()) {
     return topo + `
     <div style="padding:1rem;display:flex;flex-direction:column;gap:1rem">
@@ -756,7 +756,7 @@ function outubroHtml() {
         </div>
       </div>
       <div id="registro-erro" style="display:none"></div>
-      <button id="btn-registrar" class="start-btn" style="background:var(--coral);font-weight:700;line-height:1.3" onclick="registrarParticipacao()">${ROTULO_REGISTRAR}</button>
+      <button id="btn-registrar" class="start-btn" style="background:var(--coral);font-weight:700;line-height:1.3;font-size:15px;padding:.55rem .9rem;flex-direction:column;align-items:center;text-align:center" onclick="registrarParticipacao()">${ROTULO_REGISTRAR}</button>
     </div>`;
 }
 
