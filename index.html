@@ -5574,12 +5574,12 @@ function embAgostoEntradaHtml() {
   // é assim que o retorno opcional fica visível ao voltar aos Embaixadores.
   const temRetornoPendente = (typeof getForcaEmbAgosto === 'function')
     && getForcaEmbAgosto() && !getRetornoEmbAgosto();
-  const legenda = temRetornoPendente ? 'Como foi sua missão?' : '"Construindo pontes"';
+  const legenda = temRetornoPendente ? 'Como foi sua missão?' : '"' + EMB_OUT_TEMA + '"';
   return `
       <button onclick="abrirEmbaixadoresAgosto()" style="width:100%;display:flex;align-items:center;gap:10px;text-align:left;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);padding:.7rem .85rem;margin:.4rem 0;cursor:pointer;font-family:var(--ff-body)">
         <span style="font-size:22px;flex-shrink:0">🌟</span>
         <span style="flex:1;min-width:0">
-          <span style="display:block;font-size:15px;font-weight:700;line-height:1.25">Experiência digital de ${EMB_DIGITAL_ENCERRADO ? 'setembro/2026' : embMonthLabel(embMonthKey())}</span>
+          <span style="display:block;font-size:15px;font-weight:700;line-height:1.25">Experiência digital de ${EMB_DIGITAL_ENCERRADO ? EMB_DIGITAL_MES_ENCERRADO + '/2026' : embMonthLabel(embMonthKey())}</span>
           <span style="display:block;font-size:12.5px;color:rgba(255,255,255,0.6);margin-top:1px">${EMB_DIGITAL_ENCERRADO ? 'Encerrada' : legenda}</span>
         </span>
         <span style="font-size:18px;color:rgba(255,255,255,0.5);flex-shrink:0">›</span>
@@ -5598,17 +5598,22 @@ let EMB_AGO_ETAPA = 0;
 // 2026-10-01 (pedido do Capelão): Embaixadores Digital de setembro ENCERRADO — só valem os
 // registros até 30/09; outubro será presencial. Enquanto true, o botão verde da Home e a
 // entrada dos Desafios abrem só o aviso abaixo, e a jornada (com o registro) fica inacessível.
-const EMB_DIGITAL_ENCERRADO = true;
+// 2026-10-20 (pedido do Capelão): experiência digital REABERTA para outubro — mesmo conteúdo
+// de setembro ("Construindo pontes"); o registro conta para o mês corrente (embMonthKey).
+// Encerramento PROGRAMADO (pedido do Capelão, 20/10): vale até 31/10/2026 inclusive; a partir
+// de 01/11/2026 00:00 (relógio do aparelho) o botão abre só o aviso abaixo.
+const EMB_DIGITAL_ENCERRADO = new Date() >= new Date(2026, 10, 1);
+const EMB_DIGITAL_MES_ENCERRADO = 'outubro';
 function embDigitalEncerradoHtml() {
   return `
     <div style="background:linear-gradient(160deg,var(--navy),var(--navy2));padding:2rem 1.25rem 1.75rem;text-align:center">
       <div style="font-size:44px;line-height:1;margin-bottom:.6rem">🌟</div>
-      <div style="font-family:var(--ff-serif);font-size:28px;font-weight:500;color:#fff;line-height:1.25">Embaixadores Digital de setembro — encerrado</div>
+      <div style="font-family:var(--ff-serif);font-size:28px;font-weight:500;color:#fff;line-height:1.25">Embaixadores Digital de ${EMB_DIGITAL_MES_ENCERRADO} — encerrado</div>
     </div>
     <div style="padding:1.25rem 1rem;display:flex;flex-direction:column;gap:1rem">
       <div class="content-card" style="border-left:3px solid var(--teal)">
         <p class="body-text" style="margin:0 0 .9rem"><strong>Obrigado a todos que participaram!</strong></p>
-        <p class="body-text" style="margin:0">Em outubro o Embaixadores será presencial. Aguarde as orientações da Capelania.</p>
+        <p class="body-text" style="margin:0">Aguarde as orientações da Capelania para o próximo mês.</p>
       </div>
     </div>`;
 }
@@ -5617,21 +5622,89 @@ function abrirEmbaixadoresAgosto() {
   if (EMB_DIGITAL_ENCERRADO) {
     EMB_AGO_ETAPA = 0;  // a seta de voltar, na etapa 0, sai da tela
     const hdr = document.getElementById('emb-ago-hdr-mes');
-    if (hdr) hdr.textContent = 'Experiência digital · setembro';
+    if (hdr) hdr.textContent = 'Experiência digital · ' + EMB_DIGITAL_MES_ENCERRADO;
     showScreen('embaixadores-ago');
     const el = document.getElementById('embaixadores-ago-body');
     if (el) el.innerHTML = embDigitalEncerradoHtml();
     resetScroll();
     return;
   }
-  // Quem já recebeu a missão deste mês, ao voltar, cai no retorno sobre ela (etapa 9) em
-  // vez de recomeçar a experiência do zero. De lá dá para rever tudo desde o início.
-  EMB_AGO_ETAPA = getForcaEmbAgosto() ? 9 : 0;
+  // 2026-10-20 (pedido do Capelão): a jornada de setembro ("Construindo pontes") foi
+  // RETIRADA — outubro é o Genially abaixo. As funções de setembro seguem no arquivo, mas
+  // nada mais as chama a partir daqui.
+  EMB_AGO_ETAPA = 0;  // a seta de voltar, na etapa 0, sai da tela
   // O cabeçalho vinha fixo em "Agosto" — agora mostra o mês atual (2026-09-24).
   const hdrMes = document.getElementById('emb-ago-hdr-mes');
   if (hdrMes) hdrMes.textContent = 'Experiência digital · ' + MESES_PT[new Date().getMonth()];
   showScreen('embaixadores-ago');
-  renderEmbaixadoresAgosto();
+  renderEmbaixadoresOutubro();
+}
+
+// ── Embaixadores de OUTUBRO/2026: "Como serão seus próximos cinco anos?" ──────────
+// O conteúdo é um Genially (páginas curtas + vídeo de ~5 min no fim), mostrado dentro da
+// tela. O app NÃO enxerga o que acontece dentro do Genially (outro site): a participação é
+// a confirmação da própria pessoa no botão abaixo dele (opção B, escolhida pelo Capelão).
+// Grava pelo mesmo confirmarEmbaixadores() de sempre — mesmo campo, mesmo bloqueio por mês.
+const EMB_OUT_GENIALLY_URL = 'https://view.genially.com/6ad7b168a64fca9aa90fa312';
+const EMB_OUT_TEMA = 'Como serão seus próximos cinco anos?';
+
+function embOutubroHtml() {
+  const meuGrupo = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
+  const eu = getMeuEmbaixadoresParticipante();
+  const monthKey = embMonthKey();
+  const registro = eu && eu.embaixadores ? eu.embaixadores[monthKey] : null;
+  const jaRegistrado = !!(registro && registro.participou);
+  const selo = embMonthLabel(monthKey).split('/')[0].toUpperCase();
+
+  // Os mesmos quatro estados da tela de participação de setembro.
+  const bloco = jaRegistrado ? `
+      <div style="background:var(--teal-light);border:0.5px solid var(--teal);border-radius:var(--radius);padding:1.35rem 1.15rem;text-align:center">
+        <div style="font-size:40px;line-height:1;margin-bottom:.5rem">✅</div>
+        <div style="font-size:19px;font-weight:700;color:#04342C;font-family:var(--ff-body);line-height:1.35">Participação registrada</div>
+        <div style="font-size:16px;color:#04342C;margin-top:.35rem;font-family:var(--ff-body)">Embaixadores da Esperança — ${embMonthLabel(monthKey)}</div>
+        <div style="font-size:14px;color:var(--text3);margin-top:.5rem;font-family:var(--ff-body)">Registrada em ${registro.data}${registro.hora ? ' às ' + registro.hora : ''}</div>
+      </div>`
+    : eu ? `
+      <p style="margin:0;text-align:center;font-size:15px;color:var(--text2);font-family:var(--ff-body);line-height:1.5">Passe por todas as páginas e assista ao vídeo do final. Depois, confirme abaixo.</p>
+      <button onclick="registrarParticipacaoEmbOutubro()" style="width:100%;background:var(--coral);color:#fff;border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17.5px;font-weight:700;line-height:1.3;cursor:pointer;font-family:var(--ff-body)">✅ Li o conteúdo e assisti ao pequeno vídeo</button>`
+    : meuGrupo ? `
+      <div style="background:#FDECEA;border:0.5px solid #F3B8B4;border-radius:var(--radius);padding:1rem">
+        <div style="font-weight:700;font-size:16px;color:#E05050;margin-bottom:.4rem;font-family:var(--ff-body)">⚠️ Não conseguimos confirmar seu vínculo com o Pequeno Grupo "${sanitize(meuGrupo.grupoNome || ('Grupo ' + meuGrupo.grupoNum))}" neste aparelho.</div>
+        <div style="font-size:15px;color:var(--text2);line-height:1.5;font-family:var(--ff-body)">Por isso não é possível registrar sua participação agora. Peça ao seu Coordenador um novo link de convite: ao aceitar com o mesmo nome e WhatsApp de antes, seu progresso é recuperado e você poderá registrar.</div>
+      </div>`
+    : `
+      <div style="background:var(--gold-pale);border:0.5px solid rgba(184,134,11,0.25);border-radius:var(--radius);padding:1rem">
+        <div style="font-weight:700;font-size:16px;color:var(--gold);margin-bottom:.4rem;font-family:var(--ff-body)">Você ainda não faz parte de um Pequeno Grupo neste aparelho.</div>
+        <div style="font-size:15px;color:var(--text2);line-height:1.5;font-family:var(--ff-body)">A experiência é sua e vale do mesmo jeito. Para que sua participação seja contabilizada, avise o Coordenador do Pequeno Grupo do seu setor — ele registra os participantes que ainda não estão em um PG.</div>
+      </div>`;
+
+  return `
+    <div style="background:linear-gradient(160deg,var(--navy),var(--navy2));padding:1.6rem 1.25rem 1.4rem;text-align:center">
+      <div style="display:inline-block;font-size:12px;font-weight:700;letter-spacing:2.5px;color:var(--gold-mid);border:1px solid rgba(212,160,23,.45);border-radius:99px;padding:3px 12px;margin-bottom:.7rem;font-family:var(--ff-body)">${selo}</div>
+      <div style="font-family:var(--ff-serif);font-size:28px;font-weight:500;color:#fff;line-height:1.25">Embaixadores da Esperança</div>
+      <div style="font-family:var(--ff-serif);font-style:italic;font-size:20px;color:var(--gold-mid);margin-top:.55rem">${EMB_OUT_TEMA}</div>
+    </div>
+    <div style="padding:1rem;display:flex;flex-direction:column;gap:1rem">
+      <div style="position:relative;width:100%;padding-bottom:75%;border-radius:var(--radius-sm);overflow:hidden;background:#000">
+        <iframe src="${EMB_OUT_GENIALLY_URL}" title="${EMB_OUT_TEMA}" allowfullscreen allow="autoplay; fullscreen" style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>
+      </div>
+      <a href="${EMB_OUT_GENIALLY_URL}" target="_blank" rel="noopener" style="text-align:center;font-size:15px;color:var(--blue);font-family:var(--ff-body)">Abrir em tela cheia ↗</a>
+      ${bloco}
+      <button onclick="fecharEmbaixadoresAgosto()" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;font-size:16px;color:var(--text2);cursor:pointer;font-family:var(--ff-body)">Concluir</button>
+    </div>`;
+}
+
+function renderEmbaixadoresOutubro() {
+  const el = document.getElementById('embaixadores-ago-body');
+  if (!el) return;
+  el.innerHTML = embOutubroHtml();
+  resetScroll();
+}
+
+// Não escreve nada por conta própria: delega a confirmarEmbaixadores() e redesenha.
+function registrarParticipacaoEmbOutubro() {
+  confirmarEmbaixadores();
+  renderEmbaixadoresOutubro();
 }
 
 // Rever a experiência inteira, do começo (a partir do retorno).
@@ -13459,9 +13532,9 @@ function renderGruposBtnHome() {
   // participação nos Embaixadores do mês, que antes ficava em Desafios do Discipulado. O mês
   // do texto muda sozinho. Para trazer o card de volta: MOSTRAR_CARD_GRUPO_HOME = true.
   const MOSTRAR_CARD_GRUPO_HOME = false;
-  const mesEmb = EMB_DIGITAL_ENCERRADO ? 'setembro' : MESES_PT[new Date().getMonth()];
+  const mesEmb = EMB_DIGITAL_ENCERRADO ? EMB_DIGITAL_MES_ENCERRADO : MESES_PT[new Date().getMonth()];
   const btnEmbHtml = mgHome ? `
-    <button onclick="abrirEmbaixadoresAgosto()" style="width:100%;background:var(--teal);color:#fff;border:none;border-radius:var(--radius);padding:.9rem 1rem;font-size:21px;font-weight:800;line-height:1.15;cursor:pointer;font-family:var(--ff-body)">Embaixadores ${mesEmb}</button>` : '';
+    <button onclick="abrirEmbaixadoresAgosto()" style="width:100%;background:var(--coral);color:#fff;border:none;border-radius:var(--radius);padding:.9rem 1rem;font-size:21px;font-weight:800;line-height:1.15;cursor:pointer;font-family:var(--ff-body)">Embaixadores ${mesEmb}</button>` : '';
   div.innerHTML = (MOSTRAR_CARD_GRUPO_HOME && !MOSTRAR_PROGRESSO_PG_HOME && mgHome) ? htmlCardDoGrupo(mgHome, true) : btnEmbHtml;
 
   // UX-01: o card "Mural de Gratidão" foi removido daqui — consolidado no único card
