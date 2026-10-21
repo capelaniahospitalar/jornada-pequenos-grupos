@@ -8087,6 +8087,7 @@ function initApp() {
   }
 
   if (ST.welcomeDone) {
+    pedirArmazenamentoPermanente();
     showScreen('home');
     renderHome();
     renderCompanionFab();
@@ -11772,10 +11773,102 @@ function showInstitutionalLanding() {
     <p style="font-size:16px;color:rgba(255,255,255,0.85);font-family:var(--ff-body);line-height:1.65;max-width:340px;margin:0 0 1rem">
       O acesso é realizado somente por meio de um convite enviado pelo Tutor ou pelo Coordenador do seu grupo.
     </p>
-    <p style="font-size:15px;color:rgba(255,255,255,0.6);font-family:var(--ff-body);line-height:1.6;max-width:340px;margin:0">
-      Caso você já participe de um Pequeno Grupo e precise voltar a acessar o aplicativo, solicite um novo convite ao Coordenador.
+    <p style="font-size:15px;color:rgba(255,255,255,0.6);font-family:var(--ff-body);line-height:1.6;max-width:340px;margin:0 0 1.5rem">
+      Caso você já participe de um Pequeno Grupo e precise voltar a acessar o aplicativo, toque no botão abaixo.
     </p>
+    <div id="ja-participo-area" style="width:100%;max-width:340px">
+      <button onclick="abrirJaParticipo()" style="width:100%;background:var(--gold);border:none;border-radius:var(--radius-sm);padding:.95rem 1rem;font-size:17px;font-weight:700;color:#0D2137;cursor:pointer;font-family:var(--ff-body)">Já participo de um Pequeno Grupo</button>
+    </div>
   </div>`;
+}
+
+// ── "Já participo" (pedido do usuário, 21/10/2026) ───────────────────────────────────────
+// O celular às vezes apaga o que o app guardava (pouco espaço, app de limpeza, regra de 7 dias
+// do Safari) e a pessoa caía nesta porta sem saída, dependendo de um convite novo a cada vez
+// (PG 37: 11 convites em 30 dias para 10 pessoas). Aqui ela volta sozinha com a MESMA prova da
+// reentrada por convite — nome compatível + WhatsApp compatível (buscarCadastroExistente).
+// Decisão do usuário: aceita-se que, sem convite, o coordenador não fica sabendo da reentrada.
+// NÃO grava nada na nuvem: o aparelho só adota o memberId do cadastro encontrado e restaura o
+// progresso, como o aceite faz. Matrícula sem app fica de fora (exige convite, que tira a marca).
+function abrirJaParticipo() {
+  const area = document.getElementById('ja-participo-area');
+  if (!area) return;
+  const campo = 'width:100%;border:0.5px solid rgba(255,255,255,0.15);border-radius:var(--radius-sm);padding:.75rem .85rem;font-size:17px;font-family:var(--ff-body);background:rgba(255,255,255,0.07);color:#fff;outline:none;box-sizing:border-box;margin-bottom:.6rem';
+  area.innerHTML = `
+    <input id="jp-nome" type="text" maxlength="80" autocomplete="name" placeholder="Seu nome completo" style="${campo}">
+    <input id="jp-wa" type="tel" maxlength="20" autocomplete="off" placeholder="Seu WhatsApp: DDD + número" style="${campo}">
+    <div id="jp-erro" style="color:#FF9980;font-size:14px;font-family:var(--ff-body);min-height:18px;margin:.1rem 0 .5rem;line-height:1.5"></div>
+    <button id="jp-btn" onclick="confirmarJaParticipo()" style="width:100%;background:var(--gold);border:none;border-radius:var(--radius-sm);padding:.95rem 1rem;font-size:17px;font-weight:700;color:#0D2137;cursor:pointer;font-family:var(--ff-body)">Entrar</button>
+    <p style="font-size:13.5px;color:rgba(255,255,255,0.55);font-family:var(--ff-body);line-height:1.55;margin:.8rem 0 0">Use o mesmo nome e o mesmo WhatsApp com que você entrou no seu Pequeno Grupo.</p>`;
+  document.getElementById('jp-nome')?.focus();
+}
+
+// Procura o cadastro ATIVO em todos os PGs. Devolve { g, p } do melhor candidato ou null.
+function buscarCadastroParaReentrada(nome, wa) {
+  const achados = [];
+  PEQUENOS_GRUPOS.forEach(g => {
+    if (!g || !g.nome) return;
+    const ativos = participantesAtivos(g).filter(p => !p.semApp);
+    const p = buscarCadastroExistente({ participantes: ativos }, nome, wa);
+    if (p) achados.push({ g, p });
+  });
+  if (!achados.length) return null;
+  // Mais de um PG (ex.: tutor que também participa): fica o de atividade mais recente.
+  const toque = x => Math.max(x.p.updatedAt || 0, (x.p.progresso && x.p.progresso.updatedAt) || 0);
+  return achados.sort((a, b) => toque(b) - toque(a))[0];
+}
+
+async function confirmarJaParticipo() {
+  const erro = document.getElementById('jp-erro');
+  const btn = document.getElementById('jp-btn');
+  const falha = (msg) => {
+    if (erro) erro.textContent = msg;
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Entrar'; }
+  };
+  const nome = (document.getElementById('jp-nome')?.value || '').trim().replace(/\s+/g, ' ');
+  const wa = normalizarWaBR(document.getElementById('jp-wa')?.value || '');
+  if (!nome) return falha('Por favor, informe seu nome.');
+  if (!wa) return falha('Informe um WhatsApp válido com DDD.');
+  if (erro) erro.textContent = '';
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.7'; btn.textContent = 'Procurando seu cadastro…'; }
+
+  const leituraOk = await syncFromFirebase();
+  if (!leituraOk) return falha('Sem conexão com a internet. Verifique e tente novamente.');
+  const achado = buscarCadastroParaReentrada(nome, wa);
+  if (!achado) return falha('Não encontramos um cadastro com este nome e este WhatsApp. Confira os dados ou peça um novo convite ao Coordenador do seu grupo.');
+
+  const { g, p } = achado;
+  try { if (p.memberId) localStorage.setItem(MEMBER_ID_KEY, p.memberId); } catch (_) {}
+  saveMeuGrupo({ grupoNum: g.num, grupoNome: g.nome, nome: p.nome, wa: p.wa, tipo: p.tipo,
+    papel: p.papel, departamento: p.departamento || '', dataInscricao: p.dataInscricao, ts: p.ts,
+    memberId: p.memberId || getMyMemberId() });
+  // Progresso: mesma regra do aceite (B1.5) — compara, nunca diminui o que o aparelho já tem.
+  const prog = p.progresso || {};
+  ST.xp     = Math.max(ST.xp || 0,     prog.xp || 0);
+  ST.streak = Math.max(ST.streak || 0, prog.streak || 0);
+  const feitosNuvem = prog.estudosConcluidos || 0;
+  if (feitosNuvem > (ST.done || []).length) ST.done = Array.from({ length: feitosNuvem }, (_, i) => i);
+  ST.userName = p.nome;
+  ST.welcomeDone = true;
+  ST.grupoNum = g.num;
+  save(ST);
+  pedirArmazenamentoPermanente();
+  renderIdentidadeRecuperadaModal(() => {
+    showScreen('home'); renderHome(); renderCompanionFab(); setTimeout(initGrupos, 100);
+  });
+}
+
+// Pede ao navegador que não apague os dados do app quando faltar espaço (Chrome concede sem
+// perguntar a sites usados com frequência). Só depois de a pessoa estar dentro do app, e só
+// uma vez por aparelho: no Firefox o pedido vira uma pergunta na tela.
+const PERSIST_PEDIDO_KEY = chaveTeste('jdpg_persist_pedido_v1');
+function pedirArmazenamentoPermanente() {
+  try {
+    if (!navigator.storage || !navigator.storage.persist) return;
+    if (localStorage.getItem(PERSIST_PEDIDO_KEY)) return;
+    localStorage.setItem(PERSIST_PEDIDO_KEY, String(Date.now()));
+    navigator.storage.persisted().then(jaTem => { if (!jaTem) return navigator.storage.persist(); }).catch(() => {});
+  } catch (_) {}
 }
 
 // Tela de entrada por convite — os 4 elementos (mockup aprovado).
@@ -11890,6 +11983,7 @@ async function confirmarEntradaConvite(inviteId) {
   if (res.ok) {
     window.history.replaceState({}, '', window.location.pathname);
     ST.welcomeDone = true; ST.grupoNum = res.grupoNum; save(ST);
+    pedirArmazenamentoPermanente();
     if (res.recuperado) {
       renderIdentidadeRecuperadaModal(() => {
         showScreen('home'); renderHome(); renderCompanionFab(); setTimeout(initGrupos, 100);
