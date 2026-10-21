@@ -12214,7 +12214,12 @@ function resolverCampoIdentidade(campo, lg, rg) {
   const base = baseNuvem[rg.num];
   // Sem base (instalação que ainda não leu a nuvem nenhuma vez): mantém a regra antiga, para
   // não descartar uma edição feita antes da primeira sincronização.
-  if (!base || !(campo in base)) return lg[campo] ?? rg[campo];
+  // Exceção (21/10/2026): lista VAZIA não é edição — é o molde de um aparelho que nunca viu a
+  // nuvem. Antes `[] ?? rg` devolvia [] e apagava os setores de todos os PGs.
+  if (!base || !(campo in base)) {
+    if (Array.isArray(lg[campo]) && lg[campo].length === 0) return rg[campo];
+    return lg[campo] ?? rg[campo];
+  }
   // Igual à base = este aparelho não mexeu nisso desde que viu a nuvem. Não tem opinião:
   // deixa passar o valor remoto, seja ele qual for. É esta linha que impede o retrocesso.
   if (mesmoValorIdentidade(lg[campo], base[campo])) return rg[campo];
@@ -12712,6 +12717,7 @@ async function prepareSaveGrupos(cfg) {
   if (!localTemDados && remoteTemDados) {
     console.warn('Proteção: gravação cancelada (local vazio, nuvem com dados). Recuperando dados da nuvem.');
     applyGruposData(remote.dados);
+    saveGruposLocal();   // cópia guardada = fotografia (ver a mesclagem abaixo)
     fbLastKnownTs = remote.ts;
     return { remote, abort: true };
   }
@@ -12732,6 +12738,11 @@ async function prepareSaveGrupos(cfg) {
   if (remote && remote.ts && remote.ts !== fbLastKnownTs) {
     console.warn('Firebase: nuvem mais nova — fazendo merge antes de gravar');
     applyGruposData(mergeGruposData(remote.dados, PEQUENOS_GRUPOS));
+    // 21/10/2026: applyGruposData atualiza a fotografia da nuvem (baseNuvem), mas a cópia
+    // guardada no aparelho ficava a de antes. O próximo loadGrupos() trazia de volta a cópia
+    // velha, que divergia da fotografia e passava por "edição local" — causa provável de os
+    // setores de todos os PGs terem sido apagados de novo em 20–21/10.
+    saveGruposLocal();
   }
   return { remote, abort: false };
 }
