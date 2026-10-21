@@ -4055,11 +4055,13 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
           ? `<div style="text-align:right;margin-top:.3rem"><button onclick="removerParticipanteDoPainel(${grupoNum}, '${p.ts}', '${nome.replace(/'/g,"\\'")}')" style="background:none;border:none;padding:0;font-size:12.5px;color:#E05050;cursor:pointer;font-family:var(--ff-body);text-decoration:underline">🗑️ Remover do grupo</button></div>`
           : '';
 
-        if (!prog) return `
+        if (p.semApp || !prog) return `
           <div class="tutor-participante-row">
             <div class="tutor-participante-nome">${sanitize(p.nome)}</div>
             <div class="tutor-participante-meta">${tipoLabel} · inscrito em ${sanitize(p.dataInscricao || '—')}</div>
-            <div style="font-size:13px;color:var(--text3);padding:.2rem 0">Ainda não iniciou estudos pelo app. Pode começar a qualquer momento fazendo os estudos e as missões para ganhar XP.</div>
+            ${p.semApp
+              ? `<div style="font-size:13px;color:var(--text3);padding:.2rem 0">📵 Sem app · matriculado por ${sanitize((p.matriculadoPor || '—').split(' ')[0])} em ${sanitize(p.dataInscricao || '—')}</div>`
+              : `<div style="font-size:13px;color:var(--text3);padding:.2rem 0">Ainda não iniciou estudos pelo app. Pode começar a qualquer momento fazendo os estudos e as missões para ganhar XP.</div>`}
             ${seletorSetorHtml}
             ${removerHtml}
           </div>`;
@@ -4116,6 +4118,7 @@ function renderTutorGrupoDetalhe(grupoNum, nome) {
     </div>
     ${lembreteSection}
     ${souCoordenadorDesteGrupo ? `<button onclick="iniciarConvidarParticipanteDoPainel(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:#FF6B4A;border:none;border-radius:var(--radius-sm);padding:.85rem 1rem;font-size:17px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">🔗 Convidar Participante</button>` : ''}
+    ${podeGerenciarParticipantes && PGS_MATRICULA_SEM_APP.includes(grupoNum) ? `<button onclick="iniciarMatricularSemApp(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--card);border:1px solid #FF6B4A;border-radius:var(--radius-sm);padding:.8rem 1rem;font-size:16px;font-weight:700;color:#FF6B4A;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">➕ Matricular participante sem app</button>` : ''}
     <button onclick="iniciarEditarNomeGrupo(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">✎ Editar nome do grupo</button>
     <button onclick="iniciarEditarReuniaoPainel(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="width:100%;background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem">🗓️ Editar dia e horário</button>
     <button onclick="abrirMutiraoPainel(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--orange);border:none;border-radius:var(--radius-sm);padding:.95rem 1rem;font-size:21px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;line-height:1.15;color:#fff;cursor:pointer;font-family:var(--ff-body);margin-bottom:.5rem"><span style="font-size:26px">🎁</span> Mutirão de Natal</button>
@@ -5006,6 +5009,87 @@ function iniciarConvidarParticipanteDoPainel(grupoNum, nome) {
   // ainda mais longe do formulário do que antes (medido: ia para 2531px em vez de ~994px).
   renderMeusConvitesEnviados(grupoNum);
   document.getElementById('convidar-participante-form')?.scrollIntoView({ block: 'center' });
+}
+
+// ── Matrícula SEM APP (pedido do usuário, 21/10/2026) ─────────────────────────────────────
+// Pessoas que não querem/não conseguem instalar o app (aparelho antigo, pouca internet) ficam
+// matriculadas no PG para controle e contam no ADV-e (Participação por Setor) — que já conta
+// todo participante ativo com setor. Não entram no IMD/Ranking (populacaoPgV3) nem no
+// Embaixadores. Começa só nos PGs desta lista; liberar outro PG = acrescentar o número aqui.
+// Se a pessoa instalar depois, o convite normal com o mesmo nome + WhatsApp recupera este
+// cadastro (buscarCadastroExistente) e tira a marca `semApp` (ver aceitarConvite).
+const PGS_MATRICULA_SEM_APP = [38];
+
+function iniciarMatricularSemApp(grupoNum, nome) {
+  const body = document.getElementById('tutorpanel-body');
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!body || !g) return;
+  const opcoesSetor = (g.setores || []).map(setorId => {
+    const sm = SETORES_MESTRE.find(x => x.setorId === setorId);
+    return sm ? `<option value="${sm.setorId}">${sanitize(sm.nome)}</option>` : '';
+  }).join('');
+
+  const formHtml = `
+    <div class="panel-section" id="matricular-sem-app-form">
+      <div class="panel-title">➕ Matricular participante sem app</div>
+      <p class="body-text" style="margin:0 0 .6rem">Para quem não vai instalar o aplicativo. A pessoa fica matriculada neste PG e conta no relatório do ADV-e.</p>
+      <input class="insc-input" id="sem-app-nome" type="text" maxlength="80" autocomplete="off" placeholder="Nome completo" style="margin-bottom:.6rem">
+      <select id="sem-app-setor" class="insc-input" style="margin-bottom:.6rem">
+        <option value="">Setor: escolha</option>
+        ${opcoesSetor}
+      </select>
+      ${opcoesSetor ? '' : `<p style="font-size:13px;color:#E05050;margin:0 0 .6rem;font-family:var(--ff-body)">Este PG ainda não acompanha nenhum setor. Inclua o setor em "Indicadores por Setor" antes de matricular.</p>`}
+      <input class="insc-input" id="sem-app-wa" type="tel" maxlength="20" autocomplete="off" placeholder="WhatsApp (opcional): DDD + número" style="margin-bottom:.6rem">
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:14px;color:var(--text2);margin-bottom:.6rem;font-family:var(--ff-body)">
+        <input type="checkbox" id="sem-app-consentiu" style="margin-top:3px"> Esta pessoa concordou em ser matriculada no PG.
+      </label>
+      <div id="sem-app-erro" style="color:#E05050;font-size:14px;min-height:18px;margin-bottom:.4rem;font-family:var(--ff-body)"></div>
+      <div style="display:flex;gap:8px">
+        <button class="insc-submit-btn" style="margin:0;flex:1" onclick="confirmarMatricularSemApp(${grupoNum}, '${nome.replace(/'/g,"\\'")}')">Matricular</button>
+        <button onclick="renderTutorGrupoDetalhe(${grupoNum}, '${nome.replace(/'/g,"\\'")}')" style="background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.7rem 1rem;font-size:15px;color:var(--text3);cursor:pointer;font-family:var(--ff-body)">Fechar</button>
+      </div>
+    </div>`;
+
+  const existing = document.getElementById('matricular-sem-app-form');
+  if (existing) existing.remove();
+  body.insertAdjacentHTML('afterbegin', formHtml);
+  // Mesmo motivo do formulário de convite acima: o botão fica embaixo, o formulário nasce no topo.
+  document.getElementById('matricular-sem-app-form')?.scrollIntoView({ block: 'center' });
+}
+
+function confirmarMatricularSemApp(grupoNum, nome) {
+  const erro = document.getElementById('sem-app-erro');
+  const falha = (msg) => { if (erro) erro.textContent = msg; return false; };
+  const g = PEQUENOS_GRUPOS.find(x => x.num === grupoNum);
+  if (!g || !PGS_MATRICULA_SEM_APP.includes(grupoNum)) return falha('Opção não disponível para este Pequeno Grupo.');
+  const autorizado = nomesCorrespondem(g.tutor && g.tutor.trim().toLowerCase(), nome.trim().toLowerCase()) ||
+                     nomesCorrespondem(g.coordenador && g.coordenador.trim().toLowerCase(), nome.trim().toLowerCase());
+  if (!autorizado) return falha('Só o Tutor ou o Coordenador deste PG pode matricular.');
+
+  const nomeNovo = (document.getElementById('sem-app-nome')?.value || '').trim().replace(/\s+/g, ' ');
+  const setorId = document.getElementById('sem-app-setor')?.value || '';
+  const waDigitado = (document.getElementById('sem-app-wa')?.value || '').trim();
+  const consentiu = !!document.getElementById('sem-app-consentiu')?.checked;
+  if (nomeNovo.split(' ').length < 2) return falha('Informe o nome completo (nome e sobrenome).');
+  if (!setorId || !(g.setores || []).includes(setorId)) return falha('Escolha o setor da pessoa.');
+  const wa = waDigitado ? normalizarWaBR(waDigitado) : '';
+  if (waDigitado && !wa) return falha('WhatsApp inválido. Use DDD + número, ou deixe em branco.');
+  if (!consentiu) return falha('Confirme que a pessoa concordou em ser matriculada.');
+  if (participantesAtivos(g).some(p => (p.nome || '').trim().toLowerCase() === nomeNovo.toLowerCase())) {
+    return falha('Já existe um participante com este nome neste PG.');
+  }
+
+  const agora = Date.now();
+  g.participantes = g.participantes || [];
+  g.participantes.push({
+    nome: nomeNovo, wa, tipo: 'colaborador', papel: null, departamento: '',
+    dataInscricao: new Date(agora).toLocaleDateString('pt-BR'), ts: agora, updatedAt: agora,
+    setorId, semApp: true, matriculadoPor: nome.trim(),
+  });
+  atualizarStatusPg(g);
+  saveGrupos();
+  renderTutorGrupoDetalhe(grupoNum, nome);
+  return true;
 }
 
 function renderProgramaSemanal() {
@@ -11508,6 +11592,8 @@ async function aceitarConvite(inviteId, dadosPessoa) {
     // isto o aceite devolvia SUCESSO e a pessoa continuava invisível no PG — o "entrei e
     // ninguém me vê" (auditoria: F-37, reproduzido no teste T5 da Fase 10).
     if (p.removed) { p.removed = false; reativado = true; p.reativadoEm = agora; }   // B2.4
+    // Matrícula sem app (21/10/2026): quem aceitou um convite passou a usar o app.
+    if (p.semApp) { delete p.semApp; p.instalouAppEm = agora; }
     // ── B1.5 — PROTEÇÃO DO PROGRESSO ────────────────────────────────────────────────────
     // O aceite NUNCA escreve `p.progresso`. O que existia continua exatamente como estava —
     // XP, estudos, streak e indicadores são preservados por não serem tocados.
@@ -14176,7 +14262,8 @@ function getPgIMD(grupoNum) {
   };
   const g = (typeof PEQUENOS_GRUPOS !== 'undefined') ? PEQUENOS_GRUPOS.find(x => x.num === grupoNum) : null;
   if (!g || !g.participantes) return pgIMD;
-  const participantesSemDup = participantesAtivos(g).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
+  const participantesSemDup = participantesAtivos(g).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i)
+    .filter(p => !p.semApp);   // matrícula sem app: fora do IMD/Ranking (21/10/2026)
 
   if (participantesSemDup.length) {
     const somaXP = participantesSemDup.reduce((soma, p) => soma + (p.progresso?.xp || 0), 0);
@@ -14370,7 +14457,8 @@ function getPgIMDv2(grupoNum) {
 
   const agora = Date.now();
   const monthKey = embMonthKey();
-  const participantesSemDup = participantesAtivos(g).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
+  const participantesSemDup = participantesAtivos(g).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i)
+    .filter(p => !p.semApp);   // matrícula sem app: fora do IMD/Ranking (21/10/2026)
   const elegiveis = participantesSemDup.filter(p => participanteElegivelV2(p, agora));
   const comEvidenciaLista = elegiveis.filter(p => participanteComEvidenciaEngajamentoV2(p, monthKey));
 
@@ -14623,7 +14711,8 @@ function classificarPgs() {
   const calculatedAt = new Date().toISOString();
   const entradas = gruposFormados.map(g => {
     const imd = getPgIMD(g.num);
-    const participantesSemDup = participantesAtivos(g).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i);
+    const participantesSemDup = participantesAtivos(g).filter((p, i, arr) => arr.findIndex(x => x.nome.trim().toLowerCase() === p.nome.trim().toLowerCase()) === i)
+      .filter(p => !p.semApp);   // matrícula sem app: fora do IMD/Ranking (21/10/2026)
     return {
       grupoNum: g.num,
       grupo: g.nome || (PG_DEFAULT_NAME + ' ' + g.num),
@@ -14863,8 +14952,10 @@ function temEvidenciaV3(p, monthKey, inicioCiclo) {
 // População do PG, nas quatro camadas que a homologação exige distinguir.
 function populacaoPgV3(g, monthKey, agora, inicioCiclo) {
   const ativos = participantesAtivos(g);
+  // Matrícula sem app (21/10/2026): não registra atividade pelo app, então não entra na medição.
   const semDup = ativos.filter((p, i, arr) =>
-    arr.findIndex(x => (x.nome || '').trim().toLowerCase() === (p.nome || '').trim().toLowerCase()) === i);
+    arr.findIndex(x => (x.nome || '').trim().toLowerCase() === (p.nome || '').trim().toLowerCase()) === i)
+    .filter(p => !p.semApp);
   const fora      = semDup.filter(p => foraDaCarenciaV3(p, agora));
   const mediveis  = semDup.filter(p => foraDaCarenciaV3(p, agora) || temEvidenciaV3(p, monthKey, inicioCiclo));
   const evidencia = mediveis.filter(p => temEvidenciaV3(p, monthKey, inicioCiclo));
