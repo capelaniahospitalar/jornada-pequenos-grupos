@@ -16,8 +16,10 @@ recomeçam do estudo 1; XP, medalhas, missões já ganhas e diário ficam. Nova 
   antes, ou por app antigo em cache) conta 0 no ciclo atual (`estudosDoCiclo()`) — reentrada, "Já
   participo", aceite de convite, Painel do Tutor, mediana do PG, meta do PG e IMD (decisão: o Ranking
   conta só o ciclo novo).
-- **Encontros (`ENCONTROS`)**: 17 roteiros novos escritos a partir dos estudos (texto, versículo,
-  perguntas de conversa, espelho, missão e diário).
+- **Encontros (`ENCONTROS`)**: 17 roteiros novos. O "Texto do encontro" é o texto principal do estudo de
+  mesmo número (abertura, conteúdo, aprofundamento e reflexão), lido na hora de `STUDIES`
+  (`textoPrincipalDoEstudo`); escritos para o encontro: versículo,
+  perguntas de conversa, espelho, missão e diário.
 - **Missões, obstáculos, atributos, fases e medalhas**: missões da jornada refeitas (`c2_*`),
   obstáculos religados aos temas novos, `STUDY_ATTRS`/`FASE_UNLOCK`/`RPG_LEVELS`/`BADGES` para os 17;
   conquistas do 2º ciclo registradas como `c2_nivel1…c2_complete` (as do 1º continuam).
