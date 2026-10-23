@@ -1,5 +1,36 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-10-25] — 2º ciclo: 17 estudos do "Aos Pés do Mestre" + roupagem "Verde renovo"
+
+**Pedido do Capelão:** novo ciclo dos PGs a partir de 26/10/2026 com os 17 estudos do app "Aos Pés do
+Mestre" (cópia entre produtos autorizada só para isto). Os 13 estudos do 1º ciclo saem; todos
+recomeçam do estudo 1; XP, medalhas, missões já ganhas e diário ficam. Nova roupagem de cores.
+
+- **Estudos (`STUDIES`)**: os 17 do "Aos Pés", com a fase nova "Embaixador do Reino" (`missionario`).
+  Corrigidas numerações herdadas (recapitulação do estudo 9; lista de revisão e "Decisão Final" do 17).
+- **Virada de ciclo (`CICLO_ATUAL = 2`)**: no celular, `ST.done`/`completedAt` zeram uma única vez; a
+  contagem antiga fica em `ST.estudosCiclo1`; o diário antigo continua visível, marcado `ciclo:1`;
+  diários dos encontros e a tela de encerramento também recomeçam (`E7.diariosCiclo1`,
+  `E8.journeyCompletedCiclo1`). Na nuvem, `progresso.ciclo` marca o ciclo do número
+  `estudosConcluidos` e `progresso.estudosCiclo1` guarda o antigo. Registro sem a marca (gravado
+  antes, ou por app antigo em cache) conta 0 no ciclo atual (`estudosDoCiclo()`) — reentrada, "Já
+  participo", aceite de convite, Painel do Tutor, mediana do PG, meta do PG e IMD (decisão: o Ranking
+  conta só o ciclo novo).
+- **Encontros (`ENCONTROS`)**: 17 roteiros novos escritos a partir dos estudos (texto, versículo,
+  perguntas de conversa, espelho, missão e diário).
+- **Missões, obstáculos, atributos, fases e medalhas**: missões da jornada refeitas (`c2_*`),
+  obstáculos religados aos temas novos, `STUDY_ATTRS`/`FASE_UNLOCK`/`RPG_LEVELS`/`BADGES` para os 17;
+  conquistas do 2º ciclo registradas como `c2_nivel1…c2_complete` (as do 1º continuam).
+- **"13" fixo** trocado por `STUDIES.length`/`ENCONTROS.length` (Home, estudo, Encontros, Diretoria
+  PG 47, Painel do Tutor, meta do PG, IA). Embaixadores e Mutirão de Natal sem alteração.
+- **Roupagem "Verde renovo"**: topo `#0F3B2E`, botões `#1D6B50`, destaque âmbar `#E0A030`, fundo
+  `#F4F7F2`; fase Iniciante em âmbar; topo "Novo ciclo · Aos Pés do Mestre"; ícone e logotipo
+  recoloridos (mesmo desenho). Laranja do Mutirão, vermelho de erro e verde do WhatsApp mantidos.
+- **1º ciclo guardado**: `ciclo-1/ciclo-1-temas.js` (estudos, encontros, missões, obstáculos, fases e
+  medalhas — não é carregado pelo app) e tag local `ciclo-1-final` no commit 24875c9.
+- Testes em `?teste=1`: 17 estudos concluídos em sequência sem erro; baterias B1 55/55, B2 42/42,
+  E1 27/27, Fase4 11/11, Mutirão 52/52, Permissões 20/20, Matriz 43/43, Sync 26/26.
+
 ## [2026-10-08] — Relatório Mensal: "Participação por Setor (ADV-e)" com aviso de divergência
 
 **Pedido do Capelão:** o ADV-e presta contas mensalmente ao Planejamento/Auditoria do HAS e precisa
