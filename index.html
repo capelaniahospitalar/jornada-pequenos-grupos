@@ -6034,6 +6034,8 @@ const JOURNEY_MISSIONS = [
   // então pode ser cumprida de novo no mês seguinte. Getters porque MESES_PT é declarado mais abaixo.
   { get id(){ return 'pg_visita_' + embMonthKey(); }, get label(){ return 'Enviar um representante do PG para visitar outro Pequeno Grupo em ' + MESES_PT[new Date().getMonth()] + ', e orar por eles.'; }, icon:'🚶', xp:50, unlock:[], unlockFn:()=>true, manual:true, check(){ return (ST.missionsDone||[]).includes(this.id); } },
   { id:'pg_oracao',       label:'Participar da Semana de Oração com Pastor convidado',                     icon:'🙏', xp:60,  unlock:[], unlockFn:()=>new Date().getMonth()+1===9, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_oracao') },
+  // Semana de Oração da sede da Adventist Health Brasil (out/2026, videoconferência no auditório externo) — só em outubro/2026
+  { id:'pg_oracao_ah_2026_10', label:'Participei da Semana de Oração da Adventist Health',              icon:'🙏', xp:60,  unlock:[], unlockFn:()=>embMonthKey()==='2026-10', manual:true, check:()=>(ST.missionsDone||[]).includes('pg_oracao_ah_2026_10') },
 ];
 
 // ── Embaixadores da Esperança: evento recorrente mensal (registrado no participante,
@@ -14824,7 +14826,7 @@ function calcularMissaoScore(participantes) {
     ? pgImdPercent(participantes.filter(p => p.embaixadores?.[monthKey]?.participou).length, participantes.length)
     : 0;
   const g = PEQUENOS_GRUPOS.find(x => x.num === PG_IMD_CTX.grupoNum);
-  const campanhasDesbloqueadas = PG_CAMPANHAS.filter(c => c.mensal || (new Date().getMonth() + 1) >= c.mesInicio);
+  const campanhasDesbloqueadas = campanhasAtivas();
   if (!campanhasDesbloqueadas.length) return embaixadoresPct;
   const campanhasProgresso = (g && g.campanhas) || {};
   const concluidas = campanhasDesbloqueadas.filter(c => {
@@ -16034,14 +16036,15 @@ const PG_CAMPANHAS = [
     corLight: '#D5EDE9',
   },
   {
-    id: 'semana_oracao',
-    titulo: 'Semana de Oração',
+    // Substitui a de setembro (id 'semana_oracao', registros antigos ficam em g.campanhas, fora do IMD)
+    id: 'semana_oracao_ah_2026_10',
+    titulo: 'Semana de Oração da Adventist Health',
     icon: '🙏',
-    periodo: 'Setembro',
-    desc: 'Semana de oração com Pastor convidado. Meta: pelo menos 70% dos membros do departamento presentes em 3 ou mais cultos.',
+    periodo: 'Outubro',
+    desc: 'Semana de Oração da sede da Adventist Health Brasil, transmitida por videoconferência no auditório externo. Meta: pelo menos 70% dos membros do departamento presentes em 3 ou mais cultos.',
     metaPct: 70,
     tipo: 'presenca',
-    mesInicio: 9,
+    soMes: '2026-10',
     cor: '#5C3D8F',
     corLight: '#EDE7F6',
   },
@@ -16086,7 +16089,7 @@ function saveCampanhasProgress(grupoNum, data) {
 // Retorna apenas as campanhas cujo mês de início já chegou
 function campanhasAtivas() {
   const mes = new Date().getMonth() + 1; // 1–12
-  return PG_CAMPANHAS.filter(c => c.mensal || mes >= c.mesInicio);
+  return PG_CAMPANHAS.filter(c => c.mensal || (c.soMes ? embMonthKey() === c.soMes : mes >= c.mesInicio));
 }
 
 // ── Render das missões de campanha no painel do tutor/coordenador ───────────
