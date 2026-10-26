@@ -6030,10 +6030,10 @@ const JOURNEY_MISSIONS = [
   { id:'c2_complete',label:'Completar toda a Jornada — 17 estudos concluídos',            icon:'👑', xp:200, unlock:[16], check:()=>ST.done.length>=17 },
   // ── Missões de campanha dos Pequenos Grupos (desbloqueiam pelo mês) ──────
   // unlockFn substitui unlock[] quando presente
-  { id:'pg_visita_jul',   label:'Enviar delegação representando o PG para visitar outro Pequeno Grupo, e orar por eles.', icon:'🚶', xp:50,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=7, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_visita_jul') },
-  { id:'pg_visita_ago',   label:'Enviar delegação representando o PG para visitar outro Pequeno Grupo em Agosto, e orar por eles.', icon:'🚶', xp:50,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=8, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_visita_ago') },
-  { id:'pg_visita_set',   label:'Enviar delegação representando o PG para visitar outro Pequeno Grupo em Setembro, e orar por eles.', icon:'🚶', xp:50,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=9, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_visita_set') },
-  { id:'pg_oracao',       label:'Participar da Semana de Oração com Pastor convidado',                     icon:'🙏', xp:60,  unlock:[], unlockFn:()=>new Date().getMonth()+1>=9, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_oracao') },
+  // Visita entre PGs: MENSAL — só a do mês vigente aparece; o id muda a cada mês (pg_visita_AAAA-MM),
+  // então pode ser cumprida de novo no mês seguinte. Getters porque MESES_PT é declarado mais abaixo.
+  { get id(){ return 'pg_visita_' + embMonthKey(); }, get label(){ return 'Enviar um representante do PG para visitar outro Pequeno Grupo em ' + MESES_PT[new Date().getMonth()] + ', e orar por eles.'; }, icon:'🚶', xp:50, unlock:[], unlockFn:()=>true, manual:true, check(){ return (ST.missionsDone||[]).includes(this.id); } },
+  { id:'pg_oracao',       label:'Participar da Semana de Oração com Pastor convidado',                     icon:'🙏', xp:60,  unlock:[], unlockFn:()=>new Date().getMonth()+1===9, manual:true, check:()=>(ST.missionsDone||[]).includes('pg_oracao') },
 ];
 
 // ── Embaixadores da Esperança: evento recorrente mensal (registrado no participante,
@@ -14824,7 +14824,7 @@ function calcularMissaoScore(participantes) {
     ? pgImdPercent(participantes.filter(p => p.embaixadores?.[monthKey]?.participou).length, participantes.length)
     : 0;
   const g = PEQUENOS_GRUPOS.find(x => x.num === PG_IMD_CTX.grupoNum);
-  const campanhasDesbloqueadas = PG_CAMPANHAS.filter(c => (new Date().getMonth() + 1) >= c.mesInicio);
+  const campanhasDesbloqueadas = PG_CAMPANHAS.filter(c => c.mensal || (new Date().getMonth() + 1) >= c.mesInicio);
   if (!campanhasDesbloqueadas.length) return embaixadoresPct;
   const campanhasProgresso = (g && g.campanhas) || {};
   const concluidas = campanhasDesbloqueadas.filter(c => {
@@ -16021,35 +16021,15 @@ function checkPgSemanaCompleta(grupoNum, weekKey) {
 // mesInicio: mês do calendário em que a missão é desbloqueada (1=jan…12=dez)
 const PG_CAMPANHAS = [
   {
-    id: 'visita_jul',
-    titulo: 'Visita entre PGs — Julho',
+    // MENSAL: só a do mês vigente aparece e conta no IMD; o id muda a cada mês (visita_AAAA-MM),
+    // então cada mês é um registro novo em g.campanhas.
+    get id() { return 'visita_' + embMonthKey(); },
+    get titulo() { return 'Visita entre PGs — ' + MESES_PT[new Date().getMonth()]; },
     icon: '🚶',
-    periodo: 'Julho',
-    desc: 'Enviar delegação representando o PG para visitar outro Pequeno Grupo, e orar por eles.',
+    get periodo() { return MESES_PT[new Date().getMonth()]; },
+    desc: 'Enviar um representante do PG para visitar outro Pequeno Grupo, e orar por eles.',
     tipo: 'visita',
-    mesInicio: 7,
-    cor: '#0E7B6C',
-    corLight: '#D5EDE9',
-  },
-  {
-    id: 'visita_ago',
-    titulo: 'Visita entre PGs — Agosto',
-    icon: '🚶',
-    periodo: 'Agosto',
-    desc: 'Enviar delegação representando o PG para visitar outro Pequeno Grupo, e orar por eles.',
-    tipo: 'visita',
-    mesInicio: 8,
-    cor: '#0E7B6C',
-    corLight: '#D5EDE9',
-  },
-  {
-    id: 'visita_set',
-    titulo: 'Visita entre PGs — Setembro',
-    icon: '🚶',
-    periodo: 'Setembro',
-    desc: 'Enviar delegação representando o PG para visitar outro Pequeno Grupo, e orar por eles.',
-    tipo: 'visita',
-    mesInicio: 9,
+    mensal: true,
     cor: '#0E7B6C',
     corLight: '#D5EDE9',
   },
@@ -16106,7 +16086,7 @@ function saveCampanhasProgress(grupoNum, data) {
 // Retorna apenas as campanhas cujo mês de início já chegou
 function campanhasAtivas() {
   const mes = new Date().getMonth() + 1; // 1–12
-  return PG_CAMPANHAS.filter(c => mes >= c.mesInicio);
+  return PG_CAMPANHAS.filter(c => c.mensal || mes >= c.mesInicio);
 }
 
 // ── Render das missões de campanha no painel do tutor/coordenador ───────────
@@ -16158,8 +16138,8 @@ function renderCampanhasTutor(grupoNum, tutorNome) {
       const pgVisitado = p.pgVisitado || '';
 
       statusHtml = feita
-        ? `<div style="font-size:14px;color:#0E7B6C;margin:.4rem 0">✅ Delegação enviada — visitou ${pgVisitado || 'PG'}</div>`
-        : `<div style="font-size:13px;color:var(--text3);margin:.4rem 0">Delegação ainda não enviada.</div>`;
+        ? `<div style="font-size:14px;color:#0E7B6C;margin:.4rem 0">✅ Representante enviado — visitou ${pgVisitado || 'PG'}</div>`
+        : `<div style="font-size:13px;color:var(--text3);margin:.4rem 0">Representante ainda não enviado.</div>`;
 
       inputHtml = feita ? `
         <button onclick="desfazerVisita(${grupoNum},'${c.id}','${tutorNome}')"
@@ -16167,13 +16147,13 @@ function renderCampanhasTutor(grupoNum, tutorNome) {
           ↩ Desfazer registro
         </button>` : `
         <div style="margin-top:.6rem">
-          <label style="font-size:12px;color:var(--text3);display:block;margin-bottom:2px">Qual PG a delegação visitou?</label>
+          <label style="font-size:12px;color:var(--text3);display:block;margin-bottom:2px">Qual PG o representante visitou?</label>
           <input type="text" id="camp-pg-${c.id}" value="${pgVisitado}"
             placeholder="ex: PG 5 — UTI, PG 12 — Recepção"
             style="width:100%;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:.5rem .7rem;font-size:15px;font-family:var(--ff-body);background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:.4rem">
           <button onclick="salvarCampanhaVisita(${grupoNum},'${c.id}','${tutorNome}')"
             style="width:100%;background:var(--teal);color:#fff;border:none;border-radius:var(--radius-sm);padding:.6rem;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--ff-body)">
-            ✓ Confirmar delegação enviada
+            ✓ Confirmar representante enviado
           </button>
         </div>`;
     }
