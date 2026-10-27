@@ -1,5 +1,13 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-10-27] — Logo do Silvestre e ícone do atalho voltam ao azul
+
+**Pedido do Capelão:** o logo e o ícone do atalho voltam às cores anteriores ao 2º ciclo.
+
+- `icon-192.png`, `icon-512.png` e o logo embutido no topo da home: restaurados idênticos à versão `24875c9`.
+- Tela de abertura e barra do celular: `theme-color` `#042C53` e `background_color` `#0D2137` (como antes).
+- O resto da roupagem "Verde renovo" continua. No iPhone, atalho já criado só muda se for apagado e refeito.
+
 ## [2026-10-25] — 2º ciclo: 17 estudos do "Aos Pés do Mestre" + roupagem "Verde renovo"
 
 **Pedido do Capelão:** novo ciclo dos PGs a partir de 26/10/2026 com os 17 estudos do app "Aos Pés do
