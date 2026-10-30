@@ -5106,7 +5106,7 @@ function renderBarraIndicador(pct, metaPct, status) {
 // calcularEmbaixadoresPorSetor) sem alterar a fórmula de nenhum — só a apresentação.
 function renderPainelIndicadoresPorSetor(g, grupoNum, nome) {
   const cobertura = calcularCoberturaSetorial(grupoNum);
-  const monthKey = embMonthKey();
+  const monthKey = embMesCampanha();
   const embaixadores = calcularEmbaixadoresPorSetor(monthKey);
   const participacao = calcularParticipacaoSetoresPg(g);   // ADV-e: divergência soma todos os PGs
   const nomeEsc = nome.replace(/'/g,"\\'");
@@ -6050,6 +6050,13 @@ function embMonthLabel(monthKey) {
   const [y, m] = monthKey.split('-');
   return MESES_PT[parseInt(m, 10) - 1] + '/' + y;
 }
+// Mês da CAMPANHA do Embaixadores (registro, botão e telas). É o mês do calendário, exceto na
+// prorrogação de outubro/2026 (pedido do Capelão, 30/10): de 01 a 04/11 ainda conta como
+// outubro. IMD, ranking e missões continuam no embMonthKey() do calendário.
+function embMesCampanha() {
+  const d = new Date();
+  return (d >= new Date(2026, 10, 1) && d < new Date(2026, 10, 5)) ? '2026-10' : embMonthKey(d);
+}
 function getMeuEmbaixadoresParticipante() {
   const meuGrupo = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
   if (!meuGrupo) return null;
@@ -6060,7 +6067,7 @@ function getMeuEmbaixadoresParticipante() {
 function confirmarEmbaixadores() {
   const eu = getMeuEmbaixadoresParticipante();
   if (!eu) return;
-  const monthKey = embMonthKey();
+  const monthKey = embMesCampanha();
   if (eu.embaixadores && eu.embaixadores[monthKey] && eu.embaixadores[monthKey].participou) return;
   const agora = new Date();
   eu.embaixadores = {
@@ -6085,7 +6092,7 @@ function renderEmbaixadoresMissoes() {
   const el = document.getElementById('desafios-embaixadores');
   if (!el) return;
 
-  const embMonth = embMonthKey();
+  const embMonth = embMesCampanha();
   const embLabel = embMonthLabel(embMonth);
   const meuGrupo = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
   const euEmb = getMeuEmbaixadoresParticipante();
@@ -6165,7 +6172,7 @@ function embAgostoEntradaHtml() {
       <button onclick="abrirEmbaixadoresAgosto()" style="width:100%;display:flex;align-items:center;gap:10px;text-align:left;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);padding:.7rem .85rem;margin:.4rem 0;cursor:pointer;font-family:var(--ff-body)">
         <span style="font-size:22px;flex-shrink:0">🌟</span>
         <span style="flex:1;min-width:0">
-          <span style="display:block;font-size:15px;font-weight:700;line-height:1.25">Experiência digital de ${EMB_DIGITAL_ENCERRADO ? EMB_DIGITAL_MES_ENCERRADO + '/2026' : embMonthLabel(embMonthKey())}</span>
+          <span style="display:block;font-size:15px;font-weight:700;line-height:1.25">Experiência digital de ${EMB_DIGITAL_ENCERRADO ? EMB_DIGITAL_MES_ENCERRADO + '/2026' : embMonthLabel(embMesCampanha())}</span>
           <span style="display:block;font-size:12.5px;color:rgba(255,255,255,0.6);margin-top:1px">${EMB_DIGITAL_ENCERRADO ? 'Encerrada' : legenda}</span>
         </span>
         <span style="font-size:18px;color:rgba(255,255,255,0.5);flex-shrink:0">›</span>
@@ -6188,7 +6195,9 @@ let EMB_AGO_ETAPA = 0;
 // de setembro ("Construindo pontes"); o registro conta para o mês corrente (embMonthKey).
 // Encerramento PROGRAMADO (pedido do Capelão, 20/10): vale até 31/10/2026 inclusive; a partir
 // de 01/11/2026 00:00 (relógio do aparelho) o botão abre só o aviso abaixo.
-const EMB_DIGITAL_ENCERRADO = new Date() >= new Date(2026, 10, 1);
+// PRORROGADO (pedido do Capelão, 30/10, baixa aderência): vale até 04/11/2026 inclusive; fecha
+// em 05/11/2026 00:00. Os registros de 01 a 04/11 contam como outubro (embMesCampanha).
+const EMB_DIGITAL_ENCERRADO = new Date() >= new Date(2026, 10, 5);
 const EMB_DIGITAL_MES_ENCERRADO = 'outubro';
 function embDigitalEncerradoHtml() {
   return `
@@ -6221,7 +6230,7 @@ function abrirEmbaixadoresAgosto() {
   EMB_AGO_ETAPA = 0;  // a seta de voltar, na etapa 0, sai da tela
   // O cabeçalho vinha fixo em "Agosto" — agora mostra o mês atual (2026-09-24).
   const hdrMes = document.getElementById('emb-ago-hdr-mes');
-  if (hdrMes) hdrMes.textContent = 'Experiência digital · ' + MESES_PT[new Date().getMonth()];
+  if (hdrMes) hdrMes.textContent = 'Experiência digital · ' + embMonthLabel(embMesCampanha()).split('/')[0];
   showScreen('embaixadores-ago');
   renderEmbaixadoresOutubro();
 }
@@ -6237,7 +6246,7 @@ const EMB_OUT_TEMA = 'Como serão seus próximos cinco anos?';
 function embOutubroHtml() {
   const meuGrupo = (typeof loadMeuGrupo === 'function') ? loadMeuGrupo() : null;
   const eu = getMeuEmbaixadoresParticipante();
-  const monthKey = embMonthKey();
+  const monthKey = embMesCampanha();
   const registro = eu && eu.embaixadores ? eu.embaixadores[monthKey] : null;
   const jaRegistrado = !!(registro && registro.participou);
   const selo = embMonthLabel(monthKey).split('/')[0].toUpperCase();
@@ -14277,7 +14286,7 @@ function renderGruposBtnHome() {
   // participação nos Embaixadores do mês, que antes ficava em Desafios do Discipulado. O mês
   // do texto muda sozinho. Para trazer o card de volta: MOSTRAR_CARD_GRUPO_HOME = true.
   const MOSTRAR_CARD_GRUPO_HOME = false;
-  const mesEmb = EMB_DIGITAL_ENCERRADO ? EMB_DIGITAL_MES_ENCERRADO : MESES_PT[new Date().getMonth()];
+  const mesEmb = EMB_DIGITAL_ENCERRADO ? EMB_DIGITAL_MES_ENCERRADO : embMonthLabel(embMesCampanha()).split('/')[0];
   const btnEmbHtml = mgHome ? `
     <button onclick="abrirEmbaixadoresAgosto()" style="width:100%;background:var(--coral);color:#fff;border:none;border-radius:var(--radius);padding:.9rem 1rem;font-size:21px;font-weight:800;line-height:1.15;cursor:pointer;font-family:var(--ff-body)">Embaixadores ${mesEmb}</button>` : '';
   div.innerHTML = (MOSTRAR_CARD_GRUPO_HOME && !MOSTRAR_PROGRESSO_PG_HOME && mgHome) ? htmlCardDoGrupo(mgHome, true) : btnEmbHtml;

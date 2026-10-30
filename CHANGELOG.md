@@ -1,5 +1,12 @@
 # CHANGELOG — Jornada Discipular em Pequenos Grupos
 
+## [2026-10-30] — Embaixadores de outubro prorrogado até 04/11
+
+**Pedido do Capelão (baixa aderência):** o Embaixadores Digital de outubro fica aberto até 04/11/2026 inclusive e fecha sozinho em 05/11 às 00:00 (antes: 01/11).
+
+- De 01 a 04/11 tudo continua como "outubro": botão da Home, tela, Painel por setor e o registro gravado (`2026-10`). Nova função `embMesCampanha()` no app dos PGs; `mesAtual()` com a mesma regra na página dos externos (`embaixadores.html`).
+- IMD, ranking e missões continuam seguindo o mês do calendário (`embMonthKey()`).
+
 ## [2026-10-27] — Logo do Silvestre e ícone do atalho voltam ao azul
 
 **Pedido do Capelão:** o logo e o ícone do atalho voltam às cores anteriores ao 2º ciclo.

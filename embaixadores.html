@@ -106,8 +106,11 @@ const MODO_TESTE = (function () {
 const CHAVE_ESCOLHAS = 'embx_ago_escolhas_v1';
 const CHAVE_REGISTRO = 'embx_ago_registro_v1';
 
+// Mês da campanha. Prorrogação de outubro/2026 (pedido do Capelão, 30/10): de 01 a 04/11
+// ainda conta como outubro — mesma regra do embMesCampanha() do app dos PGs.
 function mesAtual() {
   const d = new Date();
+  if (d >= new Date(2026, 10, 1) && d < new Date(2026, 10, 5)) return '2026-10';
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
 }
 const MESES_PT = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
@@ -124,7 +127,8 @@ function mesLabel(mk) {
 // setembro ("Construindo pontes") foi retirada do caminho (funções seguem no arquivo).
 // Encerramento PROGRAMADO (pedido do Capelão, 20/10): vale até 31/10/2026 inclusive; a partir
 // de 01/11/2026 00:00 (relógio do aparelho) a página mostra só o aviso de encerrado.
-const ENCERRADO = new Date() >= new Date(2026, 10, 1);
+// PRORROGADO (pedido do Capelão, 30/10): vale até 04/11/2026 inclusive; fecha em 05/11 00:00.
+const ENCERRADO = new Date() >= new Date(2026, 10, 5);
 const MES_ENCERRADO = 'outubro';
 const GENIALLY_URL = 'https://view.genially.com/6ad7b168a64fca9aa90fa312';
 const TEMA_MES = 'Como serão seus próximos cinco anos?';
