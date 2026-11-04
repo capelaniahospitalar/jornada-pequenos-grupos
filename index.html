@@ -5329,6 +5329,9 @@ function excluirSetor(grupoNum, nome, setorId) {
   }
   if (!confirm(`Remover "${nomeSetor}" deste Pequeno Grupo? O setor continua cadastrado institucionalmente para outros PGs.`)) return;
   g.setores = (g.setores || []).filter(id => id !== setorId);
+  // 04/11/2026: tirar o ÚLTIMO setor é a única forma legítima de um PG ficar sem setor — avisa a
+  // trava de protegerSetoresContraEsvaziamento() para deixar esta gravação passar.
+  if (!g.setores.length) setoresEsvaziadosDeProposito.add(grupoNum);
   saveGrupos();
   renderTutorGrupoDetalhe(grupoNum, nome);
 }
@@ -12196,6 +12199,10 @@ async function aceitarConvite(inviteId, dadosPessoa) {
       dados, convites: convitesNovos,
       aplicarLocal: () => {
         applyGruposData(dados);
+        // 04/11/2026: mesmo defeito consertado em prepareSaveGrupos em 21/10 — applyGruposData
+        // atualiza a fotografia da nuvem, mas a cópia guardada no aparelho ficava a de antes, e o
+        // próximo loadGrupos() podia trazer setores vazios que passavam por "edição local".
+        saveGruposLocal();
         saveConvitesLocal(convitesNovos);
         upsertVinculo(vinculo);
         setGrupoAberto(g.num);
@@ -13487,7 +13494,29 @@ async function prepareSaveGrupos(cfg) {
     // setores de todos os PGs terem sido apagados de novo em 20–21/10.
     saveGruposLocal();
   }
+  if (remote && protegerSetoresContraEsvaziamento(remote.dados)) saveGruposLocal();
   return { remote, abort: false };
+}
+
+// 04/11/2026 — TRAVA dos setores. Os setores de TODOS os PGs foram apagados na nuvem três vezes
+// (19/10, 21/10 e 03–04/11), a última já com o conserto de 21/10 no ar, sem que se descobrisse
+// qual aparelho gravou. Em vez de depender de achar o caminho, a gravação deixa de poder
+// esvaziar: se a nuvem tem setores num PG e este aparelho mandaria a lista vazia, ficam os da
+// nuvem. Única exceção: o tutor tirou de propósito o último setor (excluirSetor).
+const setoresEsvaziadosDeProposito = new Set();
+function protegerSetoresContraEsvaziamento(remoteDados) {
+  if (!Array.isArray(remoteDados)) return false;
+  let corrigiu = false;
+  PEQUENOS_GRUPOS.forEach(g => {
+    if ((g.setores || []).length) return;
+    const rg = remoteDados.find(x => x && x.num === g.num);
+    if (!rg || !Array.isArray(rg.setores) || !rg.setores.length) return;
+    if (setoresEsvaziadosDeProposito.has(g.num)) return;
+    console.warn('Trava de setores: PG', g.num, 'iria para a nuvem sem setor — mantidos os da nuvem.');
+    g.setores = rg.setores.slice();
+    corrigiu = true;
+  });
+  return corrigiu;
 }
 
 // Grava UMA vez, com pré-condição (trava otimista). Não decide nem re-tenta.
@@ -13562,6 +13591,7 @@ async function saveGruposToFirebase() {
 
       if (res && res.ok) {
         fbLastKnownTs = res.ts;
+        setoresEsvaziadosDeProposito.clear();   // a remoção de propósito já chegou à nuvem
         setFbPendingSync(false);
         recordSync({ resultado: 'ok', tentativas: tentativa, durationMs: Date.now() - inicio });
         return true;
