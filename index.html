@@ -14468,7 +14468,8 @@ function renderMutirao(msg, confirmarId) {
           <div class="mut-pix-chave">${sanitize(MUTIRAO_PIX_GERENCIAS[k].codigo)}</div>
           <button id="mut-pix-copiar-${k}" class="mut-btn-sec" style="margin-top:.6rem;font-size:15px;padding:.6rem" onclick="copiarChavePixMutiraoUI('${k}')">Copiar código PIX</button>
         </div>`).join('') + `
-        <div style="font-size:13px;color:var(--text3);font-family:var(--ff-body);margin:.2rem 0 .4rem">No app do seu banco, escolha <strong>PIX Copia e Cola</strong>, cole o código e confira o recebedor: <strong>${sanitize(MUTIRAO_PIX.recebedor)}</strong>. Digite o valor no banco, transfira e informe abaixo o valor enviado.<br><br>Caso você consiga uma doação de um amigo, copie este mesmo código PIX e envie para a pessoa via WhatsApp, e registre aqui o valor que o amigo enviou.</div>`
+        <div style="font-size:13px;color:var(--text3);font-family:var(--ff-body);margin:.2rem 0 .4rem">No app do seu banco, escolha <strong>PIX Copia e Cola</strong>, cole o código e confira o recebedor: <strong>${sanitize(MUTIRAO_PIX.recebedor)}</strong>. Digite o valor no banco, transfira e informe abaixo o valor enviado.</div>
+        <div style="font-size:14.5px;font-weight:600;color:var(--text2);font-family:var(--ff-body);margin:.7rem 0 .35rem">Valor que você enviou (seu ou de um amigo)</div>`
         : `<div style="font-size:14.5px;color:var(--text2);font-family:var(--ff-body);margin-bottom:.6rem">O código PIX do setor do seu Pequeno Grupo ainda não foi cadastrado. Fale com a Capelania.</div>`}
         ${gerPix.length ? `
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:.35rem">
@@ -14477,7 +14478,8 @@ function renderMutirao(msg, confirmarId) {
                  maxlength="9" placeholder="0,00" value="${sanitize(pixDigitado)}" onkeydown="if(event.key==='Enter')registrarPixMutiraoUI()">
         </div>
         <div id="mut-pix-aviso" style="font-size:13.5px;color:var(--coral);font-family:var(--ff-body);min-height:19px;margin-bottom:.5rem"></div>
-        <button id="mut-pix-btn" class="mut-btn" onclick="registrarPixMutiraoUI()">Confirmar PIX</button>` : ''}
+        <button id="mut-pix-btn" class="mut-btn" onclick="registrarPixMutiraoUI()">Confirmar PIX</button>
+        <div style="font-size:13px;color:var(--text3);font-family:var(--ff-body);margin-top:.8rem">Caso você consiga uma doação de um amigo, copie este mesmo código PIX e envie para a pessoa via WhatsApp, e registre aqui o valor que o amigo enviou.</div>` : ''}
       </div>` : ''}
     </div>
 
