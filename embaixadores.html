@@ -106,11 +106,11 @@ const MODO_TESTE = (function () {
 const CHAVE_ESCOLHAS = 'embx_ago_escolhas_v1';
 const CHAVE_REGISTRO = 'embx_ago_registro_v1';
 
-// Mês da campanha. Prorrogação de outubro/2026 (pedido do Capelão, 30/10): de 01 a 04/11
-// ainda conta como outubro — mesma regra do embMesCampanha() do app dos PGs.
+// Mês da campanha. Prorrogação de novembro/2026 (pedido de 27/11): de 01 a 02/12 ainda conta
+// como novembro — mesma regra do embMesCampanha() do app dos PGs. (A de outubro já venceu.)
 function mesAtual() {
   const d = new Date();
-  if (d >= new Date(2026, 10, 1) && d < new Date(2026, 10, 5)) return '2026-10';
+  if (d >= new Date(2026, 11, 1) && d < new Date(2026, 11, 3)) return '2026-11';
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
 }
 const MESES_PT = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
@@ -128,11 +128,15 @@ function mesLabel(mk) {
 // Encerramento PROGRAMADO (pedido do Capelão, 20/10): vale até 31/10/2026 inclusive; a partir
 // de 01/11/2026 00:00 (relógio do aparelho) a página mostra só o aviso de encerrado.
 // PRORROGADO (pedido do Capelão, 30/10): vale até 04/11/2026 inclusive; fecha em 05/11 00:00.
-const ENCERRADO = new Date() >= new Date(2026, 10, 5);
-const MES_ENCERRADO = 'outubro';
-const GENIALLY_URL = 'https://view.genially.com/6ad7b168a64fca9aa90fa312';
-const TEMA_MES = 'Como serão seus próximos cinco anos?';
-const ROTULO_REGISTRAR = '✅ Li o conteúdo e assisti ao pequeno vídeo<span style="display:block;font-size:15px;font-weight:600;font-style:italic;margin-top:4px">Acreditamos em sua palavra.</span>';
+// 2026-11-27: REABERTO para novembro com o vídeo do YouTube "OQQHÁ? - Infelicidade"; vale até
+// 02/12/2026 inclusive e fecha em 03/12/2026 00:00. O iframe usa o endereço "embed"; o botão
+// de tela cheia abre o vídeo no YouTube.
+const ENCERRADO = new Date() >= new Date(2026, 11, 3);
+const MES_ENCERRADO = 'novembro';
+const GENIALLY_URL = 'https://www.youtube.com/embed/SG1YadXdbdY';
+const LINK_EXTERNO = 'https://youtu.be/SG1YadXdbdY';
+const TEMA_MES = 'Infelicidade';
+const ROTULO_REGISTRAR = '✅ Assisti ao vídeo<span style="display:block;font-size:15px;font-weight:600;font-style:italic;margin-top:4px">Acreditamos em sua palavra.</span>';
 document.title = 'Embaixadores da Esperança — ' + (ENCERRADO ? MES_ENCERRADO + '/2026' : mesLabel(mesAtual()));
 function sanitize(s) {
   return String(s == null ? '' : s).replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
@@ -722,10 +726,10 @@ function outubroHtml() {
       <div style="font-family:var(--ff-serif);font-style:italic;font-size:20px;color:var(--gold-mid);margin-top:.55rem">${TEMA_MES}</div>
     </div>`;
   const genially = `
-      <div style="position:relative;width:100%;padding-bottom:75%;border-radius:var(--radius-sm);overflow:hidden;background:#000">
-        <iframe src="${GENIALLY_URL}" title="${TEMA_MES}" allowfullscreen allow="autoplay; fullscreen" style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>
+      <div style="position:relative;width:100%;padding-bottom:56.25%;border-radius:var(--radius-sm);overflow:hidden;background:#000">
+        <iframe src="${GENIALLY_URL}" title="${TEMA_MES}" allowfullscreen allow="autoplay; fullscreen; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>
       </div>
-      <a href="${GENIALLY_URL}" target="_blank" rel="noopener" style="display:block;text-align:center;background:var(--blue);color:#fff;text-decoration:none;border-radius:var(--radius-sm);padding:1.5rem 1rem;font-size:32px;font-weight:800;line-height:1.15">⛶ ABRIR EM TELA CHEIA</a>`;
+      <a href="${LINK_EXTERNO}" target="_blank" rel="noopener" style="display:block;text-align:center;background:var(--blue);color:#fff;text-decoration:none;border-radius:var(--radius-sm);padding:1.5rem 1rem;font-size:32px;font-weight:800;line-height:1.15">⛶ ABRIR EM TELA CHEIA</a>`;
   if (registro && registro.monthKey === mesAtual()) {
     return topo + `
     <div style="padding:1rem;display:flex;flex-direction:column;gap:1rem">
@@ -743,7 +747,7 @@ function outubroHtml() {
   return topo + `
     <div style="padding:1rem;display:flex;flex-direction:column;gap:1rem">
       ${genially}
-      <p style="margin:0;text-align:center;font-size:15px;color:var(--text2);line-height:1.5">Passe por todas as páginas e assista ao vídeo do final. Depois, preencha e confirme abaixo.</p>
+      <p style="margin:0;text-align:center;font-size:15px;color:var(--text2);line-height:1.5">Assista ao vídeo até o final. Depois, preencha e confirme abaixo.</p>
       <div class="content-card">
         <div style="margin-bottom:.9rem">
           <label class="rotulo-campo" for="campo-nome">Seu nome</label>
